@@ -19,7 +19,6 @@ use Exception;
  * - The driver class specified in configuration does not exist
  * - No default driver is configured when calling driver() without arguments
  *
- * @package Voxyfy\AnadoluPay\Exceptions
  *
  * @example
  * // This exception would be thrown if 'iyzico' is not configured:
@@ -35,11 +34,10 @@ class DriverNotFoundException extends Exception
     /**
      * Create a new Driver Not Found exception instance.
      *
-     * @param string $message The exception message describing which driver
-     *                        was not found and potential solutions
-     * @param int $code The exception code (default: 0)
-     * @param \Throwable|null $previous The previous throwable for exception chaining
-     *
+     * @param  string  $message  The exception message describing which driver
+     *                           was not found and potential solutions
+     * @param  int  $code  The exception code (default: 0)
+     * @param  \Throwable|null  $previous  The previous throwable for exception chaining
      * @return void
      */
     public function __construct(

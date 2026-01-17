@@ -12,16 +12,13 @@ use Voxyfy\AnadoluPay\AnadoluPayServiceProvider;
  *
  * Provides the foundation for all package tests, configuring
  * the Laravel testing environment with the AnadoluPay service provider.
- *
- * @package Voxyfy\AnadoluPay\Tests
  */
 class TestCase extends Orchestra
 {
     /**
      * Get the service providers for the package.
      *
-     * @param \Illuminate\Foundation\Application $app
-     *
+     * @param  \Illuminate\Foundation\Application  $app
      * @return array<int, class-string>
      */
     protected function getPackageProviders($app): array
@@ -34,9 +31,7 @@ class TestCase extends Orchestra
     /**
      * Define environment setup.
      *
-     * @param \Illuminate\Foundation\Application $app
-     *
-     * @return void
+     * @param  \Illuminate\Foundation\Application  $app
      */
     public function getEnvironmentSetUp($app): void
     {

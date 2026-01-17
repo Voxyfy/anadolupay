@@ -6,8 +6,6 @@
  * This configuration file defines the settings for the AnadoluPay payment gateway
  * abstraction package. It allows you to configure multiple payment providers
  * and set a default driver for handling payments.
- *
- * @package Voxyfy\AnadoluPay
  */
 
 return [

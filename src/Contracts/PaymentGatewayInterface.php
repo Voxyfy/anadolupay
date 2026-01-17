@@ -16,8 +16,6 @@ use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
  *
  * All gateway implementations should handle provider-specific logic internally
  * while exposing this standardized interface to the application.
- *
- * @package Voxyfy\AnadoluPay\Contracts
  */
 interface PaymentGatewayInterface
 {
@@ -40,20 +38,19 @@ interface PaymentGatewayInterface
      * - 'callback_url': string URL for payment notifications
      * - 'return_url': string URL to redirect after payment
      *
-     * @param array<string, mixed> $data Payment data containing transaction details.
-     *                                    Required and optional fields depend on
-     *                                    the gateway implementation.
-     *
+     * @param  array<string, mixed>  $data  Payment data containing transaction details.
+     *                                      Required and optional fields depend on
+     *                                      the gateway implementation.
      * @return array<string, mixed> Payment response containing:
-     *                               - 'success': bool Whether payment was initiated
-     *                               - 'transaction_id': string Provider's transaction ID
-     *                               - 'status': string Payment status
-     *                               - 'redirect_url': string|null URL for 3D Secure redirect
-     *                               - 'raw_response': array Original provider response
+     *                              - 'success': bool Whether payment was initiated
+     *                              - 'transaction_id': string Provider's transaction ID
+     *                              - 'status': string Payment status
+     *                              - 'redirect_url': string|null URL for 3D Secure redirect
+     *                              - 'raw_response': array Original provider response
      *
      * @throws PaymentFailedException When the payment cannot be processed
-     *                                 due to validation errors, provider errors,
-     *                                 or connectivity issues
+     *                                due to validation errors, provider errors,
+     *                                or connectivity issues
      *
      * @example
      * $result = $gateway->createPayment([
@@ -75,28 +72,27 @@ interface PaymentGatewayInterface
      * with the payment provider. This method should be called after
      * receiving a callback or when checking payment status.
      *
-     * @param string $transactionId The unique transaction identifier returned
-     *                               by the payment provider during createPayment()
-     *                               or received in callback notifications.
-     * @param array<string, mixed> $data Additional verification data that may be
-     *                                    required by specific providers, such as:
-     *                                    - 'hash': string Verification hash from callback
-     *                                    - 'order_id': string Original order ID
-     *                                    - 'amount': float Expected amount for validation
-     *
+     * @param  string  $transactionId  The unique transaction identifier returned
+     *                                 by the payment provider during createPayment()
+     *                                 or received in callback notifications.
+     * @param  array<string, mixed>  $data  Additional verification data that may be
+     *                                      required by specific providers, such as:
+     *                                      - 'hash': string Verification hash from callback
+     *                                      - 'order_id': string Original order ID
+     *                                      - 'amount': float Expected amount for validation
      * @return array<string, mixed> Verification response containing:
-     *                               - 'verified': bool Whether payment is verified
-     *                               - 'status': string Current payment status
-     *                                           (completed, pending, failed, etc.)
-     *                               - 'transaction_id': string Provider's transaction ID
-     *                               - 'amount': float Verified payment amount
-     *                               - 'currency': string Payment currency
-     *                               - 'paid_at': string|null Payment completion timestamp
-     *                               - 'raw_response': array Original provider response
+     *                              - 'verified': bool Whether payment is verified
+     *                              - 'status': string Current payment status
+     *                              (completed, pending, failed, etc.)
+     *                              - 'transaction_id': string Provider's transaction ID
+     *                              - 'amount': float Verified payment amount
+     *                              - 'currency': string Payment currency
+     *                              - 'paid_at': string|null Payment completion timestamp
+     *                              - 'raw_response': array Original provider response
      *
      * @throws PaymentFailedException When verification fails due to
-     *                                 invalid transaction, provider errors,
-     *                                 or connectivity issues
+     *                                invalid transaction, provider errors,
+     *                                or connectivity issues
      *
      * @example
      * $result = $gateway->verify('TXN-123456', [
@@ -116,27 +112,26 @@ interface PaymentGatewayInterface
      * Not all payment providers support partial refunds; check provider
      * documentation for specific capabilities.
      *
-     * @param string $transactionId The unique transaction identifier of the
-     *                               original payment to be refunded.
-     * @param array<string, mixed> $data Refund data containing:
-     *                                    - 'amount': float|null Refund amount. If null or
-     *                                                not provided, full refund is processed.
-     *                                    - 'reason': string|null Reason for the refund
-     *                                    - 'reference': string|null Your internal refund reference
-     *
+     * @param  string  $transactionId  The unique transaction identifier of the
+     *                                 original payment to be refunded.
+     * @param  array<string, mixed>  $data  Refund data containing:
+     *                                      - 'amount': float|null Refund amount. If null or
+     *                                      not provided, full refund is processed.
+     *                                      - 'reason': string|null Reason for the refund
+     *                                      - 'reference': string|null Your internal refund reference
      * @return array<string, mixed> Refund response containing:
-     *                               - 'success': bool Whether refund was processed
-     *                               - 'refund_id': string Provider's refund ID
-     *                               - 'transaction_id': string Original transaction ID
-     *                               - 'amount': float Refunded amount
-     *                               - 'status': string Refund status
-     *                               - 'raw_response': array Original provider response
+     *                              - 'success': bool Whether refund was processed
+     *                              - 'refund_id': string Provider's refund ID
+     *                              - 'transaction_id': string Original transaction ID
+     *                              - 'amount': float Refunded amount
+     *                              - 'status': string Refund status
+     *                              - 'raw_response': array Original provider response
      *
      * @throws PaymentFailedException When refund cannot be processed due to
-     *                                 invalid transaction, insufficient funds,
-     *                                 provider errors, or connectivity issues
+     *                                invalid transaction, insufficient funds,
+     *                                provider errors, or connectivity issues
      * @throws UnsupportedOperationException When the payment provider or specific
-     *                                        payment method does not support refunds
+     *                                       payment method does not support refunds
      *
      * @example
      * // Full refund

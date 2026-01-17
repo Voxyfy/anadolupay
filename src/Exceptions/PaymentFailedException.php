@@ -25,7 +25,6 @@ use Exception;
  * - Invalid transaction data
  * - Expired or invalid transaction for verification/refund
  *
- * @package Voxyfy\AnadoluPay\Exceptions
  *
  * @example
  * try {
@@ -48,8 +47,6 @@ class PaymentFailedException extends Exception
 {
     /**
      * The error code returned by the payment provider.
-     *
-     * @var string|null
      */
     protected ?string $errorCode = null;
 
@@ -62,19 +59,16 @@ class PaymentFailedException extends Exception
 
     /**
      * A user-friendly error message suitable for display.
-     *
-     * @var string|null
      */
     protected ?string $userMessage = null;
 
     /**
      * Create a new Payment Failed exception instance.
      *
-     * @param string $message The technical exception message describing
-     *                        the failure reason
-     * @param int $code The exception code (default: 0)
-     * @param \Throwable|null $previous The previous throwable for exception chaining
-     *
+     * @param  string  $message  The technical exception message describing
+     *                           the failure reason
+     * @param  int  $code  The exception code (default: 0)
+     * @param  \Throwable|null  $previous  The previous throwable for exception chaining
      * @return void
      */
     public function __construct(
@@ -88,8 +82,7 @@ class PaymentFailedException extends Exception
     /**
      * Set the error code from the payment provider.
      *
-     * @param string $errorCode The provider-specific error code
-     *
+     * @param  string  $errorCode  The provider-specific error code
      * @return static Returns the exception instance for method chaining
      */
     public function setErrorCode(string $errorCode): static
@@ -115,8 +108,7 @@ class PaymentFailedException extends Exception
      * Stores the complete response from the payment provider for
      * debugging and detailed error analysis.
      *
-     * @param array<string, mixed> $response The complete provider response array
-     *
+     * @param  array<string, mixed>  $response  The complete provider response array
      * @return static Returns the exception instance for method chaining
      */
     public function setProviderResponse(array $response): static
@@ -142,8 +134,7 @@ class PaymentFailedException extends Exception
      * This message should be safe to display to end users and should
      * not contain sensitive technical details or provider-specific codes.
      *
-     * @param string $message A user-friendly message suitable for display
-     *
+     * @param  string  $message  A user-friendly message suitable for display
      * @return static Returns the exception instance for method chaining
      */
     public function setUserMessage(string $message): static
@@ -171,12 +162,11 @@ class PaymentFailedException extends Exception
      *
      * Factory method for creating a fully populated exception in a single call.
      *
-     * @param string $message The technical exception message
-     * @param string|null $errorCode The provider-specific error code
-     * @param array<string, mixed> $providerResponse The raw provider response
-     * @param string|null $userMessage The user-friendly message
-     * @param \Throwable|null $previous The previous throwable
-     *
+     * @param  string  $message  The technical exception message
+     * @param  string|null  $errorCode  The provider-specific error code
+     * @param  array<string, mixed>  $providerResponse  The raw provider response
+     * @param  string|null  $userMessage  The user-friendly message
+     * @param  \Throwable|null  $previous  The previous throwable
      * @return static A fully configured exception instance
      *
      * @example
@@ -200,7 +190,7 @@ class PaymentFailedException extends Exception
             $exception->setErrorCode($errorCode);
         }
 
-        if (!empty($providerResponse)) {
+        if (! empty($providerResponse)) {
             $exception->setProviderResponse($providerResponse);
         }
 

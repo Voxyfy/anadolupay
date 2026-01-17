@@ -12,8 +12,6 @@ use Illuminate\Support\ServiceProvider;
  * This service provider is responsible for bootstrapping the AnadoluPay package
  * within a Laravel application. It handles configuration publishing, service
  * container bindings, and package initialization.
- *
- * @package Voxyfy\AnadoluPay
  */
 class AnadoluPayServiceProvider extends ServiceProvider
 {
@@ -23,13 +21,11 @@ class AnadoluPayServiceProvider extends ServiceProvider
      * This method is called during the registration phase of the service provider.
      * It binds the AnadoluPay class to the service container as a singleton,
      * ensuring only one instance exists throughout the application lifecycle.
-     *
-     * @return void
      */
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/anadolupay.php',
+            __DIR__.'/../config/anadolupay.php',
             'anadolupay'
         );
 
@@ -46,13 +42,11 @@ class AnadoluPayServiceProvider extends ServiceProvider
      * This method is called after all service providers have been registered.
      * It publishes the configuration file to the application's config directory,
      * allowing users to customize the package settings.
-     *
-     * @return void
      */
     public function boot(): void
     {
         $this->publishes([
-            __DIR__ . '/../config/anadolupay.php' => config_path('anadolupay.php'),
+            __DIR__.'/../config/anadolupay.php' => config_path('anadolupay.php'),
         ], 'anadolupay-config');
     }
 

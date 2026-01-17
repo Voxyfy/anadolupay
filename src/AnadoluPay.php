@@ -14,7 +14,6 @@ use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
  * This class manages payment gateway drivers and provides a unified interface
  * for interacting with different Turkish payment providers.
  *
- * @package Voxyfy\AnadoluPay
  *
  * @example
  * // Get the default driver
@@ -49,10 +48,9 @@ class AnadoluPay
      * The configuration should include the 'default' driver name and
      * a 'drivers' array with individual driver configurations.
      *
-     * @param array<string, mixed> $config The package configuration array containing:
-     *                                      - 'default': string|null The default driver name
-     *                                      - 'drivers': array Driver-specific configurations
-     *
+     * @param  array<string, mixed>  $config  The package configuration array containing:
+     *                                        - 'default': string|null The default driver name
+     *                                        - 'drivers': array Driver-specific configurations
      * @return void
      */
     public function __construct(array $config)
@@ -67,14 +65,13 @@ class AnadoluPay
      * is provided, the default driver from configuration will be used.
      * Driver instances are cached for reuse within the same request.
      *
-     * @param string|null $name The name of the driver to retrieve. If null,
-     *                          uses the default driver from configuration.
-     *                          Must match a key in the 'drivers' config array.
-     *
+     * @param  string|null  $name  The name of the driver to retrieve. If null,
+     *                             uses the default driver from configuration.
+     *                             Must match a key in the 'drivers' config array.
      * @return PaymentGatewayInterface The resolved payment gateway instance
      *
      * @throws DriverNotFoundException When the requested driver is not configured
-     *                                  or the driver class does not exist
+     *                                 or the driver class does not exist
      *
      * @example
      * // Using the default driver
@@ -115,10 +112,9 @@ class AnadoluPay
      * Retrieves the configuration array for a named driver from
      * the 'drivers' section of the package configuration.
      *
-     * @param string $name The driver name to get configuration for
-     *
+     * @param  string  $name  The driver name to get configuration for
      * @return array<string, mixed>|null The driver configuration array,
-     *                                    or null if not found
+     *                                   or null if not found
      */
     public function getDriverConfig(string $name): ?array
     {
@@ -131,12 +127,11 @@ class AnadoluPay
      * Creates and returns a new instance of the specified payment gateway
      * driver. The driver class is determined from the driver configuration.
      *
-     * @param string $name The name of the driver to resolve
-     *
+     * @param  string  $name  The name of the driver to resolve
      * @return PaymentGatewayInterface The resolved payment gateway instance
      *
      * @throws DriverNotFoundException When the driver configuration is missing
-     *                                  or the driver class is not specified
+     *                                 or the driver class is not specified
      */
     protected function resolve(string $name): PaymentGatewayInterface
     {
@@ -156,7 +151,7 @@ class AnadoluPay
             );
         }
 
-        if (!class_exists($driverClass)) {
+        if (! class_exists($driverClass)) {
             throw new DriverNotFoundException(
                 "Payment driver class [{$driverClass}] does not exist."
             );
@@ -184,8 +179,7 @@ class AnadoluPay
      * Determines whether a specific driver has been configured
      * in the package configuration.
      *
-     * @param string $name The driver name to check
-     *
+     * @param  string  $name  The driver name to check
      * @return bool True if the driver is configured, false otherwise
      */
     public function hasDriver(string $name): bool

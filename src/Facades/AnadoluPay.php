@@ -15,7 +15,6 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
  * throughout your Laravel application without needing to inject the
  * AnadoluPay instance.
  *
- * @package Voxyfy\AnadoluPay\Facades
  *
  * @method static PaymentGatewayInterface driver(string|null $name = null) Get a payment gateway driver instance
  * @method static string|null getDefaultDriver() Get the default driver name
