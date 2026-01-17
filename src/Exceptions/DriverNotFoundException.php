@@ -7,41 +7,40 @@ namespace Voxyfy\AnadoluPay\Exceptions;
 use Exception;
 
 /**
- * Driver Not Found Exception
+ * Driver Bulunamadı Exception
  *
- * Thrown when attempting to use a payment gateway driver that has not been
- * configured or does not exist. This exception indicates a configuration
- * issue that should be resolved before the application can process payments.
+ * Yapılandırılmamış veya mevcut olmayan bir ödeme geçidi driver'ı
+ * kullanılmaya çalışıldığında fırlatılır. Bu exception, uygulamanın
+ * ödeme işlemlerini gerçekleştirebilmesi için çözülmesi gereken
+ * bir yapılandırma sorununu gösterir.
  *
- * Common causes:
- * - The requested driver name is misspelled
- * - The driver has not been added to the 'drivers' array in anadolupay.php
- * - The driver class specified in configuration does not exist
- * - No default driver is configured when calling driver() without arguments
- *
+ * Yaygın nedenler:
+ * - İstenen driver adı yanlış yazılmış
+ * - Driver, anadolupay.php'deki 'drivers' dizisine eklenmemiş
+ * - Yapılandırmada belirtilen driver sınıfı mevcut değil
+ * - driver() argümansız çağrıldığında varsayılan driver yapılandırılmamış
  *
  * @example
- * // This exception would be thrown if 'iyzico' is not configured:
+ * // 'iyzico' yapılandırılmamışsa bu exception fırlatılır:
  * try {
  *     $gateway = AnadoluPay::driver('iyzico');
  * } catch (DriverNotFoundException $e) {
- *     // Handle missing driver configuration
- *     Log::error('Payment driver not configured: ' . $e->getMessage());
+ *     // Eksik driver yapılandırmasını ele al
+ *     Log::error('Ödeme driver\'ı yapılandırılmamış: ' . $e->getMessage());
  * }
  */
 class DriverNotFoundException extends Exception
 {
     /**
-     * Create a new Driver Not Found exception instance.
+     * Yeni bir Driver Bulunamadı exception instance'ı oluşturur.
      *
-     * @param  string  $message  The exception message describing which driver
-     *                           was not found and potential solutions
-     * @param  int  $code  The exception code (default: 0)
-     * @param  \Throwable|null  $previous  The previous throwable for exception chaining
-     * @return void
+     * @param  string  $message  Hangi driver'ın bulunamadığını ve olası
+     *                           çözümleri açıklayan exception mesajı
+     * @param  int  $code  Exception kodu (varsayılan: 0)
+     * @param  \Throwable|null  $previous  Exception zincirleme için önceki throwable
      */
     public function __construct(
-        string $message = 'The requested payment driver was not found.',
+        string $message = 'İstenen ödeme driver\'ı bulunamadı.',
         int $code = 0,
         ?\Throwable $previous = null
     ) {

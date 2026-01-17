@@ -7,54 +7,52 @@ namespace Voxyfy\AnadoluPay\Exceptions;
 use Exception;
 
 /**
- * Unsupported Operation Exception
+ * Desteklenmeyen İşlem Exception
  *
- * Thrown when attempting to perform an operation that is not supported
- * by a specific payment gateway driver. Not all payment providers support
- * all operations (e.g., some may not support refunds or partial refunds).
+ * Belirli bir ödeme geçidi driver'ı tarafından desteklenmeyen bir işlem
+ * gerçekleştirilmeye çalışıldığında fırlatılır. Tüm ödeme sağlayıcıları
+ * tüm işlemleri desteklemez (örn: bazıları iade veya kısmi iade desteklemez).
  *
- * This exception helps differentiate between operational failures and
- * feature limitations of specific payment providers.
+ * Bu exception, operasyonel hatalar ile belirli ödeme sağlayıcılarının
+ * özellik sınırlamalarını ayırt etmeye yardımcı olur.
  *
- * Common scenarios:
- * - Attempting to refund a payment on a provider that doesn't support refunds
- * - Requesting partial refund when only full refunds are supported
- * - Using a payment method not supported by the gateway
- * - Attempting recurring payments on a non-supporting provider
- *
+ * Yaygın senaryolar:
+ * - İade desteklemeyen bir sağlayıcıda iade yapılmaya çalışılması
+ * - Sadece tam iade desteklenirken kısmi iade istenmesi
+ * - Gateway tarafından desteklenmeyen bir ödeme yöntemi kullanılması
+ * - Desteklemeyen bir sağlayıcıda tekrarlayan ödeme yapılmaya çalışılması
  *
  * @example
  * try {
  *     $gateway->refund($transactionId, ['amount' => 50.00]);
  * } catch (UnsupportedOperationException $e) {
- *     // This provider may not support partial refunds
- *     // Consider offering full refund or alternative solution
- *     Log::warning('Partial refund not supported: ' . $e->getMessage());
+ *     // Bu sağlayıcı kısmi iadeyi desteklemiyor olabilir
+ *     // Tam iade veya alternatif çözüm sun
+ *     Log::warning('Kısmi iade desteklenmiyor: ' . $e->getMessage());
  * }
  */
 class UnsupportedOperationException extends Exception
 {
     /**
-     * The name of the payment gateway driver.
+     * Ödeme geçidi driver'ının adı.
      */
     protected ?string $driverName = null;
 
     /**
-     * The name of the unsupported operation.
+     * Desteklenmeyen işlemin adı.
      */
     protected ?string $operationName = null;
 
     /**
-     * Create a new Unsupported Operation exception instance.
+     * Yeni bir Desteklenmeyen İşlem exception instance'ı oluşturur.
      *
-     * @param  string  $message  The exception message describing the unsupported
-     *                           operation and the gateway that doesn't support it
-     * @param  int  $code  The exception code (default: 0)
-     * @param  \Throwable|null  $previous  The previous throwable for exception chaining
-     * @return void
+     * @param  string  $message  Desteklenmeyen işlemi ve onu desteklemeyen
+     *                           gateway'i açıklayan exception mesajı
+     * @param  int  $code  Exception kodu (varsayılan: 0)
+     * @param  \Throwable|null  $previous  Exception zincirleme için önceki throwable
      */
     public function __construct(
-        string $message = 'This operation is not supported by the payment gateway.',
+        string $message = 'Bu işlem ödeme geçidi tarafından desteklenmiyor.',
         int $code = 0,
         ?\Throwable $previous = null
     ) {
@@ -62,10 +60,10 @@ class UnsupportedOperationException extends Exception
     }
 
     /**
-     * Set the driver name that doesn't support the operation.
+     * İşlemi desteklemeyen driver adını ayarlar.
      *
-     * @param  string  $driverName  The name of the payment gateway driver
-     * @return static Returns the exception instance for method chaining
+     * @param  string  $driverName  Ödeme geçidi driver'ının adı
+     * @return static Metot zincirleme için exception instance'ı döndürür
      */
     public function setDriverName(string $driverName): static
     {
@@ -75,9 +73,9 @@ class UnsupportedOperationException extends Exception
     }
 
     /**
-     * Get the driver name that doesn't support the operation.
+     * İşlemi desteklemeyen driver adını döndürür.
      *
-     * @return string|null The driver name, or null if not set
+     * @return string|null Driver adı, ayarlanmamışsa null
      */
     public function getDriverName(): ?string
     {
@@ -85,11 +83,11 @@ class UnsupportedOperationException extends Exception
     }
 
     /**
-     * Set the name of the unsupported operation.
+     * Desteklenmeyen işlemin adını ayarlar.
      *
-     * @param  string  $operationName  The name of the operation that failed
-     *                                 (e.g., 'refund', 'partial_refund', 'recurring')
-     * @return static Returns the exception instance for method chaining
+     * @param  string  $operationName  Başarısız olan işlemin adı
+     *                                 (örn: 'refund', 'partial_refund', 'recurring')
+     * @return static Metot zincirleme için exception instance'ı döndürür
      */
     public function setOperationName(string $operationName): static
     {
@@ -99,9 +97,9 @@ class UnsupportedOperationException extends Exception
     }
 
     /**
-     * Get the name of the unsupported operation.
+     * Desteklenmeyen işlemin adını döndürür.
      *
-     * @return string|null The operation name, or null if not set
+     * @return string|null İşlem adı, ayarlanmamışsa null
      */
     public function getOperationName(): ?string
     {

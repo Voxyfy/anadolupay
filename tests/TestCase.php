@@ -8,15 +8,15 @@ use Orchestra\Testbench\TestCase as Orchestra;
 use Voxyfy\AnadoluPay\AnadoluPayServiceProvider;
 
 /**
- * Base Test Case
+ * Temel Test Sınıfı
  *
- * Provides the foundation for all package tests, configuring
- * the Laravel testing environment with the AnadoluPay service provider.
+ * Tüm paket testleri için temel oluşturur ve Laravel test ortamını
+ * AnadoluPay service provider ile yapılandırır.
  */
 class TestCase extends Orchestra
 {
     /**
-     * Get the service providers for the package.
+     * Paket için service provider'ları döndürür.
      *
      * @param  \Illuminate\Foundation\Application  $app
      * @return array<int, class-string>
@@ -29,7 +29,7 @@ class TestCase extends Orchestra
     }
 
     /**
-     * Define environment setup.
+     * Ortam ayarlarını tanımlar.
      *
      * @param  \Illuminate\Foundation\Application  $app
      */

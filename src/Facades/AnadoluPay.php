@@ -10,43 +10,41 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 /**
  * AnadoluPay Facade
  *
- * Provides a static interface to the AnadoluPay payment gateway manager.
- * This facade allows convenient access to payment gateway functionality
- * throughout your Laravel application without needing to inject the
- * AnadoluPay instance.
+ * AnadoluPay ödeme geçidi yöneticisine statik bir arayüz sağlar.
+ * Bu facade, Laravel uygulamanız boyunca AnadoluPay instance'ını
+ * enjekte etmeden ödeme geçidi işlevlerine kolay erişim sağlar.
  *
- *
- * @method static PaymentGatewayInterface driver(string|null $name = null) Get a payment gateway driver instance
- * @method static string|null getDefaultDriver() Get the default driver name
- * @method static array|null getDriverConfig(string $name) Get configuration for a specific driver
- * @method static array getAvailableDrivers() Get all registered driver names
- * @method static bool hasDriver(string $name) Check if a driver is configured
+ * @method static PaymentGatewayInterface driver(string|null $name = null) Ödeme geçidi driver instance'ı döndürür
+ * @method static string|null getDefaultDriver() Varsayılan driver adını döndürür
+ * @method static array|null getDriverConfig(string $name) Belirli bir driver için yapılandırmayı döndürür
+ * @method static array getAvailableDrivers() Tüm kayıtlı driver adlarını döndürür
+ * @method static bool hasDriver(string $name) Driver'ın yapılandırılıp yapılandırılmadığını kontrol eder
  *
  * @see \Voxyfy\AnadoluPay\AnadoluPay
  *
  * @example
- * // Get the default payment gateway driver
+ * // Varsayılan ödeme geçidi driver'ını al
  * $gateway = AnadoluPay::driver();
  *
- * // Get a specific payment gateway driver
+ * // Belirli bir ödeme geçidi driver'ını al
  * $gateway = AnadoluPay::driver('iyzico');
  *
- * // Create a payment using the default driver
- * $result = AnadoluPay::driver()->createPayment($paymentData);
+ * // Varsayılan driver ile ödeme oluştur
+ * $sonuc = AnadoluPay::driver()->createPayment($odemeVerisi);
  *
- * // Check available drivers
+ * // Mevcut driver'ları kontrol et
  * $drivers = AnadoluPay::getAvailableDrivers();
  */
 class AnadoluPay extends Facade
 {
     /**
-     * Get the registered name of the component.
+     * Bileşenin kayıtlı adını döndürür.
      *
-     * Returns the service container binding key that this facade
-     * proxies to. The AnadoluPay class is registered as a singleton
-     * in the service provider.
+     * Bu facade'in proxy yaptığı service container bağlama anahtarını
+     * döndürür. AnadoluPay sınıfı, service provider'da singleton
+     * olarak kaydedilmiştir.
      *
-     * @return string The service container binding key
+     * @return string Service container bağlama anahtarı
      */
     protected static function getFacadeAccessor(): string
     {

@@ -4,95 +4,95 @@
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/voxyfy/anadolupay/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/voxyfy/anadolupay/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/voxyfy/anadolupay.svg?style=flat-square)](https://packagist.org/packages/voxyfy/anadolupay)
 
-A unified Laravel 12 payment gateway abstraction for Turkish payment providers. AnadoluPay provides a clean, consistent API for integrating multiple Turkish payment gateways into your Laravel application.
+Laravel 12 için birleşik Türk ödeme geçidi soyutlama paketi. AnadoluPay, birden fazla Türk ödeme sağlayıcısını Laravel uygulamanıza entegre etmek için temiz ve tutarlı bir API sunar.
 
-## Requirements
+## Gereksinimler
 
-- PHP 8.2 or higher
+- PHP 8.2 veya üzeri
 - Laravel 12.x
 
-## Installation
+## Kurulum
 
-Install the package via Composer:
+Paketi Composer ile yükleyin:
 
 ```bash
 composer require voxyfy/anadolupay
 ```
 
-Publish the configuration file:
+Yapılandırma dosyasını yayınlayın:
 
 ```bash
 php artisan vendor:publish --tag="anadolupay-config"
 ```
 
-## Configuration
+## Yapılandırma
 
-After publishing, the configuration file will be located at `config/anadolupay.php`:
+Yayınladıktan sonra yapılandırma dosyası `config/anadolupay.php` konumunda olacaktır:
 
 ```php
 return [
-    // Default payment driver
+    // Varsayılan ödeme driver'ı
     'default' => env('ANADOLUPAY_DRIVER', null),
 
-    // Payment gateway drivers
+    // Ödeme geçidi driver'ları
     'drivers' => [
-        // Configure your payment providers here
+        // Ödeme sağlayıcılarınızı burada yapılandırın
     ],
 ];
 ```
 
-Set your default driver in your `.env` file:
+Varsayılan driver'ı `.env` dosyanızda ayarlayın:
 
 ```env
-ANADOLUPAY_DRIVER=your_driver_name
+ANADOLUPAY_DRIVER=iyzico
 ```
 
-## Basic Usage
+## Temel Kullanım
 
-### Using the Facade
+### Facade Kullanımı
 
 ```php
 use Voxyfy\AnadoluPay\Facades\AnadoluPay;
 
-// Get the default driver
+// Varsayılan driver'ı al
 $gateway = AnadoluPay::driver();
 
-// Get a specific driver
+// Belirli bir driver'ı al
 $gateway = AnadoluPay::driver('iyzico');
 
-// Create a payment
-$result = AnadoluPay::driver()->createPayment([
+// Ödeme oluştur
+$sonuc = AnadoluPay::driver()->createPayment([
     'amount' => 100.00,
     'currency' => 'TRY',
-    'order_id' => 'ORDER-123',
+    'order_id' => 'SIPARIS-123',
     'customer' => [
-        'name' => 'John Doe',
-        'email' => 'john@example.com',
+        'name' => 'Ahmet Yılmaz',
+        'email' => 'ahmet@example.com',
     ],
 ]);
 
-// Verify a payment
-$verification = AnadoluPay::driver()->verify($transactionId);
+// Ödemeyi doğrula
+$dogrulama = AnadoluPay::driver()->verify($transactionId);
 
-// Process a refund
-$refund = AnadoluPay::driver()->refund($transactionId, [
-    'amount' => 50.00, // Partial refund
-    'reason' => 'Customer request',
+// İade işlemi yap
+$iade = AnadoluPay::driver()->refund($transactionId, [
+    'amount' => 50.00, // Kısmi iade
+    'reason' => 'Müşteri talebi',
 ]);
 ```
 
-### Using Dependency Injection
+### Dependency Injection Kullanımı
 
 ```php
 use Voxyfy\AnadoluPay\AnadoluPay;
 
-class PaymentController extends Controller
+class OdemeController extends Controller
 {
     public function __construct(
         protected AnadoluPay $anadoluPay
     ) {}
 
-    public function process()
+    public function odemeYap()
     {
         $gateway = $this->anadoluPay->driver();
         // ...
@@ -100,21 +100,21 @@ class PaymentController extends Controller
 }
 ```
 
-### Checking Available Drivers
+### Mevcut Driver'ları Kontrol Etme
 
 ```php
-// Get all configured driver names
+// Tüm yapılandırılmış driver adlarını al
 $drivers = AnadoluPay::getAvailableDrivers();
 
-// Check if a specific driver is configured
+// Belirli bir driver'ın yapılandırılıp yapılandırılmadığını kontrol et
 if (AnadoluPay::hasDriver('iyzico')) {
-    // Driver is available
+    // Driver mevcut
 }
 ```
 
-## Creating a Gateway Driver
+## Gateway Driver Oluşturma
 
-To create a custom payment gateway driver, implement the `PaymentGatewayInterface`:
+Özel bir ödeme geçidi driver'ı oluşturmak için `PaymentGatewayInterface`'i implement edin:
 
 ```php
 <?php
@@ -123,56 +123,58 @@ namespace App\PaymentGateways;
 
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 
-class CustomGateway implements PaymentGatewayInterface
+class OzelGateway implements PaymentGatewayInterface
 {
     public function __construct(protected array $config)
     {
-        // Initialize with configuration
+        // Yapılandırma ile başlat
     }
 
     public function createPayment(array $data): array
     {
-        // Implement payment creation logic
+        // Ödeme oluşturma mantığını implement et
     }
 
     public function verify(string $transactionId, array $data = []): array
     {
-        // Implement payment verification logic
+        // Ödeme doğrulama mantığını implement et
     }
 
     public function refund(string $transactionId, array $data = []): array
     {
-        // Implement refund logic
+        // İade mantığını implement et
     }
 }
 ```
 
-Then register it in your configuration:
+Ardından yapılandırmanıza kaydedin:
 
 ```php
 'drivers' => [
-    'custom' => [
-        'driver' => \App\PaymentGateways\CustomGateway::class,
-        'api_key' => env('CUSTOM_GATEWAY_API_KEY'),
-        'api_secret' => env('CUSTOM_GATEWAY_API_SECRET'),
-        'sandbox' => env('CUSTOM_GATEWAY_SANDBOX', true),
+    'ozel' => [
+        'driver' => \App\PaymentGateways\OzelGateway::class,
+        'api_key' => env('OZEL_GATEWAY_API_KEY'),
+        'api_secret' => env('OZEL_GATEWAY_API_SECRET'),
+        'sandbox' => env('OZEL_GATEWAY_SANDBOX', true),
     ],
 ],
 ```
 
-## Supported Providers (Planned)
+## Desteklenen Sağlayıcılar (Planlanan)
 
-The following Turkish payment providers are planned for future releases:
+Aşağıdaki Türk ödeme sağlayıcıları gelecek sürümler için planlanmaktadır:
 
 - iyzico
 - PayTR
 - Param
 - Sipay
 - Craftgate
+- Paynet
+- Moka
 
-## Exception Handling
+## Hata Yönetimi
 
-AnadoluPay provides specific exceptions for different error scenarios:
+AnadoluPay, farklı hata senaryoları için özel exception'lar sağlar:
 
 ```php
 use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
@@ -180,41 +182,41 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
 
 try {
-    $result = AnadoluPay::driver()->createPayment($data);
+    $sonuc = AnadoluPay::driver()->createPayment($veri);
 } catch (DriverNotFoundException $e) {
-    // Driver not configured
+    // Driver yapılandırılmamış
 } catch (PaymentFailedException $e) {
-    // Payment processing failed
-    $errorCode = $e->getErrorCode();
-    $userMessage = $e->getUserMessage();
+    // Ödeme işleme başarısız
+    $hataKodu = $e->getErrorCode();
+    $kullaniciMesaji = $e->getUserMessage();
 } catch (UnsupportedOperationException $e) {
-    // Operation not supported by this gateway
+    // İşlem bu gateway tarafından desteklenmiyor
 }
 ```
 
-## Testing
+## Testler
 
 ```bash
 composer test
 ```
 
-## Changelog
+## Değişiklik Günlüğü
 
-Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
+Son değişiklikler hakkında daha fazla bilgi için [CHANGELOG](CHANGELOG.md) dosyasına bakın.
 
-## Contributing
+## Katkıda Bulunma
 
-Contributions are welcome! Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+Katkılarınızı bekliyoruz! Detaylar için [CONTRIBUTING](CONTRIBUTING.md) dosyasına bakın.
 
-## Security Vulnerabilities
+## Güvenlik Açıkları
 
-If you discover a security vulnerability, please send an e-mail to security@voxyfy.com.
+Bir güvenlik açığı keşfederseniz, lütfen security@voxyfy.com adresine e-posta gönderin.
 
-## Credits
+## Katkıda Bulunanlar
 
 - [Voxyfy](https://github.com/Voxyfy)
-- [All Contributors](../../contributors)
+- [Tüm Katkıda Bulunanlar](../../contributors)
 
-## License
+## Lisans
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+MIT Lisansı (MIT). Daha fazla bilgi için [Lisans Dosyası](LICENSE.md)'na bakın.

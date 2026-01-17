@@ -9,18 +9,18 @@ use Illuminate\Support\ServiceProvider;
 /**
  * AnadoluPay Service Provider
  *
- * This service provider is responsible for bootstrapping the AnadoluPay package
- * within a Laravel application. It handles configuration publishing, service
- * container bindings, and package initialization.
+ * Bu service provider, AnadoluPay paketinin Laravel uygulaması içinde
+ * başlatılmasından sorumludur. Yapılandırma yayınlama, service container
+ * bağlamaları ve paket başlatma işlemlerini yönetir.
  */
 class AnadoluPayServiceProvider extends ServiceProvider
 {
     /**
-     * Register any application services.
+     * Uygulama servislerini kaydet.
      *
-     * This method is called during the registration phase of the service provider.
-     * It binds the AnadoluPay class to the service container as a singleton,
-     * ensuring only one instance exists throughout the application lifecycle.
+     * Bu metot, service provider'ın kayıt aşamasında çağrılır.
+     * AnadoluPay sınıfını service container'a singleton olarak bağlar,
+     * böylece uygulama yaşam döngüsü boyunca tek bir instance bulunur.
      */
     public function register(): void
     {
@@ -37,11 +37,11 @@ class AnadoluPayServiceProvider extends ServiceProvider
     }
 
     /**
-     * Bootstrap any application services.
+     * Uygulama servislerini başlat.
      *
-     * This method is called after all service providers have been registered.
-     * It publishes the configuration file to the application's config directory,
-     * allowing users to customize the package settings.
+     * Bu metot, tüm service provider'lar kaydedildikten sonra çağrılır.
+     * Yapılandırma dosyasını uygulamanın config dizinine yayınlar,
+     * böylece kullanıcılar paket ayarlarını özelleştirebilir.
      */
     public function boot(): void
     {
@@ -51,12 +51,12 @@ class AnadoluPayServiceProvider extends ServiceProvider
     }
 
     /**
-     * Get the services provided by the provider.
+     * Provider tarafından sağlanan servisleri döndürür.
      *
-     * Returns an array of service container bindings that this provider
-     * registers. This is used for deferred provider loading.
+     * Bu provider'ın kaydettiği service container bağlamalarının
+     * bir dizisini döndürür. Ertelenmiş provider yüklemesi için kullanılır.
      *
-     * @return array<int, string> Array of service identifiers
+     * @return array<int, string> Servis tanımlayıcıları dizisi
      */
     public function provides(): array
     {

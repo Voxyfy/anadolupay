@@ -8,50 +8,48 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
 
 /**
- * AnadoluPay Core Class
+ * AnadoluPay Ana Sınıfı
  *
- * The main entry point for the AnadoluPay payment gateway abstraction.
- * This class manages payment gateway drivers and provides a unified interface
- * for interacting with different Turkish payment providers.
- *
+ * AnadoluPay ödeme geçidi soyutlamasının ana giriş noktası.
+ * Bu sınıf, ödeme geçidi driver'larını yönetir ve farklı Türk ödeme
+ * sağlayıcılarıyla etkileşim için birleşik bir arayüz sunar.
  *
  * @example
- * // Get the default driver
+ * // Varsayılan driver'ı al
  * $gateway = AnadoluPay::driver();
  *
- * // Get a specific driver
+ * // Belirli bir driver'ı al
  * $gateway = AnadoluPay::driver('iyzico');
  */
 class AnadoluPay
 {
     /**
-     * The configuration array for the package.
+     * Paket yapılandırma dizisi.
      *
      * @var array<string, mixed>
      */
     protected array $config;
 
     /**
-     * The array of resolved driver instances.
+     * Çözümlenmiş driver instance'larının dizisi.
      *
-     * Stores instantiated gateway drivers to avoid creating multiple
-     * instances of the same driver during a request lifecycle.
+     * Aynı driver'ın birden fazla instance'ının oluşturulmasını önlemek için
+     * oluşturulan gateway driver'larını saklar.
      *
      * @var array<string, PaymentGatewayInterface>
      */
     protected array $drivers = [];
 
     /**
-     * Create a new AnadoluPay instance.
+     * Yeni bir AnadoluPay instance'ı oluşturur.
      *
-     * Initializes the AnadoluPay manager with the provided configuration.
-     * The configuration should include the 'default' driver name and
-     * a 'drivers' array with individual driver configurations.
+     * Verilen yapılandırma ile AnadoluPay yöneticisini başlatır.
+     * Yapılandırma, 'default' driver adını ve bireysel driver
+     * yapılandırmalarını içeren 'drivers' dizisini içermelidir.
      *
-     * @param  array<string, mixed>  $config  The package configuration array containing:
-     *                                        - 'default': string|null The default driver name
-     *                                        - 'drivers': array Driver-specific configurations
-     * @return void
+     * @param  array<string, mixed>  $config  Paket yapılandırma dizisi:
+     *                                        - 'default': string|null Varsayılan driver adı
+     *                                        - 'drivers': array Driver'a özel yapılandırmalar
      */
     public function __construct(array $config)
     {
@@ -59,25 +57,25 @@ class AnadoluPay
     }
 
     /**
-     * Get a payment gateway driver instance.
+     * Bir ödeme geçidi driver instance'ı döndürür.
      *
-     * Returns a configured payment gateway driver instance. If no driver name
-     * is provided, the default driver from configuration will be used.
-     * Driver instances are cached for reuse within the same request.
+     * Yapılandırılmış bir ödeme geçidi driver instance'ı döndürür.
+     * Driver adı belirtilmezse, yapılandırmadaki varsayılan driver kullanılır.
+     * Driver instance'ları aynı istek içinde tekrar kullanım için önbelleğe alınır.
      *
-     * @param  string|null  $name  The name of the driver to retrieve. If null,
-     *                             uses the default driver from configuration.
-     *                             Must match a key in the 'drivers' config array.
-     * @return PaymentGatewayInterface The resolved payment gateway instance
+     * @param  string|null  $name  Alınacak driver'ın adı. null ise yapılandırmadaki
+     *                             varsayılan driver kullanılır. 'drivers' config
+     *                             dizisindeki bir anahtarla eşleşmelidir.
+     * @return PaymentGatewayInterface Çözümlenmiş ödeme geçidi instance'ı
      *
-     * @throws DriverNotFoundException When the requested driver is not configured
-     *                                 or the driver class does not exist
+     * @throws DriverNotFoundException İstenen driver yapılandırılmamışsa veya
+     *                                 driver sınıfı mevcut değilse fırlatılır
      *
      * @example
-     * // Using the default driver
+     * // Varsayılan driver'ı kullan
      * $gateway = $anadoluPay->driver();
      *
-     * // Using a specific driver
+     * // Belirli bir driver kullan
      * $gateway = $anadoluPay->driver('iyzico');
      */
     public function driver(?string $name = null): PaymentGatewayInterface
@@ -86,7 +84,7 @@ class AnadoluPay
 
         if ($name === null) {
             throw new DriverNotFoundException(
-                'No default payment driver configured. Please set ANADOLUPAY_DRIVER in your .env file or specify a driver name.'
+                'Varsayılan ödeme driver\'ı yapılandırılmamış. Lütfen .env dosyanızda ANADOLUPAY_DRIVER değerini ayarlayın veya bir driver adı belirtin.'
             );
         }
 
@@ -94,12 +92,12 @@ class AnadoluPay
     }
 
     /**
-     * Get the default driver name from configuration.
+     * Yapılandırmadan varsayılan driver adını döndürür.
      *
-     * Retrieves the default payment gateway driver name as specified
-     * in the package configuration.
+     * Paket yapılandırmasında belirtilen varsayılan ödeme geçidi
+     * driver adını alır.
      *
-     * @return string|null The default driver name, or null if not configured
+     * @return string|null Varsayılan driver adı, yapılandırılmamışsa null
      */
     public function getDefaultDriver(): ?string
     {
@@ -107,14 +105,14 @@ class AnadoluPay
     }
 
     /**
-     * Get the configuration for a specific driver.
+     * Belirli bir driver için yapılandırmayı döndürür.
      *
-     * Retrieves the configuration array for a named driver from
-     * the 'drivers' section of the package configuration.
+     * Paket yapılandırmasının 'drivers' bölümünden adlandırılmış
+     * driver'ın yapılandırma dizisini alır.
      *
-     * @param  string  $name  The driver name to get configuration for
-     * @return array<string, mixed>|null The driver configuration array,
-     *                                   or null if not found
+     * @param  string  $name  Yapılandırması alınacak driver adı
+     * @return array<string, mixed>|null Driver yapılandırma dizisi,
+     *                                   bulunamazsa null
      */
     public function getDriverConfig(string $name): ?array
     {
@@ -122,16 +120,16 @@ class AnadoluPay
     }
 
     /**
-     * Resolve a payment gateway driver instance.
+     * Bir ödeme geçidi driver instance'ını çözümler.
      *
-     * Creates and returns a new instance of the specified payment gateway
-     * driver. The driver class is determined from the driver configuration.
+     * Belirtilen ödeme geçidi driver'ının yeni bir instance'ını oluşturur
+     * ve döndürür. Driver sınıfı, driver yapılandırmasından belirlenir.
      *
-     * @param  string  $name  The name of the driver to resolve
-     * @return PaymentGatewayInterface The resolved payment gateway instance
+     * @param  string  $name  Çözümlenecek driver'ın adı
+     * @return PaymentGatewayInterface Çözümlenmiş ödeme geçidi instance'ı
      *
-     * @throws DriverNotFoundException When the driver configuration is missing
-     *                                 or the driver class is not specified
+     * @throws DriverNotFoundException Driver yapılandırması eksikse veya
+     *                                 driver sınıfı belirtilmemişse fırlatılır
      */
     protected function resolve(string $name): PaymentGatewayInterface
     {
@@ -139,7 +137,7 @@ class AnadoluPay
 
         if ($config === null) {
             throw new DriverNotFoundException(
-                "Payment driver [{$name}] is not configured. Please add it to your anadolupay.php config file."
+                "Ödeme driver'ı [{$name}] yapılandırılmamış. Lütfen anadolupay.php config dosyanıza ekleyin."
             );
         }
 
@@ -147,13 +145,13 @@ class AnadoluPay
 
         if ($driverClass === null) {
             throw new DriverNotFoundException(
-                "Payment driver [{$name}] does not have a 'driver' class specified in its configuration."
+                "Ödeme driver'ı [{$name}] yapılandırmasında 'driver' sınıfı belirtilmemiş."
             );
         }
 
         if (! class_exists($driverClass)) {
             throw new DriverNotFoundException(
-                "Payment driver class [{$driverClass}] does not exist."
+                "Ödeme driver sınıfı [{$driverClass}] mevcut değil."
             );
         }
 
@@ -161,12 +159,12 @@ class AnadoluPay
     }
 
     /**
-     * Get all registered driver names.
+     * Tüm kayıtlı driver adlarını döndürür.
      *
-     * Returns an array of all driver names that have been configured
-     * in the package configuration.
+     * Paket yapılandırmasında yapılandırılmış tüm driver adlarının
+     * bir dizisini döndürür.
      *
-     * @return array<int, string> Array of configured driver names
+     * @return array<int, string> Yapılandırılmış driver adları dizisi
      */
     public function getAvailableDrivers(): array
     {
@@ -174,13 +172,13 @@ class AnadoluPay
     }
 
     /**
-     * Check if a driver is configured.
+     * Bir driver'ın yapılandırılıp yapılandırılmadığını kontrol eder.
      *
-     * Determines whether a specific driver has been configured
-     * in the package configuration.
+     * Belirli bir driver'ın paket yapılandırmasında tanımlanıp
+     * tanımlanmadığını belirler.
      *
-     * @param  string  $name  The driver name to check
-     * @return bool True if the driver is configured, false otherwise
+     * @param  string  $name  Kontrol edilecek driver adı
+     * @return bool Driver yapılandırılmışsa true, değilse false
      */
     public function hasDriver(string $name): bool
     {

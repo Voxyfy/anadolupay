@@ -1,28 +1,28 @@
 <?php
 
 /**
- * AnadoluPay Configuration File
+ * AnadoluPay Yapılandırma Dosyası
  *
- * This configuration file defines the settings for the AnadoluPay payment gateway
- * abstraction package. It allows you to configure multiple payment providers
- * and set a default driver for handling payments.
+ * Bu dosya, AnadoluPay ödeme geçidi soyutlama paketinin ayarlarını içerir.
+ * Birden fazla ödeme sağlayıcısını yapılandırabilir ve varsayılan
+ * driver'ı belirleyebilirsiniz.
  */
 
 return [
 
     /*
     |--------------------------------------------------------------------------
-    | Default Payment Driver
+    | Varsayılan Ödeme Driver'ı
     |--------------------------------------------------------------------------
     |
-    | This option defines the default payment gateway driver that will be used
-    | when no specific driver is requested. Set this value to the name of one
-    | of the drivers configured in the 'drivers' array below.
+    | Bu seçenek, belirli bir driver belirtilmediğinde kullanılacak varsayılan
+    | ödeme geçidi driver'ını tanımlar. Aşağıdaki 'drivers' dizisindeki
+    | anahtarlardan birini kullanabilirsiniz.
     |
-    | When set to null, you must explicitly specify a driver when making
-    | payment requests.
+    | null olarak ayarlandığında, ödeme işlemlerinde driver'ı açıkça
+    | belirtmeniz gerekir.
     |
-    | Supported: Any key from the 'drivers' array below
+    | Desteklenen: Aşağıdaki 'drivers' dizisindeki herhangi bir anahtar
     |
     */
 
@@ -30,32 +30,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Payment Gateway Drivers
+    | Ödeme Geçidi Driver'ları
     |--------------------------------------------------------------------------
     |
-    | Here you may configure the payment gateway drivers for your application.
-    | Each driver represents a specific payment provider integration.
+    | Burada uygulamanız için ödeme geçidi driver'larını yapılandırabilirsiniz.
+    | Her driver, belirli bir ödeme sağlayıcısı entegrasyonunu temsil eder.
     |
-    | Each driver configuration should include:
-    | - 'driver': The gateway class that implements PaymentGatewayInterface
-    | - Provider-specific credentials and settings
+    | Her driver yapılandırması şunları içermelidir:
+    | - 'driver': PaymentGatewayInterface'i implement eden gateway sınıfı
+    | - Sağlayıcıya özel kimlik bilgileri ve ayarlar
     |
-    | Example configuration for a hypothetical provider:
+    | Örnek yapılandırma:
     |
-    | 'provider_name' => [
-    |     'driver' => \Voxyfy\AnadoluPay\Gateways\ProviderGateway::class,
-    |     'merchant_id' => env('PROVIDER_MERCHANT_ID'),
-    |     'api_key' => env('PROVIDER_API_KEY'),
-    |     'api_secret' => env('PROVIDER_API_SECRET'),
-    |     'sandbox' => env('PROVIDER_SANDBOX', true),
+    | 'iyzico' => [
+    |     'driver' => \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::class,
+    |     'api_key' => env('IYZICO_API_KEY'),
+    |     'secret_key' => env('IYZICO_SECRET_KEY'),
+    |     'base_url' => env('IYZICO_BASE_URL', 'https://sandbox-api.iyzipay.com'),
+    |     'sandbox' => env('IYZICO_SANDBOX', true),
+    | ],
+    |
+    | 'paytr' => [
+    |     'driver' => \Voxyfy\AnadoluPay\Gateways\PayTRGateway::class,
+    |     'merchant_id' => env('PAYTR_MERCHANT_ID'),
+    |     'merchant_key' => env('PAYTR_MERCHANT_KEY'),
+    |     'merchant_salt' => env('PAYTR_MERCHANT_SALT'),
+    |     'sandbox' => env('PAYTR_SANDBOX', true),
     | ],
     |
     */
 
     'drivers' => [
 
-        // Payment gateway drivers will be configured here.
-        // Each driver should implement PaymentGatewayInterface.
+        // Ödeme geçidi driver'ları burada yapılandırılacak.
+        // Her driver PaymentGatewayInterface'i implement etmelidir.
 
     ],
 

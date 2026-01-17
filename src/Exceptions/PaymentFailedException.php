@@ -7,72 +7,71 @@ namespace Voxyfy\AnadoluPay\Exceptions;
 use Exception;
 
 /**
- * Payment Failed Exception
+ * Ödeme Başarısız Exception
  *
- * Thrown when a payment operation fails during processing. This exception
- * encapsulates errors that occur during payment creation, verification,
- * or refund operations, providing detailed information about the failure.
+ * İşlem sırasında bir ödeme işlemi başarısız olduğunda fırlatılır.
+ * Bu exception, ödeme oluşturma, doğrulama veya iade işlemleri
+ * sırasında oluşan hataları kapsar ve başarısızlık hakkında
+ * detaylı bilgi sağlar.
  *
- * The exception includes methods to access the original error response
- * from the payment provider, enabling detailed error handling and logging.
+ * Exception, ödeme sağlayıcısından gelen orijinal hata yanıtına
+ * erişim sağlayan metotlar içerir, böylece detaylı hata yönetimi
+ * ve loglama yapılabilir.
  *
- * Common failure scenarios:
- * - Insufficient funds on the card
- * - Invalid card details
- * - Declined by issuing bank
- * - Fraud detection triggered
- * - Network/connectivity errors with payment provider
- * - Invalid transaction data
- * - Expired or invalid transaction for verification/refund
- *
+ * Yaygın başarısızlık senaryoları:
+ * - Kartta yetersiz bakiye
+ * - Geçersiz kart bilgileri
+ * - Kartı veren banka tarafından reddedilme
+ * - Dolandırıcılık tespiti tetiklenmesi
+ * - Ödeme sağlayıcısı ile ağ/bağlantı hataları
+ * - Geçersiz işlem verisi
+ * - Doğrulama/iade için süresi dolmuş veya geçersiz işlem
  *
  * @example
  * try {
- *     $result = $gateway->createPayment($paymentData);
+ *     $sonuc = $gateway->createPayment($odemeVerisi);
  * } catch (PaymentFailedException $e) {
- *     $errorCode = $e->getErrorCode();
- *     $providerResponse = $e->getProviderResponse();
+ *     $hataKodu = $e->getErrorCode();
+ *     $saglaycıYanit = $e->getProviderResponse();
  *
- *     Log::error('Payment failed', [
- *         'message' => $e->getMessage(),
- *         'code' => $errorCode,
- *         'provider_response' => $providerResponse,
+ *     Log::error('Ödeme başarısız', [
+ *         'mesaj' => $e->getMessage(),
+ *         'kod' => $hataKodu,
+ *         'saglayici_yanit' => $saglaycıYanit,
  *     ]);
  *
- *     // Show user-friendly error message based on error code
- *     return back()->withErrors(['payment' => $e->getUserMessage()]);
+ *     // Hata koduna göre kullanıcı dostu mesaj göster
+ *     return back()->withErrors(['odeme' => $e->getUserMessage()]);
  * }
  */
 class PaymentFailedException extends Exception
 {
     /**
-     * The error code returned by the payment provider.
+     * Ödeme sağlayıcısı tarafından döndürülen hata kodu.
      */
     protected ?string $errorCode = null;
 
     /**
-     * The raw response from the payment provider.
+     * Ödeme sağlayıcısından gelen ham yanıt.
      *
      * @var array<string, mixed>
      */
     protected array $providerResponse = [];
 
     /**
-     * A user-friendly error message suitable for display.
+     * Görüntülemeye uygun kullanıcı dostu hata mesajı.
      */
     protected ?string $userMessage = null;
 
     /**
-     * Create a new Payment Failed exception instance.
+     * Yeni bir Ödeme Başarısız exception instance'ı oluşturur.
      *
-     * @param  string  $message  The technical exception message describing
-     *                           the failure reason
-     * @param  int  $code  The exception code (default: 0)
-     * @param  \Throwable|null  $previous  The previous throwable for exception chaining
-     * @return void
+     * @param  string  $message  Başarısızlık nedenini açıklayan teknik exception mesajı
+     * @param  int  $code  Exception kodu (varsayılan: 0)
+     * @param  \Throwable|null  $previous  Exception zincirleme için önceki throwable
      */
     public function __construct(
-        string $message = 'The payment could not be processed.',
+        string $message = 'Ödeme işlenemedi.',
         int $code = 0,
         ?\Throwable $previous = null
     ) {
@@ -80,10 +79,10 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Set the error code from the payment provider.
+     * Ödeme sağlayıcısından gelen hata kodunu ayarlar.
      *
-     * @param  string  $errorCode  The provider-specific error code
-     * @return static Returns the exception instance for method chaining
+     * @param  string  $errorCode  Sağlayıcıya özel hata kodu
+     * @return static Metot zincirleme için exception instance'ı döndürür
      */
     public function setErrorCode(string $errorCode): static
     {
@@ -93,9 +92,9 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Get the error code from the payment provider.
+     * Ödeme sağlayıcısından gelen hata kodunu döndürür.
      *
-     * @return string|null The provider-specific error code, or null if not set
+     * @return string|null Sağlayıcıya özel hata kodu, ayarlanmamışsa null
      */
     public function getErrorCode(): ?string
     {
@@ -103,13 +102,13 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Set the raw response from the payment provider.
+     * Ödeme sağlayıcısından gelen ham yanıtı ayarlar.
      *
-     * Stores the complete response from the payment provider for
-     * debugging and detailed error analysis.
+     * Hata ayıklama ve detaylı hata analizi için ödeme
+     * sağlayıcısından gelen tam yanıtı saklar.
      *
-     * @param  array<string, mixed>  $response  The complete provider response array
-     * @return static Returns the exception instance for method chaining
+     * @param  array<string, mixed>  $response  Sağlayıcının tam yanıt dizisi
+     * @return static Metot zincirleme için exception instance'ı döndürür
      */
     public function setProviderResponse(array $response): static
     {
@@ -119,9 +118,9 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Get the raw response from the payment provider.
+     * Ödeme sağlayıcısından gelen ham yanıtı döndürür.
      *
-     * @return array<string, mixed> The complete provider response array
+     * @return array<string, mixed> Sağlayıcının tam yanıt dizisi
      */
     public function getProviderResponse(): array
     {
@@ -129,13 +128,13 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Set a user-friendly error message.
+     * Kullanıcı dostu hata mesajını ayarlar.
      *
-     * This message should be safe to display to end users and should
-     * not contain sensitive technical details or provider-specific codes.
+     * Bu mesaj son kullanıcılara gösterilmeye uygun olmalı ve
+     * hassas teknik detaylar veya sağlayıcıya özel kodlar içermemelidir.
      *
-     * @param  string  $message  A user-friendly message suitable for display
-     * @return static Returns the exception instance for method chaining
+     * @param  string  $message  Görüntülemeye uygun kullanıcı dostu mesaj
+     * @return static Metot zincirleme için exception instance'ı döndürür
      */
     public function setUserMessage(string $message): static
     {
@@ -145,36 +144,36 @@ class PaymentFailedException extends Exception
     }
 
     /**
-     * Get the user-friendly error message.
+     * Kullanıcı dostu hata mesajını döndürür.
      *
-     * Returns a message suitable for display to end users. If no user
-     * message has been explicitly set, returns a generic message.
+     * Son kullanıcılara gösterilmeye uygun bir mesaj döndürür.
+     * Kullanıcı mesajı açıkça ayarlanmamışsa, genel bir mesaj döndürür.
      *
-     * @return string A user-friendly error message
+     * @return string Kullanıcı dostu hata mesajı
      */
     public function getUserMessage(): string
     {
-        return $this->userMessage ?? 'Payment could not be processed. Please try again or use a different payment method.';
+        return $this->userMessage ?? 'Ödeme işlenemedi. Lütfen tekrar deneyin veya farklı bir ödeme yöntemi kullanın.';
     }
 
     /**
-     * Create a new exception instance with provider details.
+     * Sağlayıcı detaylarıyla yeni bir exception instance'ı oluşturur.
      *
-     * Factory method for creating a fully populated exception in a single call.
+     * Tek bir çağrıda tam yapılandırılmış exception oluşturmak için factory metodu.
      *
-     * @param  string  $message  The technical exception message
-     * @param  string|null  $errorCode  The provider-specific error code
-     * @param  array<string, mixed>  $providerResponse  The raw provider response
-     * @param  string|null  $userMessage  The user-friendly message
-     * @param  \Throwable|null  $previous  The previous throwable
-     * @return static A fully configured exception instance
+     * @param  string  $message  Teknik exception mesajı
+     * @param  string|null  $errorCode  Sağlayıcıya özel hata kodu
+     * @param  array<string, mixed>  $providerResponse  Ham sağlayıcı yanıtı
+     * @param  string|null  $userMessage  Kullanıcı dostu mesaj
+     * @param  \Throwable|null  $previous  Önceki throwable
+     * @return static Tam yapılandırılmış exception instance'ı
      *
      * @example
      * throw PaymentFailedException::withDetails(
-     *     'Card declined by issuing bank',
+     *     'Kart, kartı veren banka tarafından reddedildi',
      *     'CARD_DECLINED',
-     *     $apiResponse,
-     *     'Your card was declined. Please try a different card.'
+     *     $apiYaniti,
+     *     'Kartınız reddedildi. Lütfen farklı bir kart deneyin.'
      * );
      */
     public static function withDetails(

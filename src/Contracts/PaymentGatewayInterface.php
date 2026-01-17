@@ -8,139 +8,138 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
 
 /**
- * Payment Gateway Interface
+ * Ödeme Geçidi Arayüzü (Interface)
  *
- * Defines the contract that all payment gateway drivers must implement.
- * This interface provides a unified API for interacting with different
- * Turkish payment providers, ensuring consistency across implementations.
+ * Tüm ödeme geçidi driver'larının implement etmesi gereken sözleşmeyi tanımlar.
+ * Bu interface, farklı Türk ödeme sağlayıcılarıyla etkileşim için birleşik bir
+ * API sağlar ve implementasyonlar arasında tutarlılık sağlar.
  *
- * All gateway implementations should handle provider-specific logic internally
- * while exposing this standardized interface to the application.
+ * Tüm gateway implementasyonları, sağlayıcıya özel mantığı dahili olarak
+ * yönetirken bu standartlaştırılmış arayüzü uygulamaya sunmalıdır.
  */
 interface PaymentGatewayInterface
 {
     /**
-     * Create a new payment transaction.
+     * Yeni bir ödeme işlemi oluşturur.
      *
-     * Initiates a payment request with the configured payment provider.
-     * The data array structure may vary depending on the payment type
-     * (credit card, bank transfer, etc.) and the specific provider's requirements.
+     * Yapılandırılmış ödeme sağlayıcısı ile bir ödeme isteği başlatır.
+     * Veri dizisi yapısı, ödeme türüne (kredi kartı, banka havalesi vb.)
+     * ve sağlayıcının gereksinimlerine göre değişebilir.
      *
-     * Common data fields include:
-     * - 'amount': float|int The payment amount (required)
-     * - 'currency': string The ISO 4217 currency code (e.g., 'TRY', 'USD')
-     * - 'order_id': string|int Unique order/transaction identifier
-     * - 'description': string Payment description
-     * - 'customer': array Customer information (name, email, phone, etc.)
-     * - 'card': array Credit card details (if applicable)
-     * - 'billing_address': array Billing address information
-     * - 'shipping_address': array Shipping address information
-     * - 'callback_url': string URL for payment notifications
-     * - 'return_url': string URL to redirect after payment
+     * Yaygın veri alanları:
+     * - 'amount': float|int Ödeme tutarı (zorunlu)
+     * - 'currency': string ISO 4217 para birimi kodu (örn: 'TRY', 'USD')
+     * - 'order_id': string|int Benzersiz sipariş/işlem tanımlayıcısı
+     * - 'description': string Ödeme açıklaması
+     * - 'customer': array Müşteri bilgileri (ad, e-posta, telefon vb.)
+     * - 'card': array Kredi kartı detayları (gerekli ise)
+     * - 'billing_address': array Fatura adresi bilgileri
+     * - 'shipping_address': array Teslimat adresi bilgileri
+     * - 'callback_url': string Ödeme bildirimleri için URL
+     * - 'return_url': string Ödeme sonrası yönlendirme URL'i
      *
-     * @param  array<string, mixed>  $data  Payment data containing transaction details.
-     *                                      Required and optional fields depend on
-     *                                      the gateway implementation.
-     * @return array<string, mixed> Payment response containing:
-     *                              - 'success': bool Whether payment was initiated
-     *                              - 'transaction_id': string Provider's transaction ID
-     *                              - 'status': string Payment status
-     *                              - 'redirect_url': string|null URL for 3D Secure redirect
-     *                              - 'raw_response': array Original provider response
+     * @param  array<string, mixed>  $data  İşlem detaylarını içeren ödeme verisi.
+     *                                      Zorunlu ve opsiyonel alanlar gateway
+     *                                      implementasyonuna bağlıdır.
+     * @return array<string, mixed> Ödeme yanıtı:
+     *                              - 'success': bool Ödemenin başlatılıp başlatılmadığı
+     *                              - 'transaction_id': string Sağlayıcının işlem ID'si
+     *                              - 'status': string Ödeme durumu
+     *                              - 'redirect_url': string|null 3D Secure yönlendirme URL'i
+     *                              - 'raw_response': array Sağlayıcının orijinal yanıtı
      *
-     * @throws PaymentFailedException When the payment cannot be processed
-     *                                due to validation errors, provider errors,
-     *                                or connectivity issues
+     * @throws PaymentFailedException Doğrulama hataları, sağlayıcı hataları veya
+     *                                bağlantı sorunları nedeniyle ödeme işlenemediğinde
      *
      * @example
-     * $result = $gateway->createPayment([
+     * $sonuc = $gateway->createPayment([
      *     'amount' => 100.00,
      *     'currency' => 'TRY',
-     *     'order_id' => 'ORDER-123',
+     *     'order_id' => 'SIPARIS-123',
      *     'customer' => [
-     *         'name' => 'John Doe',
-     *         'email' => 'john@example.com',
+     *         'name' => 'Ahmet Yılmaz',
+     *         'email' => 'ahmet@example.com',
      *     ],
      * ]);
      */
     public function createPayment(array $data): array;
 
     /**
-     * Verify a payment transaction.
+     * Bir ödeme işlemini doğrular.
      *
-     * Confirms the status and authenticity of a payment transaction
-     * with the payment provider. This method should be called after
-     * receiving a callback or when checking payment status.
+     * Ödeme sağlayıcısı ile bir ödeme işleminin durumunu ve gerçekliğini
+     * onaylar. Bu metot, callback aldıktan sonra veya ödeme durumunu
+     * kontrol ederken çağrılmalıdır.
      *
-     * @param  string  $transactionId  The unique transaction identifier returned
-     *                                 by the payment provider during createPayment()
-     *                                 or received in callback notifications.
-     * @param  array<string, mixed>  $data  Additional verification data that may be
-     *                                      required by specific providers, such as:
-     *                                      - 'hash': string Verification hash from callback
-     *                                      - 'order_id': string Original order ID
-     *                                      - 'amount': float Expected amount for validation
-     * @return array<string, mixed> Verification response containing:
-     *                              - 'verified': bool Whether payment is verified
-     *                              - 'status': string Current payment status
-     *                              (completed, pending, failed, etc.)
-     *                              - 'transaction_id': string Provider's transaction ID
-     *                              - 'amount': float Verified payment amount
-     *                              - 'currency': string Payment currency
-     *                              - 'paid_at': string|null Payment completion timestamp
-     *                              - 'raw_response': array Original provider response
+     * @param  string  $transactionId  createPayment() sırasında ödeme sağlayıcısı
+     *                                 tarafından döndürülen veya callback
+     *                                 bildirimlerinde alınan benzersiz işlem tanımlayıcısı.
+     * @param  array<string, mixed>  $data  Belirli sağlayıcılar tarafından gerekli
+     *                                      olabilecek ek doğrulama verisi:
+     *                                      - 'hash': string Callback'ten gelen doğrulama hash'i
+     *                                      - 'order_id': string Orijinal sipariş ID'si
+     *                                      - 'amount': float Doğrulama için beklenen tutar
+     * @return array<string, mixed> Doğrulama yanıtı:
+     *                              - 'verified': bool Ödemenin doğrulanıp doğrulanmadığı
+     *                              - 'status': string Mevcut ödeme durumu
+     *                              (completed, pending, failed vb.)
+     *                              - 'transaction_id': string Sağlayıcının işlem ID'si
+     *                              - 'amount': float Doğrulanmış ödeme tutarı
+     *                              - 'currency': string Ödeme para birimi
+     *                              - 'paid_at': string|null Ödeme tamamlanma zamanı
+     *                              - 'raw_response': array Sağlayıcının orijinal yanıtı
      *
-     * @throws PaymentFailedException When verification fails due to
-     *                                invalid transaction, provider errors,
-     *                                or connectivity issues
+     * @throws PaymentFailedException Geçersiz işlem, sağlayıcı hataları veya
+     *                                bağlantı sorunları nedeniyle doğrulama
+     *                                başarısız olduğunda
      *
      * @example
-     * $result = $gateway->verify('TXN-123456', [
-     *     'hash' => 'callback_verification_hash',
+     * $sonuc = $gateway->verify('TXN-123456', [
+     *     'hash' => 'callback_dogrulama_hash',
      * ]);
      *
-     * if ($result['verified'] && $result['status'] === 'completed') {
-     *     // Payment confirmed, fulfill the order
+     * if ($sonuc['verified'] && $sonuc['status'] === 'completed') {
+     *     // Ödeme onaylandı, siparişi tamamla
      * }
      */
     public function verify(string $transactionId, array $data = []): array;
 
     /**
-     * Process a refund for a payment transaction.
+     * Bir ödeme işlemi için iade işlemi yapar.
      *
-     * Initiates a full or partial refund for a previously completed payment.
-     * Not all payment providers support partial refunds; check provider
-     * documentation for specific capabilities.
+     * Daha önce tamamlanmış bir ödeme için tam veya kısmi iade başlatır.
+     * Tüm ödeme sağlayıcıları kısmi iadeyi desteklemez; belirli
+     * yetenekler için sağlayıcı dokümantasyonuna bakın.
      *
-     * @param  string  $transactionId  The unique transaction identifier of the
-     *                                 original payment to be refunded.
-     * @param  array<string, mixed>  $data  Refund data containing:
-     *                                      - 'amount': float|null Refund amount. If null or
-     *                                      not provided, full refund is processed.
-     *                                      - 'reason': string|null Reason for the refund
-     *                                      - 'reference': string|null Your internal refund reference
-     * @return array<string, mixed> Refund response containing:
-     *                              - 'success': bool Whether refund was processed
-     *                              - 'refund_id': string Provider's refund ID
-     *                              - 'transaction_id': string Original transaction ID
-     *                              - 'amount': float Refunded amount
-     *                              - 'status': string Refund status
-     *                              - 'raw_response': array Original provider response
+     * @param  string  $transactionId  İade edilecek orijinal ödemenin
+     *                                 benzersiz işlem tanımlayıcısı.
+     * @param  array<string, mixed>  $data  İade verisi:
+     *                                      - 'amount': float|null İade tutarı. null veya
+     *                                      belirtilmezse tam iade yapılır.
+     *                                      - 'reason': string|null İade nedeni
+     *                                      - 'reference': string|null Dahili iade referansınız
+     * @return array<string, mixed> İade yanıtı:
+     *                              - 'success': bool İadenin işlenip işlenmediği
+     *                              - 'refund_id': string Sağlayıcının iade ID'si
+     *                              - 'transaction_id': string Orijinal işlem ID'si
+     *                              - 'amount': float İade edilen tutar
+     *                              - 'status': string İade durumu
+     *                              - 'raw_response': array Sağlayıcının orijinal yanıtı
      *
-     * @throws PaymentFailedException When refund cannot be processed due to
-     *                                invalid transaction, insufficient funds,
-     *                                provider errors, or connectivity issues
-     * @throws UnsupportedOperationException When the payment provider or specific
-     *                                       payment method does not support refunds
+     * @throws PaymentFailedException Geçersiz işlem, yetersiz bakiye, sağlayıcı
+     *                                hataları veya bağlantı sorunları nedeniyle
+     *                                iade işlenemediğinde
+     * @throws UnsupportedOperationException Ödeme sağlayıcısı veya belirli ödeme
+     *                                       yöntemi iadeleri desteklemediğinde
      *
      * @example
-     * // Full refund
-     * $result = $gateway->refund('TXN-123456');
+     * // Tam iade
+     * $sonuc = $gateway->refund('TXN-123456');
      *
-     * // Partial refund
-     * $result = $gateway->refund('TXN-123456', [
+     * // Kısmi iade
+     * $sonuc = $gateway->refund('TXN-123456', [
      *     'amount' => 50.00,
-     *     'reason' => 'Customer requested partial refund',
+     *     'reason' => 'Müşteri kısmi iade talep etti',
      * ]);
      */
     public function refund(string $transactionId, array $data = []): array;
