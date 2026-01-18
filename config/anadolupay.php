@@ -13,14 +13,17 @@ return [
     | Örnek:
     |
     | 'drivers' => [
-    |     'fake' => \Voxyfy\AnadoluPay\Gateways\FakeGateway::class,
     |     'iyzico' => \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::class,
     | ],
     |
     */
 
     'drivers' => [
-        // 'fake' => \Voxyfy\AnadoluPay\Gateways\FakeGateway::class,
+
+        // Geliştirme ve test için sahte gateway.
+        // Gerçek API çağrısı yapmaz, rastgele başarı/başarısızlık simüle eder.
+        'fake' => \Voxyfy\AnadoluPay\Gateways\FakeGateway::class,
+
     ],
 
 ];
