@@ -15,6 +15,7 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
 use Voxyfy\AnadoluPay\Support\IyzicoHttpClient;
 use Voxyfy\AnadoluPay\Support\IyzicoMapper;
+use Voxyfy\AnadoluPay\Support\IyzicoSignatureValidator;
 
 /**
  * Iyzico 3DS gateway adaptoru.
@@ -24,6 +25,7 @@ class IyzicoGateway implements PaymentGatewayInterface
     public function __construct(
         private readonly IyzicoHttpClient $client,
         private readonly IyzicoMapper $mapper,
+        private readonly IyzicoSignatureValidator $validator,
     ) {}
 
     public static function fromConfig(): self
@@ -36,7 +38,14 @@ class IyzicoGateway implements PaymentGatewayInterface
             (string) ($config['secret_key'] ?? ''),
         );
 
-        return new self($client, new IyzicoMapper);
+        $validator = new IyzicoSignatureValidator(
+            (string) ($config['secret_key'] ?? ''),
+            (bool) ($config['validate_signature'] ?? true),
+            (string) ($config['signature_header'] ?? 'x-iyzi-signature'),
+            (string) ($config['signature_param'] ?? 'signature'),
+        );
+
+        return new self($client, new IyzicoMapper(), $validator);
     }
 
     /**
@@ -80,6 +89,7 @@ class IyzicoGateway implements PaymentGatewayInterface
         $payload = $data->payload;
 
         if (isset($payload['paymentId'], $payload['mdStatus'])) {
+            $this->validator->validateCallback($payload, $data->headers);
             $normalized = $this->mapper->normalizeCallbackStatus($payload);
 
             if (! $normalized['success']) {
@@ -123,10 +133,10 @@ class IyzicoGateway implements PaymentGatewayInterface
         }
 
         if (isset($payload['iyziEventType']) || isset($payload['iyziReferenceCode'])) {
+            $this->validator->validateWebhook($payload, $data->headers);
             $status = strtoupper((string) ($payload['status'] ?? ''));
             $normalizedStatus = $status === 'SUCCESS' ? 'success' : 'failed';
 
-            // TODO: Webhook imzasını doğrula ve auth yanıtıyla ilişkilendir.
             return new VerificationResponse(
                 success: $normalizedStatus === 'success',
                 paymentId: $payload['paymentId'] ?? null,

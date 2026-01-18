@@ -33,6 +33,11 @@ return [
         // Test ortamı için sandbox URL; canlı kullanımda prod host'u kullanın.
         'base_url' => env('IYZICO_BASE_URL', 'https://sandbox-api.iyzipay.com'),
         'callback_url' => env('IYZICO_CALLBACK_URL'),
+        // Canlı ortamda true kalsın; lokal testlerde false olabilir.
+        'validate_signature' => env('IYZICO_VALIDATE_SIGNATURE', true),
+        // Imza header ve parametre adlari saglayiciya gore degisebilir.
+        'signature_header' => env('IYZICO_SIGNATURE_HEADER', 'x-iyzi-signature'),
+        'signature_param' => env('IYZICO_SIGNATURE_PARAM', 'signature'),
     ],
 
 ];

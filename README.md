@@ -44,6 +44,12 @@ Notlar:
 
 ## 3DS Ödeme Başlatma (iyzico)
 
+Akış özeti:
+- Uygulama `createPayment(...)` ile 3DS başlatma isteği yapar.
+- Iyzico `threeDSHtmlContent` döner (base64 HTML).
+- Uygulama bu HTML'i decode edip kullanıcıya render eder.
+- 3DS tamamlanınca callback URL'inize yönlendirme yapılır.
+
 ```php
 <?php
 
@@ -106,9 +112,41 @@ return response($html);
 - Iyzico redirect callback'inde `status`, `paymentId`, `conversationData`, `mdStatus` alanları gelir.
 - Gateway bu payload'u doğrular, ardından 3DS auth çağrısını yapar ve sonucu normalize eder.
 - Webhook bildirimleri için de `verify(...)` çağrısı aynı şekilde çalışır.
+- İmza doğrulaması etkinse imza yoksa veya eşleşmezse `InvalidSignatureException` fırlatılır.
+- İmza doğrulaması ayarı: `IYZICO_VALIDATE_SIGNATURE` (lokalde false yapılabilir).
 
 AnadoluPay yalnızca doğrulama ve normalizasyon yapar. Sipariş onayı, stok düşme,
 fatura kesme gibi iş kuralları uygulama tarafında yönetilmelidir.
+
+Basit bir callback örneği:
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
+use Voxyfy\AnadoluPay\Facades\AnadoluPay;
+
+class IyzicoCallbackController extends Controller
+{
+    public function handle(Request $request)
+    {
+        $result = AnadoluPay::driver('iyzico')->verify(new VerifyPaymentData(
+            payload: $request->all(),
+            headers: $request->headers->all(),
+            rawBody: $request->getContent(),
+        ));
+
+        return response()->json([
+            'success' => $result->success,
+            'status' => $result->status,
+            'paymentId' => $result->paymentId,
+        ]);
+    }
+}
+```
 
 ## Testler
 
