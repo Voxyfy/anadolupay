@@ -23,7 +23,7 @@ class AnadoluPayServiceProvider extends ServiceProvider
             'anadolupay'
         );
 
-        $this->app->singleton('anadolupay', fn () => new AnadoluPay());
+        $this->app->singleton('anadolupay', fn () => new AnadoluPay);
         $this->app->alias('anadolupay', AnadoluPay::class);
     }
 
