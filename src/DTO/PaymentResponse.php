@@ -28,15 +28,15 @@ readonly class PaymentResponse
     /**
      * Yeni bir PaymentResponse instance'ı oluşturur.
      *
-     * @param bool $success İşlem başarılı mı
-     * @param PaymentStatus $status Ödeme durumu
-     * @param string|null $transactionId Sağlayıcının işlem tanımlayıcısı
-     * @param string|null $redirectUrl 3D Secure yönlendirme URL'i
-     * @param string|null $htmlContent 3D Secure form HTML içeriği
-     * @param bool $requiresRedirect Yönlendirme gerekli mi
-     * @param array<string, mixed> $providerResponse Sağlayıcının orijinal yanıtı
-     * @param string|null $errorCode Hata kodu (başarısızlık durumunda)
-     * @param string|null $errorMessage Hata mesajı (başarısızlık durumunda)
+     * @param  bool  $success  İşlem başarılı mı
+     * @param  PaymentStatus  $status  Ödeme durumu
+     * @param  string|null  $transactionId  Sağlayıcının işlem tanımlayıcısı
+     * @param  string|null  $redirectUrl  3D Secure yönlendirme URL'i
+     * @param  string|null  $htmlContent  3D Secure form HTML içeriği
+     * @param  bool  $requiresRedirect  Yönlendirme gerekli mi
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcının orijinal yanıtı
+     * @param  string|null  $errorCode  Hata kodu (başarısızlık durumunda)
+     * @param  string|null  $errorMessage  Hata mesajı (başarısızlık durumunda)
      */
     public function __construct(
         public bool $success,
@@ -53,10 +53,9 @@ readonly class PaymentResponse
     /**
      * Başarılı bir yanıt oluşturur (3D Secure yönlendirmesi ile).
      *
-     * @param string $transactionId İşlem ID'si
-     * @param string $redirectUrl Yönlendirme URL'i
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $transactionId  İşlem ID'si
+     * @param  string  $redirectUrl  Yönlendirme URL'i
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function redirect(
         string $transactionId,
@@ -76,10 +75,9 @@ readonly class PaymentResponse
     /**
      * Başarılı bir yanıt oluşturur (HTML form ile).
      *
-     * @param string $transactionId İşlem ID'si
-     * @param string $htmlContent Form HTML içeriği
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $transactionId  İşlem ID'si
+     * @param  string  $htmlContent  Form HTML içeriği
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function html(
         string $transactionId,
@@ -99,9 +97,8 @@ readonly class PaymentResponse
     /**
      * Doğrudan başarılı bir ödeme yanıtı oluşturur.
      *
-     * @param string $transactionId İşlem ID'si
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $transactionId  İşlem ID'si
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function success(
         string $transactionId,
@@ -118,10 +115,9 @@ readonly class PaymentResponse
     /**
      * Başarısız bir yanıt oluşturur.
      *
-     * @param string $errorMessage Hata mesajı
-     * @param string|null $errorCode Hata kodu
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $errorMessage  Hata mesajı
+     * @param  string|null  $errorCode  Hata kodu
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function failed(
         string $errorMessage,

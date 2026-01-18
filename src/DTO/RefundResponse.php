@@ -28,15 +28,15 @@ readonly class RefundResponse
     /**
      * Yeni bir RefundResponse instance'ı oluşturur.
      *
-     * @param bool $success İşlem başarılı mı
-     * @param RefundStatus $status İade durumu
-     * @param string|null $refundId Sağlayıcının iade tanımlayıcısı
-     * @param string|null $transactionId Orijinal işlem ID'si
-     * @param float|null $amount İade tutarı
-     * @param string|null $currency Para birimi
-     * @param array<string, mixed> $providerResponse Sağlayıcının orijinal yanıtı
-     * @param string|null $errorCode Hata kodu (başarısızlık durumunda)
-     * @param string|null $errorMessage Hata mesajı (başarısızlık durumunda)
+     * @param  bool  $success  İşlem başarılı mı
+     * @param  RefundStatus  $status  İade durumu
+     * @param  string|null  $refundId  Sağlayıcının iade tanımlayıcısı
+     * @param  string|null  $transactionId  Orijinal işlem ID'si
+     * @param  float|null  $amount  İade tutarı
+     * @param  string|null  $currency  Para birimi
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcının orijinal yanıtı
+     * @param  string|null  $errorCode  Hata kodu (başarısızlık durumunda)
+     * @param  string|null  $errorMessage  Hata mesajı (başarısızlık durumunda)
      */
     public function __construct(
         public bool $success,
@@ -53,12 +53,11 @@ readonly class RefundResponse
     /**
      * Başarılı bir iade yanıtı oluşturur.
      *
-     * @param string $refundId İade ID'si
-     * @param string $transactionId Orijinal işlem ID'si
-     * @param float $amount İade tutarı
-     * @param string $currency Para birimi
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $refundId  İade ID'si
+     * @param  string  $transactionId  Orijinal işlem ID'si
+     * @param  float  $amount  İade tutarı
+     * @param  string  $currency  Para birimi
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function success(
         string $refundId,
@@ -81,11 +80,10 @@ readonly class RefundResponse
     /**
      * Başarısız bir iade yanıtı oluşturur.
      *
-     * @param string $errorMessage Hata mesajı
-     * @param string|null $errorCode Hata kodu
-     * @param string|null $transactionId Orijinal işlem ID'si (varsa)
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $errorMessage  Hata mesajı
+     * @param  string|null  $errorCode  Hata kodu
+     * @param  string|null  $transactionId  Orijinal işlem ID'si (varsa)
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function failed(
         string $errorMessage,
@@ -107,12 +105,11 @@ readonly class RefundResponse
      * Beklemede olan bir iade yanıtı oluşturur.
      * Bazı sağlayıcılar iadeyi asenkron olarak işler.
      *
-     * @param string $refundId İade ID'si
-     * @param string $transactionId Orijinal işlem ID'si
-     * @param float $amount İade tutarı
-     * @param string $currency Para birimi
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $refundId  İade ID'si
+     * @param  string  $transactionId  Orijinal işlem ID'si
+     * @param  float  $amount  İade tutarı
+     * @param  string  $currency  Para birimi
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function pending(
         string $refundId,
@@ -154,8 +151,6 @@ readonly class RefundResponse
 
     /**
      * İadenin tamamlanıp tamamlanmadığını kontrol eder.
-     *
-     * @return bool
      */
     public function isCompleted(): bool
     {
@@ -164,8 +159,6 @@ readonly class RefundResponse
 
     /**
      * İadenin beklemede olup olmadığını kontrol eder.
-     *
-     * @return bool
      */
     public function isPending(): bool
     {

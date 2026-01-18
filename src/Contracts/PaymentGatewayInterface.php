@@ -82,9 +82,8 @@ interface PaymentGatewayInterface
      * - error_code: (string|null) Hata kodu (başarısızlık durumunda)
      * - error_message: (string|null) Hata mesajı (başarısızlık durumunda)
      *
-     * @param CreatePaymentData $data Ödeme oluşturmak için gerekli tüm bilgileri
-     *                                içeren veri transfer nesnesi
-     *
+     * @param  CreatePaymentData  $data  Ödeme oluşturmak için gerekli tüm bilgileri
+     *                                   içeren veri transfer nesnesi
      * @return PaymentResponse Ödeme işleminin sonucunu içeren yanıt nesnesi.
      *                         3D Secure gerektiren işlemlerde redirect_url
      *                         veya html_content dolu olacaktır.
@@ -163,9 +162,8 @@ interface PaymentGatewayInterface
      * - provider_response: (array) Sağlayıcının ham yanıtı
      * - failure_reason: (string|null) Başarısızlık nedeni
      *
-     * @param VerifyPaymentData $data Doğrulama için gerekli callback/webhook
-     *                                verilerini içeren veri transfer nesnesi
-     *
+     * @param  VerifyPaymentData  $data  Doğrulama için gerekli callback/webhook
+     *                                   verilerini içeren veri transfer nesnesi
      * @return VerificationResponse Doğrulama sonucunu ve ödeme detaylarını
      *                              içeren yanıt nesnesi
      *
@@ -246,9 +244,8 @@ interface PaymentGatewayInterface
      * - error_code: (string|null) Hata kodu (başarısızlık durumunda)
      * - error_message: (string|null) Hata mesajı (başarısızlık durumunda)
      *
-     * @param RefundPaymentData $data İade işlemi için gerekli bilgileri
-     *                                içeren veri transfer nesnesi
-     *
+     * @param  RefundPaymentData  $data  İade işlemi için gerekli bilgileri
+     *                                   içeren veri transfer nesnesi
      * @return RefundResponse İade işleminin sonucunu içeren yanıt nesnesi
      *
      * @throws PaymentFailedException Aşağıdaki durumlarda fırlatılır:
@@ -258,7 +255,6 @@ interface PaymentGatewayInterface
      *                                - İade süresi dolmuş
      *                                - Sağlayıcı API hatası
      *                                - Yetersiz bakiye (satıcı hesabında)
-     *
      * @throws UnsupportedOperationException Aşağıdaki durumlarda fırlatılır:
      *                                       - Sağlayıcı iade desteklemiyor
      *                                       - Kısmi iade desteklenmiyor

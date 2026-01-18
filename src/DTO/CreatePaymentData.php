@@ -31,20 +31,20 @@ readonly class CreatePaymentData
     /**
      * Yeni bir CreatePaymentData instance'ı oluşturur.
      *
-     * @param float $amount Ödeme tutarı (zorunlu, pozitif sayı)
-     * @param string $currency Para birimi kodu (zorunlu, örn: 'TRY')
-     * @param string $orderId Benzersiz sipariş ID'si (zorunlu)
-     * @param CustomerData $customer Müşteri bilgileri (zorunlu)
-     * @param string $callbackUrl Webhook URL'i (zorunlu)
-     * @param string $returnUrl Başarılı ödeme sonrası yönlendirme (zorunlu)
-     * @param CardData|null $card Kart bilgileri (hosted payment için null)
-     * @param string|null $description Ödeme/ürün açıklaması
-     * @param AddressData|null $billingAddress Fatura adresi
-     * @param AddressData|null $shippingAddress Teslimat adresi
-     * @param string|null $cancelUrl İptal durumunda yönlendirme
-     * @param string $locale Dil kodu (varsayılan: 'tr')
-     * @param int $installment Taksit sayısı (varsayılan: 1 = peşin)
-     * @param array<string, mixed> $metadata Sağlayıcıya özel ek veriler
+     * @param  float  $amount  Ödeme tutarı (zorunlu, pozitif sayı)
+     * @param  string  $currency  Para birimi kodu (zorunlu, örn: 'TRY')
+     * @param  string  $orderId  Benzersiz sipariş ID'si (zorunlu)
+     * @param  CustomerData  $customer  Müşteri bilgileri (zorunlu)
+     * @param  string  $callbackUrl  Webhook URL'i (zorunlu)
+     * @param  string  $returnUrl  Başarılı ödeme sonrası yönlendirme (zorunlu)
+     * @param  CardData|null  $card  Kart bilgileri (hosted payment için null)
+     * @param  string|null  $description  Ödeme/ürün açıklaması
+     * @param  AddressData|null  $billingAddress  Fatura adresi
+     * @param  AddressData|null  $shippingAddress  Teslimat adresi
+     * @param  string|null  $cancelUrl  İptal durumunda yönlendirme
+     * @param  string  $locale  Dil kodu (varsayılan: 'tr')
+     * @param  int  $installment  Taksit sayısı (varsayılan: 1 = peşin)
+     * @param  array<string, mixed>  $metadata  Sağlayıcıya özel ek veriler
      */
     public function __construct(
         public float $amount,
@@ -66,8 +66,7 @@ readonly class CreatePaymentData
     /**
      * Array'den CreatePaymentData oluşturur.
      *
-     * @param array<string, mixed> $data Ödeme verileri
-     * @return self
+     * @param  array<string, mixed>  $data  Ödeme verileri
      */
     public static function fromArray(array $data): self
     {

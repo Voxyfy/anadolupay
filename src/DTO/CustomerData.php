@@ -24,13 +24,13 @@ readonly class CustomerData
     /**
      * Yeni bir CustomerData instance'ı oluşturur.
      *
-     * @param string $name Müşteri adı soyadı (zorunlu)
-     * @param string $email Müşteri e-posta adresi (zorunlu)
-     * @param string $ipAddress Müşteri IP adresi (zorunlu)
-     * @param string|null $phone Müşteri telefon numarası
-     * @param string|null $identityNumber TC Kimlik veya Vergi numarası
-     * @param string|null $city Şehir
-     * @param string|null $country Ülke kodu (ISO 3166-1 alpha-2)
+     * @param  string  $name  Müşteri adı soyadı (zorunlu)
+     * @param  string  $email  Müşteri e-posta adresi (zorunlu)
+     * @param  string  $ipAddress  Müşteri IP adresi (zorunlu)
+     * @param  string|null  $phone  Müşteri telefon numarası
+     * @param  string|null  $identityNumber  TC Kimlik veya Vergi numarası
+     * @param  string|null  $city  Şehir
+     * @param  string|null  $country  Ülke kodu (ISO 3166-1 alpha-2)
      */
     public function __construct(
         public string $name,
@@ -45,8 +45,7 @@ readonly class CustomerData
     /**
      * Array'den CustomerData oluşturur.
      *
-     * @param array<string, mixed> $data Müşteri verileri
-     * @return self
+     * @param  array<string, mixed>  $data  Müşteri verileri
      */
     public static function fromArray(array $data): self
     {

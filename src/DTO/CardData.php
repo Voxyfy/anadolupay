@@ -26,11 +26,11 @@ readonly class CardData
     /**
      * Yeni bir CardData instance'ı oluşturur.
      *
-     * @param string $holderName Kart üzerindeki isim (zorunlu)
-     * @param string $number Kart numarası (zorunlu, boşluksuz)
-     * @param string $expireMonth Son kullanma ayı (zorunlu, MM formatında)
-     * @param string $expireYear Son kullanma yılı (zorunlu, YY veya YYYY)
-     * @param string $cvv Güvenlik kodu (zorunlu)
+     * @param  string  $holderName  Kart üzerindeki isim (zorunlu)
+     * @param  string  $number  Kart numarası (zorunlu, boşluksuz)
+     * @param  string  $expireMonth  Son kullanma ayı (zorunlu, MM formatında)
+     * @param  string  $expireYear  Son kullanma yılı (zorunlu, YY veya YYYY)
+     * @param  string  $cvv  Güvenlik kodu (zorunlu)
      */
     public function __construct(
         public string $holderName,
@@ -43,8 +43,7 @@ readonly class CardData
     /**
      * Array'den CardData oluşturur.
      *
-     * @param array<string, mixed> $data Kart verileri
-     * @return self
+     * @param  array<string, mixed>  $data  Kart verileri
      */
     public static function fromArray(array $data): self
     {
@@ -60,7 +59,7 @@ readonly class CardData
     /**
      * Kart numarasındaki boşluk ve tire karakterlerini temizler.
      *
-     * @param string $number Ham kart numarası
+     * @param  string  $number  Ham kart numarası
      * @return string Temizlenmiş kart numarası
      */
     private static function sanitizeNumber(string $number): string
@@ -81,7 +80,7 @@ readonly class CardData
             return str_repeat('*', $length);
         }
 
-        return substr($this->number, 0, 6) . str_repeat('*', $length - 10) . substr($this->number, -4);
+        return substr($this->number, 0, 6).str_repeat('*', $length - 10).substr($this->number, -4);
     }
 
     /**
@@ -121,7 +120,7 @@ readonly class CardData
     public function isNotExpired(): bool
     {
         $year = strlen($this->expireYear) === 2
-            ? (int) ('20' . $this->expireYear)
+            ? (int) ('20'.$this->expireYear)
             : (int) $this->expireYear;
 
         $month = (int) $this->expireMonth;

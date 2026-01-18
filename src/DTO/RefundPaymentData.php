@@ -22,12 +22,12 @@ readonly class RefundPaymentData
     /**
      * Yeni bir RefundPaymentData instance'ı oluşturur.
      *
-     * @param string $transactionId Orijinal işlemin sağlayıcı ID'si (zorunlu)
-     * @param float $amount İade tutarı (zorunlu)
-     * @param string $currency Para birimi (varsayılan: 'TRY')
-     * @param string|null $reason İade nedeni
-     * @param string|null $refundId Sistem tarafından oluşturulan iade ID'si
-     * @param array<string, mixed> $metadata Sağlayıcıya özel ek veriler
+     * @param  string  $transactionId  Orijinal işlemin sağlayıcı ID'si (zorunlu)
+     * @param  float  $amount  İade tutarı (zorunlu)
+     * @param  string  $currency  Para birimi (varsayılan: 'TRY')
+     * @param  string|null  $reason  İade nedeni
+     * @param  string|null  $refundId  Sistem tarafından oluşturulan iade ID'si
+     * @param  array<string, mixed>  $metadata  Sağlayıcıya özel ek veriler
      */
     public function __construct(
         public string $transactionId,
@@ -41,8 +41,7 @@ readonly class RefundPaymentData
     /**
      * Array'den RefundPaymentData oluşturur.
      *
-     * @param array<string, mixed> $data İade verileri
-     * @return self
+     * @param  array<string, mixed>  $data  İade verileri
      */
     public static function fromArray(array $data): self
     {
@@ -86,8 +85,6 @@ readonly class RefundPaymentData
 
     /**
      * İade nedeninin belirtilip belirtilmediğini kontrol eder.
-     *
-     * @return bool
      */
     public function hasReason(): bool
     {

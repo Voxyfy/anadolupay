@@ -20,9 +20,9 @@ readonly class VerifyPaymentData
     /**
      * Yeni bir VerifyPaymentData instance'ı oluşturur.
      *
-     * @param string $transactionId Sağlayıcının işlem tanımlayıcısı (zorunlu)
-     * @param string $orderId Sipariş ID'si (zorunlu)
-     * @param array<string, mixed> $callbackData Callback'ten gelen ham veriler
+     * @param  string  $transactionId  Sağlayıcının işlem tanımlayıcısı (zorunlu)
+     * @param  string  $orderId  Sipariş ID'si (zorunlu)
+     * @param  array<string, mixed>  $callbackData  Callback'ten gelen ham veriler
      */
     public function __construct(
         public string $transactionId,
@@ -33,8 +33,7 @@ readonly class VerifyPaymentData
     /**
      * Array'den VerifyPaymentData oluşturur.
      *
-     * @param array<string, mixed> $data Doğrulama verileri
-     * @return self
+     * @param  array<string, mixed>  $data  Doğrulama verileri
      */
     public static function fromArray(array $data): self
     {
@@ -48,10 +47,9 @@ readonly class VerifyPaymentData
     /**
      * Callback isteğinden (POST/GET) VerifyPaymentData oluşturur.
      *
-     * @param array<string, mixed> $requestData İstek verileri ($_POST veya $_GET)
-     * @param string $transactionIdKey Sağlayıcıya özel transaction ID anahtarı
-     * @param string $orderIdKey Sağlayıcıya özel order ID anahtarı
-     * @return self
+     * @param  array<string, mixed>  $requestData  İstek verileri ($_POST veya $_GET)
+     * @param  string  $transactionIdKey  Sağlayıcıya özel transaction ID anahtarı
+     * @param  string  $orderIdKey  Sağlayıcıya özel order ID anahtarı
      */
     public static function fromCallback(
         array $requestData,
@@ -82,9 +80,8 @@ readonly class VerifyPaymentData
     /**
      * Callback verisinden belirli bir değer alır.
      *
-     * @param string $key Anahtar
-     * @param mixed $default Varsayılan değer
-     * @return mixed
+     * @param  string  $key  Anahtar
+     * @param  mixed  $default  Varsayılan değer
      */
     public function getCallbackValue(string $key, mixed $default = null): mixed
     {
@@ -94,8 +91,7 @@ readonly class VerifyPaymentData
     /**
      * Callback verisinin belirli bir anahtarı içerip içermediğini kontrol eder.
      *
-     * @param string $key Anahtar
-     * @return bool
+     * @param  string  $key  Anahtar
      */
     public function hasCallbackValue(string $key): bool
     {

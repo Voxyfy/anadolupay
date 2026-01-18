@@ -30,17 +30,17 @@ readonly class VerificationResponse
     /**
      * Yeni bir VerificationResponse instance'ı oluşturur.
      *
-     * @param bool $success İşlem başarılı mı
-     * @param PaymentStatus $status Ödeme durumu
-     * @param string|null $transactionId Sağlayıcının işlem tanımlayıcısı
-     * @param string|null $orderId Sipariş ID'si
-     * @param float|null $amount İşlem tutarı
-     * @param string|null $currency Para birimi
-     * @param string|null $authCode Banka onay kodu
-     * @param string|null $hostReference Banka referans numarası
-     * @param array<string, mixed> $providerResponse Sağlayıcının orijinal yanıtı
-     * @param string|null $errorCode Hata kodu (başarısızlık durumunda)
-     * @param string|null $errorMessage Hata mesajı (başarısızlık durumunda)
+     * @param  bool  $success  İşlem başarılı mı
+     * @param  PaymentStatus  $status  Ödeme durumu
+     * @param  string|null  $transactionId  Sağlayıcının işlem tanımlayıcısı
+     * @param  string|null  $orderId  Sipariş ID'si
+     * @param  float|null  $amount  İşlem tutarı
+     * @param  string|null  $currency  Para birimi
+     * @param  string|null  $authCode  Banka onay kodu
+     * @param  string|null  $hostReference  Banka referans numarası
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcının orijinal yanıtı
+     * @param  string|null  $errorCode  Hata kodu (başarısızlık durumunda)
+     * @param  string|null  $errorMessage  Hata mesajı (başarısızlık durumunda)
      */
     public function __construct(
         public bool $success,
@@ -59,14 +59,13 @@ readonly class VerificationResponse
     /**
      * Başarılı bir doğrulama yanıtı oluşturur.
      *
-     * @param string $transactionId İşlem ID'si
-     * @param string $orderId Sipariş ID'si
-     * @param float $amount İşlem tutarı
-     * @param string $currency Para birimi
-     * @param string|null $authCode Banka onay kodu
-     * @param string|null $hostReference Banka referans numarası
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $transactionId  İşlem ID'si
+     * @param  string  $orderId  Sipariş ID'si
+     * @param  float  $amount  İşlem tutarı
+     * @param  string  $currency  Para birimi
+     * @param  string|null  $authCode  Banka onay kodu
+     * @param  string|null  $hostReference  Banka referans numarası
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function success(
         string $transactionId,
@@ -93,12 +92,11 @@ readonly class VerificationResponse
     /**
      * Başarısız bir doğrulama yanıtı oluşturur.
      *
-     * @param string $errorMessage Hata mesajı
-     * @param string|null $errorCode Hata kodu
-     * @param string|null $transactionId İşlem ID'si (varsa)
-     * @param string|null $orderId Sipariş ID'si (varsa)
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $errorMessage  Hata mesajı
+     * @param  string|null  $errorCode  Hata kodu
+     * @param  string|null  $transactionId  İşlem ID'si (varsa)
+     * @param  string|null  $orderId  Sipariş ID'si (varsa)
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function failed(
         string $errorMessage,
@@ -122,10 +120,9 @@ readonly class VerificationResponse
      * Beklemede olan bir doğrulama yanıtı oluşturur.
      * Bazı sağlayıcılar ödemeyi asenkron olarak işler.
      *
-     * @param string $transactionId İşlem ID'si
-     * @param string $orderId Sipariş ID'si
-     * @param array<string, mixed> $providerResponse Sağlayıcı yanıtı
-     * @return self
+     * @param  string  $transactionId  İşlem ID'si
+     * @param  string  $orderId  Sipariş ID'si
+     * @param  array<string, mixed>  $providerResponse  Sağlayıcı yanıtı
      */
     public static function pending(
         string $transactionId,
@@ -165,8 +162,6 @@ readonly class VerificationResponse
 
     /**
      * Ödemenin tamamlanıp tamamlanmadığını kontrol eder.
-     *
-     * @return bool
      */
     public function isCompleted(): bool
     {
@@ -175,8 +170,6 @@ readonly class VerificationResponse
 
     /**
      * Ödemenin beklemede olup olmadığını kontrol eder.
-     *
-     * @return bool
      */
     public function isPending(): bool
     {

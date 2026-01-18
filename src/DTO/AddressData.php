@@ -24,13 +24,13 @@ readonly class AddressData
     /**
      * Yeni bir AddressData instance'ı oluşturur.
      *
-     * @param string $addressLine Adres satırı (zorunlu)
-     * @param string $city Şehir (zorunlu)
-     * @param string $country Ülke kodu (varsayılan: 'TR')
-     * @param string|null $district İlçe/Semt
-     * @param string|null $postalCode Posta kodu
-     * @param string|null $contactName Alıcı adı
-     * @param string|null $phone İletişim telefonu
+     * @param  string  $addressLine  Adres satırı (zorunlu)
+     * @param  string  $city  Şehir (zorunlu)
+     * @param  string  $country  Ülke kodu (varsayılan: 'TR')
+     * @param  string|null  $district  İlçe/Semt
+     * @param  string|null  $postalCode  Posta kodu
+     * @param  string|null  $contactName  Alıcı adı
+     * @param  string|null  $phone  İletişim telefonu
      */
     public function __construct(
         public string $addressLine,
@@ -45,8 +45,7 @@ readonly class AddressData
     /**
      * Array'den AddressData oluşturur.
      *
-     * @param array<string, mixed> $data Adres verileri
-     * @return self
+     * @param  array<string, mixed>  $data  Adres verileri
      */
     public static function fromArray(array $data): self
     {
