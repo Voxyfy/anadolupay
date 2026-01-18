@@ -36,7 +36,7 @@ class IyzicoGateway implements PaymentGatewayInterface
             (string) ($config['secret_key'] ?? ''),
         );
 
-        return new self($client, new IyzicoMapper());
+        return new self($client, new IyzicoMapper);
     }
 
     /**
