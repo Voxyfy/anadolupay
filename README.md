@@ -4,7 +4,9 @@
 [![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/voxyfy/anadolupay/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/voxyfy/anadolupay/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/voxyfy/anadolupay.svg?style=flat-square)](https://packagist.org/packages/voxyfy/anadolupay)
 
-Laravel 12 için birleşik Türk ödeme geçidi soyutlama paketi. AnadoluPay, birden fazla Türk ödeme sağlayıcısını Laravel uygulamanıza entegre etmek için temiz ve tutarlı bir API sunar.
+AnadoluPay is a Laravel payment abstraction layer for Turkish payment providers.
+It orchestrates payment flows and normalizes responses, while leaving UI rendering
+and final business decisions to the consuming application.
 
 ## Gereksinimler
 
@@ -13,13 +15,13 @@ Laravel 12 için birleşik Türk ödeme geçidi soyutlama paketi. AnadoluPay, bi
 
 ## Kurulum
 
-Paketi Composer ile yükleyin:
-
 ```bash
 composer require voxyfy/anadolupay
 ```
 
-Yapılandırma dosyasını yayınlayın:
+Laravel auto-discovery varsayılan olarak aktiftir; ek bir adım gerekmez.
+
+Konfigürasyon dosyasını yayınlamak isterseniz:
 
 ```bash
 php artisan vendor:publish --tag="anadolupay-config"
@@ -27,172 +29,86 @@ php artisan vendor:publish --tag="anadolupay-config"
 
 ## Yapılandırma
 
-Yayınladıktan sonra yapılandırma dosyası `config/anadolupay.php` konumunda olacaktır:
-
-```php
-return [
-    // Varsayılan ödeme driver'ı
-    'default' => env('ANADOLUPAY_DRIVER', null),
-
-    // Ödeme geçidi driver'ları
-    'drivers' => [
-        // Ödeme sağlayıcılarınızı burada yapılandırın
-    ],
-];
-```
-
-Varsayılan driver'ı `.env` dosyanızda ayarlayın:
+Iyzico 3DS için gerekli ortam değişkenleri:
 
 ```env
-ANADOLUPAY_DRIVER=iyzico
+IYZICO_API_KEY=xxx
+IYZICO_SECRET_KEY=xxx
+IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+IYZICO_CALLBACK_URL=https://example.com/anadolupay/callback/iyzico
 ```
 
-## Temel Kullanım
+Notlar:
+- `IYZICO_BASE_URL` sandbox veya production host olabilir.
+- `IYZICO_CALLBACK_URL` dışarıdan erişilebilir olmalıdır.
 
-### Facade Kullanımı
-
-```php
-use Voxyfy\AnadoluPay\Facades\AnadoluPay;
-
-// Varsayılan driver'ı al
-$gateway = AnadoluPay::driver();
-
-// Belirli bir driver'ı al
-$gateway = AnadoluPay::driver('iyzico');
-
-// Ödeme oluştur
-$sonuc = AnadoluPay::driver()->createPayment([
-    'amount' => 100.00,
-    'currency' => 'TRY',
-    'order_id' => 'SIPARIS-123',
-    'customer' => [
-        'name' => 'Ahmet Yılmaz',
-        'email' => 'ahmet@example.com',
-    ],
-]);
-
-// Ödemeyi doğrula
-$dogrulama = AnadoluPay::driver()->verify($transactionId);
-
-// İade işlemi yap
-$iade = AnadoluPay::driver()->refund($transactionId, [
-    'amount' => 50.00, // Kısmi iade
-    'reason' => 'Müşteri talebi',
-]);
-```
-
-### Dependency Injection Kullanımı
-
-```php
-use Voxyfy\AnadoluPay\AnadoluPay;
-
-class OdemeController extends Controller
-{
-    public function __construct(
-        protected AnadoluPay $anadoluPay
-    ) {}
-
-    public function odemeYap()
-    {
-        $gateway = $this->anadoluPay->driver();
-        // ...
-    }
-}
-```
-
-### Mevcut Driver'ları Kontrol Etme
-
-```php
-// Tüm yapılandırılmış driver adlarını al
-$drivers = AnadoluPay::getAvailableDrivers();
-
-// Belirli bir driver'ın yapılandırılıp yapılandırılmadığını kontrol et
-if (AnadoluPay::hasDriver('iyzico')) {
-    // Driver mevcut
-}
-```
-
-## Gateway Driver Oluşturma
-
-Özel bir ödeme geçidi driver'ı oluşturmak için `PaymentGatewayInterface`'i implement edin:
+## 3DS Ödeme Başlatma (iyzico)
 
 ```php
 <?php
 
-namespace App\PaymentGateways;
+namespace App\Http\Controllers;
 
-use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
+use Illuminate\Http\Request;
+use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
+use Voxyfy\AnadoluPay\Facades\AnadoluPay;
 
-class OzelGateway implements PaymentGatewayInterface
+class PaymentController extends Controller
 {
-    public function __construct(protected array $config)
+    public function pay(Request $request)
     {
-        // Yapılandırma ile başlat
-    }
+        $data = new CreatePaymentData(
+            amount: 100.00,
+            currency: 'TRY',
+            orderId: 'SIPARIS-123',
+            customer: [
+                'name' => 'Ahmet Yilmaz',
+                'email' => 'ahmet@example.com',
+                'phone' => '+905551112233',
+                'card' => [
+                    'cardHolderName' => 'Ahmet Yilmaz',
+                    'cardNumber' => '5528790000000008',
+                    'expireYear' => '2030',
+                    'expireMonth' => '12',
+                    'cvc' => '123',
+                ],
+            ],
+            successUrl: 'https://example.com/success',
+            failUrl: 'https://example.com/fail',
+        );
 
-    public function createPayment(array $data): array
-    {
-        // Ödeme oluşturma mantığını implement et
-    }
+        $response = AnadoluPay::driver('iyzico')->createPayment($data);
 
-    public function verify(string $transactionId, array $data = []): array
-    {
-        // Ödeme doğrulama mantığını implement et
-    }
+        $threeDsHtml = $response->raw['threeDSHtmlContent'] ?? null;
 
-    public function refund(string $transactionId, array $data = []): array
-    {
-        // İade mantığını implement et
+        return response()->json([
+            'threeDSHtmlContent' => $threeDsHtml,
+        ]);
     }
 }
 ```
 
-Ardından yapılandırmanıza kaydedin:
+## threeDSHtmlContent Render Etme
+
+`threeDSHtmlContent` base64-encoded bir HTML dokümanıdır, bir URL değildir.
+AnadoluPay bunu render etmez veya decode etmez; bu sorumluluk uygulamanızdadır.
 
 ```php
-'drivers' => [
-    'ozel' => [
-        'driver' => \App\PaymentGateways\OzelGateway::class,
-        'api_key' => env('OZEL_GATEWAY_API_KEY'),
-        'api_secret' => env('OZEL_GATEWAY_API_SECRET'),
-        'sandbox' => env('OZEL_GATEWAY_SANDBOX', true),
-    ],
-],
+$response = AnadoluPay::driver('iyzico')->createPayment($data);
+
+$html = base64_decode($response->raw['threeDSHtmlContent']);
+
+return response($html);
 ```
 
-## Desteklenen Sağlayıcılar (Planlanan)
+## Callback ve Webhook Doğrulama
 
-Aşağıdaki Türk ödeme sağlayıcıları gelecek sürümler için planlanmaktadır:
+- Iyzico redirect callback'inde `status`, `paymentId`, `conversationData`, `mdStatus` alanları gelir.
+- Gateway bu payload'u doğrular, ardından 3DS auth çağrısını yapar ve sonucu normalize eder.
+- Webhook bildirimleri için de `verify(...)` çağrısı aynı şekilde çalışır.
 
-- iyzico
-- PayTR
-- Param
-- Sipay
-- Craftgate
-- Paynet
-- Moka
-
-## Hata Yönetimi
-
-AnadoluPay, farklı hata senaryoları için özel exception'lar sağlar:
-
-```php
-use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
-use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
-use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
-
-try {
-    $sonuc = AnadoluPay::driver()->createPayment($veri);
-} catch (DriverNotFoundException $e) {
-    // Driver yapılandırılmamış
-} catch (PaymentFailedException $e) {
-    // Ödeme işleme başarısız
-    $hataKodu = $e->getErrorCode();
-    $kullaniciMesaji = $e->getUserMessage();
-} catch (UnsupportedOperationException $e) {
-    // İşlem bu gateway tarafından desteklenmiyor
-}
-```
+AnadoluPay yalnızca doğrulama ve normalizasyon yapar. Sipariş onayı, stok düşme,
+fatura kesme gibi iş kuralları uygulama tarafında yönetilmelidir.
 
 ## Testler
 
@@ -211,11 +127,6 @@ Katkılarınızı bekliyoruz! Detaylar için [CONTRIBUTING](CONTRIBUTING.md) dos
 ## Güvenlik Açıkları
 
 Bir güvenlik açığı keşfederseniz, lütfen security@voxyfy.com adresine e-posta gönderin.
-
-## Katkıda Bulunanlar
-
-- [Voxyfy](https://github.com/Voxyfy)
-- [Tüm Katkıda Bulunanlar](../../contributors)
 
 ## Lisans
 

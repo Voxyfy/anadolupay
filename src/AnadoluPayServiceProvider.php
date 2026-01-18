@@ -25,6 +25,11 @@ class AnadoluPayServiceProvider extends ServiceProvider
 
         $this->app->singleton('anadolupay', fn () => new AnadoluPay);
         $this->app->alias('anadolupay', AnadoluPay::class);
+
+        $this->app->bind(
+            \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::class,
+            fn () => \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::fromConfig()
+        );
     }
 
     /**
