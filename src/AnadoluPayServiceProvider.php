@@ -32,6 +32,8 @@ class AnadoluPayServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->loadRoutesFrom(__DIR__.'/../routes/anadolupay.php');
+
         $this->publishes([
             __DIR__.'/../config/anadolupay.php' => config_path('anadolupay.php'),
         ], 'anadolupay-config');
