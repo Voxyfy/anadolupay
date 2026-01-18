@@ -45,7 +45,7 @@ class IyzicoGateway implements PaymentGatewayInterface
             (string) ($config['signature_param'] ?? 'signature'),
         );
 
-        return new self($client, new IyzicoMapper(), $validator);
+        return new self($client, new IyzicoMapper, $validator);
     }
 
     /**

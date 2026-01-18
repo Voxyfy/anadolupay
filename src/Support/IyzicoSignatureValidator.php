@@ -160,6 +160,7 @@ class IyzicoSignatureValidator
 
             if (is_array($value)) {
                 $first = $value[0] ?? null;
+
                 return is_string($first) ? $first : null;
             }
 
