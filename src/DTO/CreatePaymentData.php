@@ -13,13 +13,13 @@ namespace Voxyfy\AnadoluPay\DTO;
 final readonly class CreatePaymentData
 {
     /**
-     * @param float $amount Ödeme tutarı (örn: 199.99)
-     * @param string $currency ISO para birimi kodu (örn: TRY, USD)
-     * @param string $orderId Satıcı sistemindeki benzersiz sipariş referansı
-     * @param array<string, mixed> $customer Müşteri bilgileri
-     * @param string|null $successUrl Başarılı ödeme sonrası yönlendirme URL'i (opsiyonel)
-     * @param string|null $failUrl Başarısız ödeme sonrası yönlendirme URL'i (opsiyonel)
-     * @param array<string, mixed> $metadata Sağlayıcıya özel veya dahili ek veriler
+     * @param  float  $amount  Ödeme tutarı (örn: 199.99)
+     * @param  string  $currency  ISO para birimi kodu (örn: TRY, USD)
+     * @param  string  $orderId  Satıcı sistemindeki benzersiz sipariş referansı
+     * @param  array<string, mixed>  $customer  Müşteri bilgileri
+     * @param  string|null  $successUrl  Başarılı ödeme sonrası yönlendirme URL'i (opsiyonel)
+     * @param  string|null  $failUrl  Başarısız ödeme sonrası yönlendirme URL'i (opsiyonel)
+     * @param  array<string, mixed>  $metadata  Sağlayıcıya özel veya dahili ek veriler
      */
     public function __construct(
         public float $amount,
