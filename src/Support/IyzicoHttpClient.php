@@ -27,9 +27,19 @@ class IyzicoHttpClient
      */
     public function post(string $path, array $payload): array
     {
+        $random = bin2hex(random_bytes(8));
+        $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $body = $body === false ? '' : $body;
+        // TODO: Iyzico resmi imza semasini dogrula ve gerekirse guncelle.
+        $signature = base64_encode(hash_hmac('sha256', $this->apiKey.$random.$body, $this->secretKey, true));
+        $authorization = 'IYZWSv2 '.$this->apiKey.':'.$signature;
+
         $response = Http::baseUrl($this->baseUrl)
             ->asJson()
-            ->withBasicAuth($this->apiKey, $this->secretKey) // TODO: Farklı bir imza şeması gerekiyorsa güncelleyin.
+            ->withHeaders([
+                'x-iyzi-rnd' => $random,
+                'Authorization' => $authorization,
+            ])
             ->post($path, $payload);
 
         if (! $response->successful()) {

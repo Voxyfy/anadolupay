@@ -27,15 +27,21 @@ class IyzicoMapper
         }
 
         $fullName = trim((string) ($customer['name'] ?? ''));
+        $explicitSurname = trim((string) ($customer['surname'] ?? ''));
         $nameParts = array_values(array_filter(explode(' ', $fullName)));
         $firstName = $nameParts[0] ?? 'Customer';
-        $lastName = $nameParts[1] ?? 'Unknown';
+        $lastName = $explicitSurname !== '' ? $explicitSurname : ($nameParts[1] ?? 'Unknown');
 
         return [
+            'locale' => (string) ($customer['locale'] ?? 'tr'),
             'price' => (string) $data->amount,
             'paidPrice' => (string) $data->amount,
             'currency' => $data->currency,
+            'installment' => (int) ($customer['installment'] ?? 1),
             'conversationId' => $data->orderId,
+            'basketId' => $data->orderId,
+            'paymentChannel' => (string) ($customer['paymentChannel'] ?? 'WEB'),
+            'paymentGroup' => (string) ($customer['paymentGroup'] ?? 'PRODUCT'),
             'callbackUrl' => $callbackUrl,
             'paymentCard' => [
                 'cardHolderName' => (string) ($card['cardHolderName'] ?? $fullName ?: 'Customer'),
