@@ -1,6 +1,6 @@
 {
     "name": "voxyfy/anadolupay",
-    "description": "Unified Laravel 12 payment gateway abstraction for Turkish providers.",
+    "description": "Türk banka sanal POS'ları ve ödeme kuruluşları için birleşik Laravel ödeme geçidi — NestPay, Garanti, PosNet, PayFlex, PayFor, InterPos, KuveytPos, PayTR, Param.",
     "keywords": [
         "voxyfy",
         "laravel",
