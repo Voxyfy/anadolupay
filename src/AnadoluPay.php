@@ -7,6 +7,7 @@ namespace Voxyfy\AnadoluPay;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 
 /**
  * AnadoluPay Ana Sınıfı
@@ -39,13 +40,20 @@ class AnadoluPay
         }
 
         $drivers = config('anadolupay.drivers', []);
+        $banks = config('anadolupay.banks', []);
 
-        if (! isset($drivers[$name])) {
-            throw new DriverNotFoundException($name, array_keys($drivers));
+        if (isset($drivers[$name])) {
+            $class = $drivers[$name];
+            $instance = app()->make($class);
+        } elseif (isset($banks[$name])) {
+            $class = $banks[$name]['gateway'] ?? null;
+            $instance = $this->makeBankGateway($name, $banks[$name]);
+        } else {
+            throw new DriverNotFoundException(
+                $name,
+                array_merge(array_keys($drivers), array_keys($banks)),
+            );
         }
-
-        $class = $drivers[$name];
-        $instance = app()->make($class);
 
         if (! $instance instanceof PaymentGatewayInterface) {
             throw new PaymentFailedException(
@@ -58,5 +66,46 @@ class AnadoluPay
         }
 
         return $this->resolved[$name] = $instance;
+    }
+
+    /**
+     * Yapılandırılmış tüm driver ve banka anahtarlarını döndürür.
+     *
+     * @return list<string>
+     */
+    public function available(): array
+    {
+        return array_values(array_unique(array_merge(
+            array_keys(config('anadolupay.drivers', [])),
+            array_keys(config('anadolupay.banks', [])),
+        )));
+    }
+
+    /**
+     * Banka preset'inden sanal POS driver'ı üretir.
+     *
+     * @param  array<string, mixed>  $bankConfig
+     *
+     * @throws PaymentFailedException Preset'te geçerli bir gateway sınıfı yoksa
+     */
+    protected function makeBankGateway(string $name, array $bankConfig): object
+    {
+        $class = $bankConfig['gateway'] ?? null;
+
+        if (! is_string($class) || ! class_exists($class)) {
+            throw new PaymentFailedException(
+                message: "Bank preset '{$name}' must declare a valid 'gateway' class.",
+                context: ['bank' => $name, 'gateway' => $class],
+            );
+        }
+
+        if (! is_subclass_of($class, AbstractBankGateway::class)) {
+            throw new PaymentFailedException(
+                message: "Bank gateway '{$class}' must extend AbstractBankGateway.",
+                context: ['bank' => $name, 'gateway' => $class],
+            );
+        }
+
+        return $class::forBank($name, $bankConfig);
     }
 }

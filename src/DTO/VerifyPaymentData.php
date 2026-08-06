@@ -21,10 +21,23 @@ readonly class VerifyPaymentData
      * @param  array<string, mixed>  $payload  Ödeme sağlayıcısı tarafından gönderilen istek verisi
      * @param  array<string, mixed>  $headers  Callback/webhook isteğiyle gönderilen HTTP başlıkları
      * @param  string|null  $rawBody  İmza doğrulaması için ham istek gövdesi
+     * @param  array<string, mixed>  $order  Orijinal sipariş bağlamı (id, amount, currency,
+     *                                       installment, payment_model). Bazı bankalar dönüşte
+     *                                       bu bilgileri geri göndermez ve provizyon isteği
+     *                                       için satıcı tarafından sağlanması gerekir.
      */
     public function __construct(
         public array $payload,
         public array $headers = [],
         public ?string $rawBody = null,
+        public array $order = [],
     ) {}
+
+    /**
+     * Sipariş bağlamından bir alanı okur.
+     */
+    public function order(string $key, mixed $default = null): mixed
+    {
+        return $this->order[$key] ?? $default;
+    }
 }

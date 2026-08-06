@@ -9,9 +9,24 @@ namespace Voxyfy\AnadoluPay\DTO;
  *
  * Ödeme sağlayıcılarından bağımsız, yeni bir ödeme işlemi
  * başlatmak için gerekli temel verileri içerir.
+ *
+ * Banka sanal POS driver'ları ek olarak `card`, `installment`,
+ * `paymentModel` ve `ip` alanlarını kullanır.
  */
 final readonly class CreatePaymentData
 {
+    /** 3D Secure: kimlik doğrulama sonrası ayrı bir provizyon isteği atılır. */
+    public const MODEL_3D_SECURE = '3d';
+
+    /** 3D Pay: kimlik doğrulama ve provizyon tek adımda banka tarafında yapılır. */
+    public const MODEL_3D_PAY = '3d_pay';
+
+    /** 3D Host: kart bilgileri de dahil tüm form banka tarafında toplanır. */
+    public const MODEL_3D_HOST = '3d_host';
+
+    /** Non-secure: 3D doğrulaması olmadan doğrudan provizyon. */
+    public const MODEL_NON_SECURE = 'regular';
+
     /**
      * @param  float  $amount  Ödeme tutarı (örn: 199.99)
      * @param  string  $currency  ISO para birimi kodu (örn: TRY, USD)
@@ -20,6 +35,11 @@ final readonly class CreatePaymentData
      * @param  string|null  $successUrl  Başarılı ödeme sonrası yönlendirme URL'i (opsiyonel)
      * @param  string|null  $failUrl  Başarısız ödeme sonrası yönlendirme URL'i (opsiyonel)
      * @param  array<string, mixed>  $metadata  Sağlayıcıya özel veya dahili ek veriler
+     * @param  CardData|null  $card  Kart bilgileri (3D Host dışındaki tüm banka akışlarında zorunlu)
+     * @param  int  $installment  Taksit sayısı (1 veya 0 = tek çekim)
+     * @param  string  $paymentModel  Ödeme modeli; self::MODEL_* sabitlerinden biri
+     * @param  string|null  $ip  Müşterinin IP adresi (birçok banka zorunlu tutar)
+     * @param  string  $lang  Banka ödeme sayfasının dili (tr/en)
      */
     public function __construct(
         public float $amount,
@@ -29,5 +49,50 @@ final readonly class CreatePaymentData
         public ?string $successUrl = null,
         public ?string $failUrl = null,
         public array $metadata = [],
+        public ?CardData $card = null,
+        public int $installment = 1,
+        public string $paymentModel = self::MODEL_3D_SECURE,
+        public ?string $ip = null,
+        public string $lang = 'tr',
     ) {}
+
+    /**
+     * Kart bilgisini döndürür; `card` verilmemişse `customer['card']`
+     * dizisinden üretmeyi dener.
+     *
+     * Bu geriye dönük uyumluluk içindir: paketin ilk sürümünde kart
+     * bilgisi `customer['card']` altında taşınıyordu.
+     */
+    public function card(): ?CardData
+    {
+        if ($this->card instanceof CardData) {
+            return $this->card;
+        }
+
+        $card = $this->customer['card'] ?? null;
+
+        return is_array($card) ? CardData::fromArray($card) : null;
+    }
+
+    /**
+     * Taksit sayısını normalize eder; tek çekim için 1 döndürür.
+     */
+    public function installments(): int
+    {
+        return $this->installment > 1 ? $this->installment : 1;
+    }
+
+    /**
+     * Müşteri IP'sini döndürür; verilmemişse `customer['ip']`e düşer.
+     */
+    public function clientIp(): string
+    {
+        if ($this->ip !== null && $this->ip !== '') {
+            return $this->ip;
+        }
+
+        $ip = $this->customer['ip'] ?? null;
+
+        return is_string($ip) && $ip !== '' ? $ip : '127.0.0.1';
+    }
 }
