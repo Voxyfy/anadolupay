@@ -2,6 +2,15 @@
 
 All notable changes to `:package_name` will be documented in this file.
 
+## v1.0.0 - 2026-08-06
+
+### What's Changed
+
+* Bump ramsey/composer-install from 3 to 4 by @dependabot[bot] in https://github.com/Voxyfy/anadolupay/pull/2
+* Bump dependabot/fetch-metadata from 2.5.0 to 3.1.0 by @dependabot[bot] in https://github.com/Voxyfy/anadolupay/pull/4
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v0.1.0...v1.0.0
+
 ## Unreleased
 
 ### Eklendi
