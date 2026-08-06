@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Tests;
 
+use Illuminate\Foundation\Application;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Voxyfy\AnadoluPay\AnadoluPayServiceProvider;
 
@@ -18,7 +19,7 @@ class TestCase extends Orchestra
     /**
      * Paket için service provider'ları döndürür.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      * @return array<int, class-string>
      */
     protected function getPackageProviders($app): array
@@ -31,7 +32,7 @@ class TestCase extends Orchestra
     /**
      * Ortam ayarlarını tanımlar.
      *
-     * @param  \Illuminate\Foundation\Application  $app
+     * @param  Application  $app
      */
     public function getEnvironmentSetUp($app): void
     {

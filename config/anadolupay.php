@@ -1,5 +1,8 @@
 <?php
 
+use Voxyfy\AnadoluPay\Gateways\FakeGateway;
+use Voxyfy\AnadoluPay\Gateways\IyzicoGateway;
+
 return [
 
     /*
@@ -22,8 +25,8 @@ return [
 
         // Geliştirme ve test için sahte gateway.
         // Gerçek API çağrısı yapmaz, rastgele başarı/başarısızlık simüle eder.
-        'fake' => \Voxyfy\AnadoluPay\Gateways\FakeGateway::class,
-        'iyzico' => \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::class,
+        'fake' => FakeGateway::class,
+        'iyzico' => IyzicoGateway::class,
 
     ],
 

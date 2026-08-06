@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Voxyfy\AnadoluPay;
 
 use Illuminate\Support\ServiceProvider;
+use Voxyfy\AnadoluPay\Gateways\IyzicoGateway;
 
 /**
  * AnadoluPay Service Provider
@@ -27,8 +28,8 @@ class AnadoluPayServiceProvider extends ServiceProvider
         $this->app->alias('anadolupay', AnadoluPay::class);
 
         $this->app->bind(
-            \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::class,
-            fn () => \Voxyfy\AnadoluPay\Gateways\IyzicoGateway::fromConfig()
+            IyzicoGateway::class,
+            fn () => IyzicoGateway::fromConfig()
         );
     }
 
