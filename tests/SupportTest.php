@@ -195,3 +195,22 @@ it('sayısal para birimi kodunu alfabetik koda çevirir', function () {
         // Tanınmayan kod ham haliyle korunur, hata fırlatılmaz
         ->and(Currency::alphabetic('999'))->toBe('999');
 });
+
+it('XML özniteliklerini @ önekiyle yazar ve okur', function () {
+    // Param SOAP istekleri ad alanını öznitelik olarak taşır; encode ve
+    // decode simetrik olmazsa istek hiç oluşturulamaz.
+    $xml = Xml::encode(['@xmlns' => 'https://turkpos.com.tr/', 'Siparis_ID' => 'ORDER-1'], 'TP_WMD_UCD', withDeclaration: false);
+
+    expect($xml)->toBe('<TP_WMD_UCD xmlns="https://turkpos.com.tr/"><Siparis_ID>ORDER-1</Siparis_ID></TP_WMD_UCD>');
+});
+
+it('ad alanlı XML’i çözümler', function () {
+    // SOAP yanıtlarında gövdenin tamamı `soap:` ad alanındadır; atlanırsa
+    // yanıt boş görünür.
+    $decoded = Xml::decode(
+        '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
+        .'<soap:Body><Sonuc>1</Sonuc></soap:Body></soap:Envelope>'
+    );
+
+    expect($decoded)->toBe(['Body' => ['Sonuc' => '1']]);
+});

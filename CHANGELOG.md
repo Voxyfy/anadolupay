@@ -37,6 +37,29 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ## Unreleased
 
+### Düzeltildi — Param driver'ı hiç çalışmıyordu
+
+Davranış testleri yazılırken iki hata ortaya çıktı; ikisi de `Xml`
+yardımcısındaydı ve Param driver'ını tamamen kullanılamaz kılıyordu:
+
+* `Xml::encode()` `@` önekli anahtarları eleman adı sanıyordu. Param istekleri
+  ad alanını `'@xmlns'` ile taşıdığı için **her çağrı `DOMException` ile
+  düşüyordu**. Artık `@` önekli anahtarlar öznitelik olarak yazılıyor —
+  `decode()`'un öznitelikleri `@ad` ile döndürmesiyle simetrik.
+* `Xml::decode()` ad alanlı çocukları atlıyordu. SOAP yanıtlarında gövdenin
+  tamamı `soap:` ad alanında olduğu için Param'ın **yanıtı boş görünüyordu**.
+  Artık belgede bildirilen her ad alanı dolaşılıyor; anahtar olarak ön eksiz
+  yerel ad kullanılıyor. Düz XML kullanan diğer driver'ların davranışı
+  değişmedi.
+
+### Eklendi
+
+* **Davranış testleri**: VakıfKatılım (sıfır kapsamdaydı), InterPos, PayFor,
+  PosNet V1, Param, Tosla, PayFlex. Her driver için 3D form üretimi, dönüş
+  imzası, provizyon, iade/iptal, ön provizyon ve durum sorgusu artık
+  testle kilitli. Süit 164 → 230 test.
+
+
 ### Eklendi
 
 * **Sağlayıcıya özel webhook onay yanıtı** (`ProvidesWebhookAcknowledgement`).

@@ -24,6 +24,10 @@ final class Xml
      * Sayısal anahtarlı listeler, üst elemanın adıyla tekrar eden
      * kardeş elemanlara dönüştürülür.
      *
+     * `@` ile başlayan anahtarlar eleman değil **öznitelik** üretir:
+     * `['@xmlns' => '...']` → `<Root xmlns="...">`. Bu, `decode()`'un
+     * öznitelikleri `@ad` anahtarıyla döndürmesiyle simetriktir.
+     *
      * @param  array<array-key, mixed>  $data
      * @param  string  $root  Kök elemanın adı (örn: CC5Request)
      * @param  string  $encoding  Belge kodlaması (örn: ISO-8859-9, UTF-8)
@@ -108,6 +112,15 @@ final class Xml
                 continue;
             }
 
+            // '@' ön ekli anahtarlar öznitelik olarak yazılır.
+            if (is_string($key) && str_starts_with($key, '@')) {
+                if (is_scalar($value)) {
+                    $parent->setAttribute(substr($key, 1), (string) $value);
+                }
+
+                continue;
+            }
+
             if (is_array($value) && $value !== [] && array_is_list($value)) {
                 // Sayısal anahtarlı liste: aynı isimde tekrar eden elemanlar.
                 foreach ($value as $item) {
@@ -152,20 +165,28 @@ final class Xml
     {
         $children = [];
 
-        foreach ($element->children() as $name => $child) {
-            $value = self::elementToArray($child);
+        // Ad alanlı çocuklar `children()` ile görünmez; SOAP yanıtlarında
+        // gövdenin tamamı `soap:` ad alanındadır ve atlanırsa yanıt boş
+        // görünür. Bu yüzden belgede bildirilen her ad alanı ayrıca
+        // dolaşılır ve anahtar olarak ön eksiz yerel ad kullanılır.
+        $scopes = array_merge([null], array_values($element->getNamespaces(true)));
 
-            if (isset($children[$name])) {
-                if (! is_array($children[$name]) || ! array_is_list($children[$name])) {
-                    $children[$name] = [$children[$name]];
+        foreach ($scopes as $namespace) {
+            foreach ($element->children($namespace) as $name => $child) {
+                $value = self::elementToArray($child);
+
+                if (isset($children[$name])) {
+                    if (! is_array($children[$name]) || ! array_is_list($children[$name])) {
+                        $children[$name] = [$children[$name]];
+                    }
+
+                    $children[$name][] = $value;
+
+                    continue;
                 }
 
-                $children[$name][] = $value;
-
-                continue;
+                $children[$name] = $value;
             }
-
-            $children[$name] = $value;
         }
 
         foreach ($element->attributes() ?? [] as $name => $value) {
