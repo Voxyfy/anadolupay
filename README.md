@@ -747,7 +747,29 @@ PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
 ```
 
-Gerçek istek atmadan akışı denemek için `fake` driver'ını kullanın.
+### Sahte driver
+
+Gerçek istek atmadan akışı denemek için `fake` driver'ını kullanın. Gerçek
+driver'ların yetenek arayüzlerini uygular ve yaptığı işlemleri bellekte
+tutar — ödeyip sonra `status()` sorarsanız gerçekten `paid` döner, iade
+ederseniz `refunded` olur.
+
+```php
+$gateway = AnadoluPay::driver('fake');
+
+$gateway->createPayment($data);
+$gateway->status('SIPARIS-123')->isPaid();      // true
+$gateway->refund(new RefundPaymentData('SIPARIS-123'));
+$gateway->status('SIPARIS-123')->isRefunded();  // true
+```
+
+Varsayılan olarak her işlem başarılıdır; testlerin rastgele kırılmaması
+için sahte geçidin öngörülebilir olması gerekir. Hata yollarını denemek
+isterseniz:
+
+```php
+config(['anadolupay.fake.success_rate' => 0]);  // her zaman başarısız
+```
 
 ## Güvenlik
 

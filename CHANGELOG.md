@@ -35,6 +35,16 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Eklendi
 
+* **Sağlayıcıya özel webhook onay yanıtı** (`ProvidesWebhookAcknowledgement`).
+  PayTR bildirimin işlendiğini yalnızca düz metin `OK` yanıtıyla kabul eder;
+  paketin webhook rotası artık bunu kendisi döndürüyor. Önceden her zaman
+  JSON dönüyordu ve PayTR bildirimi yeniden göndermeye devam ediyordu.
+* **`FakeGateway` yetenek arayüzlerini uyguluyor** ve yaptığı işlemleri
+  bellekte tutuyor: ödenen sipariş `paid`, iade edilen `refunded` döner.
+  Böylece durum sorgusu ve iptal akışları bankaya bağlanmadan test
+  edilebiliyor. Başarı oranı `anadolupay.fake.success_rate` ile ayarlanır
+  ve artık varsayılan olarak %100'dür — sahte geçidin rastgele
+  başarısız olması testleri kırılgan yapıyordu.
 * **Yetenek sözleşmeleri.** `SupportsStatusQuery`, `SupportsCancellation`,
   `SupportsPreAuthorization`, `SupportsOrderHistory`, `SupportsBinQuery`,
   `SupportsInstallmentQuery`, `SupportsRecurringPayments`. Desteklenmeyen
@@ -88,6 +98,12 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 * **iyzico webhook imzası** yanlış başlıktan (`x-iyzi-signature`) okunuyordu.
   Doğrusu `X-IYZ-SIGNATURE-V3`'tür ve HPP bildirimlerinde `token` da imzaya
   girer.
+
+### Değişti
+
+* CI matrisine PHP 8.2 eklendi. `composer.json` `^8.2` bildiriyordu ancak
+  testler yalnızca 8.3 ve 8.4'te koşuyordu. Laravel 13 en az PHP 8.3
+  istediği için o kombinasyon matristen hariç tutuldu.
 
 ### Belgelendi
 

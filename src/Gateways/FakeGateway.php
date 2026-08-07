@@ -5,48 +5,66 @@ declare(strict_types=1);
 namespace Voxyfy\AnadoluPay\Gateways;
 
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
- * Fake Ödeme Geçidi
+ * Sahte Ödeme Geçidi
  *
- * Geliştirme ve test ortamları için sahte ödeme geçidi implementasyonu.
- * Gerçek API çağrısı yapmaz, rastgele başarı/başarısızlık simüle eder.
+ * Geliştirme ve otomatik testler için; hiçbir ağ isteği yapmaz.
+ *
+ * Gerçek driver'ların desteklediği yetenek arayüzlerini uygular, böylece
+ * `SupportsStatusQuery` gibi kontroller yapan uygulama kodunuz bu driver
+ * ile de çalışır.
+ *
+ * Yaptığı işlemleri bellekte tutar: bir siparişi ödeyip sonra
+ * `status()` sorarsanız gerçekten `paid` döner, iade ederseniz
+ * `refunded` olur. Böylece akışın tamamı bankaya bağlanmadan denenebilir.
+ *
+ * Varsayılan olarak **her işlem başarılıdır**. Hata yollarını denemek
+ * isterseniz başarı oranını düşürün:
+ *
+ *     config(['anadolupay.fake.success_rate' => 0]);
  */
-class FakeGateway implements PaymentGatewayInterface
+class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
     /**
-     * Başarı oranı (0-100 arası).
+     * Bellekte tutulan siparişler.
+     *
+     * @var array<string, array{status: string, amount: Money, payment_id: string, pre_auth: bool}>
      */
-    protected int $successRate = 80;
+    protected array $orders = [];
 
-    /**
-     * Ödeme oluşturma işlemini simüle eder.
-     *
-     * @param  CreatePaymentData  $data  Ödeme verileri
-     * @return PaymentResponse Sahte ödeme yanıtı
-     *
-     * @throws PaymentFailedException Rastgele başarısızlık durumunda
-     */
     public function createPayment(CreatePaymentData $data): PaymentResponse
     {
         if (! $this->shouldSucceed()) {
             throw new PaymentFailedException(
-                message: 'Fake payment failed.',
-                context: [
-                    'order_id' => $data->orderId,
-                    'amount' => $data->money()->toDecimalString(),
-                ],
+                message: 'Sahte ödeme başarısız oldu.',
+                context: ['order_id' => $data->orderId, 'amount' => $data->money()->toDecimalString()],
             );
         }
 
-        $paymentId = uniqid('fake_pay_');
+        $paymentId = 'fake_pay_'.bin2hex(random_bytes(6));
+
+        $this->orders[$data->orderId] = [
+            'status' => $data->preAuthorization
+                ? StatusResponse::STATUS_PRE_AUTHORIZED
+                : StatusResponse::STATUS_PAID,
+            'amount' => $data->money(),
+            'payment_id' => $paymentId,
+            'pre_auth' => $data->preAuthorization,
+        ];
 
         return new PaymentResponse(
             success: true,
@@ -61,45 +79,31 @@ class FakeGateway implements PaymentGatewayInterface
         );
     }
 
-    /**
-     * Ödeme doğrulama işlemini simüle eder.
-     *
-     * @param  VerifyPaymentData  $data  Doğrulama verileri
-     * @return VerificationResponse Her zaman başarılı yanıt
-     */
     public function verify(VerifyPaymentData $data): VerificationResponse
     {
-        $paymentId = $data->payload['payment_id'] ?? uniqid('fake_pay_');
+        $orderId = isset($data->payload['order_id']) ? (string) $data->payload['order_id'] : null;
+        $paymentId = $data->payload['payment_id'] ?? ($orderId !== null ? ($this->orders[$orderId]['payment_id'] ?? null) : null);
 
         return new VerificationResponse(
             success: true,
-            paymentId: $paymentId,
+            paymentId: is_string($paymentId) ? $paymentId : 'fake_pay_'.bin2hex(random_bytes(6)),
             status: 'success',
             raw: $data->payload,
         );
     }
 
-    /**
-     * İade işlemini simüle eder.
-     *
-     * @param  RefundPaymentData  $data  İade verileri
-     * @return RefundResponse Sahte iade yanıtı
-     *
-     * @throws PaymentFailedException Rastgele başarısızlık durumunda
-     */
     public function refund(RefundPaymentData $data): RefundResponse
     {
         if (! $this->shouldSucceed()) {
             throw new PaymentFailedException(
-                message: 'Fake refund failed.',
-                context: [
-                    'payment_id' => $data->paymentId,
-                    'amount' => $data->money()?->toDecimalString(),
-                ],
+                message: 'Sahte iade başarısız oldu.',
+                context: ['payment_id' => $data->paymentId],
             );
         }
 
-        $refundId = uniqid('fake_ref_');
+        $this->markOrder($data->paymentId, StatusResponse::STATUS_REFUNDED);
+
+        $refundId = 'fake_ref_'.bin2hex(random_bytes(6));
 
         return new RefundResponse(
             success: true,
@@ -112,11 +116,114 @@ class FakeGateway implements PaymentGatewayInterface
         );
     }
 
+    public function cancel(RefundPaymentData $data): RefundResponse
+    {
+        $this->markOrder($data->paymentId, StatusResponse::STATUS_CANCELLED);
+
+        return new RefundResponse(
+            success: true,
+            refundId: 'fake_void_'.bin2hex(random_bytes(6)),
+            raw: ['payment_id' => $data->paymentId],
+        );
+    }
+
+    public function preAuthorize(CreatePaymentData $data): PaymentResponse
+    {
+        return $this->createPayment($data->asPreAuthorization());
+    }
+
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $order = $this->orders[$data->orderId] ?? null;
+
+        if ($order === null || ! $order['pre_auth']) {
+            throw new PaymentFailedException(
+                message: "Kapatılacak bir ön provizyon bulunamadı: '{$data->orderId}'.",
+                context: ['order_id' => $data->orderId],
+            );
+        }
+
+        $this->orders[$data->orderId]['status'] = StatusResponse::STATUS_PAID;
+        $this->orders[$data->orderId]['pre_auth'] = false;
+
+        if (($amount = $data->money()) !== null) {
+            $this->orders[$data->orderId]['amount'] = $amount;
+        }
+
+        return new PaymentResponse(
+            success: true,
+            paymentId: $order['payment_id'],
+            raw: ['order_id' => $data->orderId],
+        );
+    }
+
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $order = $this->orders[$orderId] ?? null;
+
+        if ($order === null) {
+            return StatusResponse::notFound($orderId);
+        }
+
+        return new StatusResponse(
+            found: true,
+            status: $order['status'],
+            orderId: $orderId,
+            paymentId: $order['payment_id'],
+            amount: $order['amount'],
+            raw: $order + ['amount' => $order['amount']->toDecimalString()],
+        );
+    }
+
     /**
-     * Başarı oranına göre işlemin başarılı olup olmayacağını belirler.
+     * Bellekteki siparişleri temizler.
+     *
+     * Testler arasında durumun sızmaması için çağırın.
+     */
+    public function flush(): void
+    {
+        $this->orders = [];
+    }
+
+    /**
+     * Sipariş numarası veya ödeme numarasıyla eşleşen kaydı işaretler.
+     */
+    protected function markOrder(string $reference, string $status): void
+    {
+        if (isset($this->orders[$reference])) {
+            $this->orders[$reference]['status'] = $status;
+
+            return;
+        }
+
+        foreach ($this->orders as $orderId => $order) {
+            if ($order['payment_id'] === $reference) {
+                $this->orders[$orderId]['status'] = $status;
+
+                return;
+            }
+        }
+    }
+
+    /**
+     * Yapılandırılmış başarı oranına göre işlemin sonucunu belirler.
+     *
+     * Varsayılan 100'dür: testlerin rastgele kırılmaması için sahte
+     * geçidin öngörülebilir olması gerekir. Hata yollarını denemek
+     * isteyen uygulama oranı düşürebilir.
      */
     protected function shouldSucceed(): bool
     {
-        return random_int(1, 100) <= $this->successRate;
+        $rate = (int) config('anadolupay.fake.success_rate', 100);
+
+        if ($rate >= 100) {
+            return true;
+        }
+
+        if ($rate <= 0) {
+            return false;
+        }
+
+        return random_int(1, 100) <= $rate;
     }
 }

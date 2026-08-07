@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use Voxyfy\AnadoluPay\Contracts\ProvidesWebhookAcknowledgement;
 use Voxyfy\AnadoluPay\Contracts\SupportsBinQuery;
 use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
 use Voxyfy\AnadoluPay\Contracts\SupportsInstallmentQuery;
@@ -35,7 +36,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - Yapılandırmada `merchant_id` => merchant id, `secret_key` => merchant key,
  *     `password` => merchant salt olarak eşlenir.
  */
-class PayTrGateway extends AbstractBankGateway implements SupportsBinQuery, SupportsInstallmentQuery, SupportsStatusQuery
+class PayTrGateway extends AbstractBankGateway implements ProvidesWebhookAcknowledgement, SupportsBinQuery, SupportsInstallmentQuery, SupportsStatusQuery
 {
     /**
      * PayTR doğrudan ödeme formu; kart alanları da PayTR'ye POST edilir.
@@ -428,5 +429,19 @@ class PayTrGateway extends AbstractBankGateway implements SupportsBinQuery, Supp
         }
 
         return $options;
+    }
+
+    /**
+     * PayTR bildirimin işlendiğini yalnızca düz metin `OK` yanıtıyla kabul
+     * eder. Başka bir gövde dönerse bildirimi saatlerce yeniden gönderir.
+     */
+    public function webhookAcknowledgement(bool $handled): string
+    {
+        return $handled ? 'OK' : '';
+    }
+
+    public function webhookAcknowledgementContentType(): string
+    {
+        return 'text/plain';
     }
 }

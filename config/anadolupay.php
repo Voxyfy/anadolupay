@@ -39,6 +39,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sahte Geçit
+    |--------------------------------------------------------------------------
+    |
+    | `fake` driver'ı hiçbir ağ isteği yapmaz ve varsayılan olarak her
+    | işlemi başarılı sayar; testlerin rastgele kırılmaması için
+    | öngörülebilir olması gerekir.
+    |
+    | Hata yollarını denemek isterseniz oranı düşürün (0 = her zaman
+    | başarısız).
+    |
+    */
+
+    'fake' => [
+        'success_rate' => env('ANADOLUPAY_FAKE_SUCCESS_RATE', 100),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Loglama
     |--------------------------------------------------------------------------
     |
