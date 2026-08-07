@@ -79,6 +79,9 @@ php artisan vendor:publish --tag="anadolupay-config"
 
 PHP 8.2+, Laravel 12 veya 13. Auto-discovery açıktır, ek adım yoktur.
 
+> Laravel 13 en az PHP 8.3 ister; PHP 8.2 kullanıyorsanız Laravel 12'de
+> kalırsınız. CI her iki kombinasyonu da koşar.
+
 Uçtan uca kurulmuş bir Laravel projesi görmek isterseniz
 [anadolupay-laravel](https://github.com/Voxyfy/anadolupay-laravel) deposu
 ödeme başlatma, 3D dönüşü ve iade akışlarını örnekliyor.

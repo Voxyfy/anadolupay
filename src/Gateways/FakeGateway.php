@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways;
 
+use Illuminate\Support\Facades\Cache;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
 use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
@@ -28,9 +29,14 @@ use Voxyfy\AnadoluPay\Support\Money;
  * `SupportsStatusQuery` gibi kontroller yapan uygulama kodunuz bu driver
  * ile de çalışır.
  *
- * Yaptığı işlemleri bellekte tutar: bir siparişi ödeyip sonra
+ * Yaptığı işlemleri önbellekte tutar: bir siparişi ödeyip sonra
  * `status()` sorarsanız gerçekten `paid` döner, iade ederseniz
  * `refunded` olur. Böylece akışın tamamı bankaya bağlanmadan denenebilir.
+ *
+ * Kayıtların önbellekte tutulmasının sebebi, 3D akışının birden fazla
+ * HTTP isteğine yayılmasıdır: ödeme bir istekte başlar, banka dönüşü
+ * başka bir istekte gelir. Nesne özelliğinde tutulan durum bu sınırı
+ * geçemez.
  *
  * Varsayılan olarak **her işlem başarılıdır**. Hata yollarını denemek
  * isterseniz başarı oranını düşürün:
@@ -39,12 +45,11 @@ use Voxyfy\AnadoluPay\Support\Money;
  */
 class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
-    /**
-     * Bellekte tutulan siparişler.
-     *
-     * @var array<string, array{status: string, amount: Money, payment_id: string, pre_auth: bool}>
-     */
-    protected array $orders = [];
+    /** Siparişlerin tutulduğu önbellek anahtarı. */
+    protected const CACHE_KEY = 'anadolupay:fake:orders';
+
+    /** Kayıtların önbellekte kalma süresi (saniye). */
+    protected const CACHE_TTL = 3600;
 
     public function createPayment(CreatePaymentData $data): PaymentResponse
     {
@@ -57,32 +62,38 @@ class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, Supp
 
         $paymentId = 'fake_pay_'.bin2hex(random_bytes(6));
 
-        $this->orders[$data->orderId] = [
+        $this->putOrder($data->orderId, [
             'status' => $data->preAuthorization
                 ? StatusResponse::STATUS_PRE_AUTHORIZED
                 : StatusResponse::STATUS_PAID,
-            'amount' => $data->money(),
+            'minor_units' => $data->money()->minorUnits,
+            'currency' => $data->currency,
             'payment_id' => $paymentId,
             'pre_auth' => $data->preAuthorization,
-        ];
+        ]);
 
         return new PaymentResponse(
             success: true,
             paymentId: $paymentId,
-            redirectUrl: "https://fake-gateway.test/pay/{$paymentId}",
             raw: [
                 'payment_id' => $paymentId,
                 'order_id' => $data->orderId,
                 'amount' => $data->money()->toDecimalString(),
                 'currency' => $data->currency,
             ],
+            // Dış bir adrese yönlendirmek yerine kendi 3D sayfamızı üretiyoruz:
+            // böylece akış internet bağlantısı olmadan, tamamen yerelde denenebilir.
+            htmlContent: $data->successUrl !== null
+                ? $this->simulated3dPage($data, $paymentId)
+                : null,
         );
     }
 
     public function verify(VerifyPaymentData $data): VerificationResponse
     {
         $orderId = isset($data->payload['order_id']) ? (string) $data->payload['order_id'] : null;
-        $paymentId = $data->payload['payment_id'] ?? ($orderId !== null ? ($this->orders[$orderId]['payment_id'] ?? null) : null);
+        $paymentId = $data->payload['payment_id']
+            ?? ($orderId !== null ? ($this->orders()[$orderId]['payment_id'] ?? null) : null);
 
         return new VerificationResponse(
             success: true,
@@ -134,7 +145,7 @@ class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, Supp
 
     public function capture(CapturePaymentData $data): PaymentResponse
     {
-        $order = $this->orders[$data->orderId] ?? null;
+        $order = $this->orders()[$data->orderId] ?? null;
 
         if ($order === null || ! $order['pre_auth']) {
             throw new PaymentFailedException(
@@ -143,12 +154,14 @@ class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, Supp
             );
         }
 
-        $this->orders[$data->orderId]['status'] = StatusResponse::STATUS_PAID;
-        $this->orders[$data->orderId]['pre_auth'] = false;
+        $order['status'] = StatusResponse::STATUS_PAID;
+        $order['pre_auth'] = false;
 
         if (($amount = $data->money()) !== null) {
-            $this->orders[$data->orderId]['amount'] = $amount;
+            $order['minor_units'] = $amount->minorUnits;
         }
+
+        $this->putOrder($data->orderId, $order);
 
         return new PaymentResponse(
             success: true,
@@ -159,30 +172,82 @@ class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, Supp
 
     public function status(string $orderId, array $context = []): StatusResponse
     {
-        $order = $this->orders[$orderId] ?? null;
+        $order = $this->orders()[$orderId] ?? null;
 
         if ($order === null) {
             return StatusResponse::notFound($orderId);
         }
+
+        $amount = Money::fromMinorUnits($order['minor_units'], $order['currency']);
 
         return new StatusResponse(
             found: true,
             status: $order['status'],
             orderId: $orderId,
             paymentId: $order['payment_id'],
-            amount: $order['amount'],
-            raw: $order + ['amount' => $order['amount']->toDecimalString()],
+            amount: $amount,
+            raw: $order + ['amount' => $amount->toDecimalString()],
         );
     }
 
     /**
-     * Bellekteki siparişleri temizler.
+     * Bankanın 3D sayfasını taklit eden yerel bir sayfa üretir.
+     *
+     * Gerçek bankada müşteri SMS kodu girer; burada iki düğme vardır.
+     * Sayfa, satıcının dönüş adresine gerçek bir POST yapar — böylece
+     * `verify()` akışı da denenmiş olur.
+     */
+    protected function simulated3dPage(CreatePaymentData $data, string $paymentId): string
+    {
+        $callback = (string) $data->successUrl;
+        $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+
+        return <<<HTML
+            <!DOCTYPE html>
+            <html lang="tr"><head><meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>Sahte Banka — 3D Secure</title>
+            <style>
+                body{font:15px/1.5 ui-sans-serif,system-ui,sans-serif;background:#f6f7f9;
+                     display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+                .box{background:#fff;border:1px solid #e4e6ea;border-radius:12px;padding:2rem;
+                     max-width:400px;width:calc(100% - 2rem);text-align:center}
+                h1{font-size:1.1rem;margin:0 0 .4rem}
+                p{color:#6b7280;font-size:.88rem;margin:0 0 1.4rem}
+                dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;text-align:left;
+                   font-size:.85rem;margin:0 0 1.5rem}
+                dt{color:#6b7280}dd{margin:0;font-family:ui-monospace,Menlo,monospace}
+                button{width:100%;padding:.7rem;border:0;border-radius:8px;font:600 15px inherit;
+                       cursor:pointer;margin-bottom:.5rem}
+                .ok{background:#16a34a;color:#fff}.no{background:#e5e7eb;color:#374151}
+            </style></head><body>
+            <div class="box">
+                <h1>Sahte Banka 3D Secure</h1>
+                <p>Bu sayfa <code>fake</code> driver'ı tarafından üretildi. Gerçek bir banka
+                   sayfası değildir; akışı yerelde denemek içindir.</p>
+                <dl>
+                    <dt>Sipariş</dt><dd>{$escape($data->orderId)}</dd>
+                    <dt>Tutar</dt><dd>{$escape($data->money()->toDecimalString())} {$escape($data->currency)}</dd>
+                    <dt>Kart</dt><dd>{$escape($data->card()?->masked() ?? '—')}</dd>
+                </dl>
+                <form method="POST" action="{$escape($callback)}">
+                    <input type="hidden" name="order_id" value="{$escape($data->orderId)}">
+                    <input type="hidden" name="payment_id" value="{$escape($paymentId)}">
+                    <button class="ok" name="mdStatus" value="1" type="submit">Onayla</button>
+                    <button class="no" name="mdStatus" value="0" type="submit">Reddet</button>
+                </form>
+            </div></body></html>
+            HTML;
+    }
+
+    /**
+     * Kaydedilmiş siparişleri temizler.
      *
      * Testler arasında durumun sızmaması için çağırın.
      */
     public function flush(): void
     {
-        $this->orders = [];
+        Cache::forget(self::CACHE_KEY);
     }
 
     /**
@@ -190,19 +255,48 @@ class FakeGateway implements PaymentGatewayInterface, SupportsCancellation, Supp
      */
     protected function markOrder(string $reference, string $status): void
     {
-        if (isset($this->orders[$reference])) {
-            $this->orders[$reference]['status'] = $status;
+        $orders = $this->orders();
+
+        if (isset($orders[$reference])) {
+            $orders[$reference]['status'] = $status;
+            $this->putOrder($reference, $orders[$reference]);
 
             return;
         }
 
-        foreach ($this->orders as $orderId => $order) {
+        foreach ($orders as $orderId => $order) {
             if ($order['payment_id'] === $reference) {
-                $this->orders[$orderId]['status'] = $status;
+                $order['status'] = $status;
+                $this->putOrder($orderId, $order);
 
                 return;
             }
         }
+    }
+
+    /**
+     * Kaydedilmiş siparişleri okur.
+     *
+     * @return array<string, array{status: string, minor_units: int, currency: string, payment_id: string, pre_auth: bool}>
+     */
+    protected function orders(): array
+    {
+        $orders = Cache::get(self::CACHE_KEY, []);
+
+        return is_array($orders) ? $orders : [];
+    }
+
+    /**
+     * Bir siparişi kaydeder.
+     *
+     * @param  array<string, mixed>  $order
+     */
+    protected function putOrder(string $orderId, array $order): void
+    {
+        $orders = $this->orders();
+        $orders[$orderId] = $order;
+
+        Cache::put(self::CACHE_KEY, $orders, self::CACHE_TTL);
     }
 
     /**

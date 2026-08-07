@@ -101,6 +101,10 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Değişti
 
+* **Pest 3 desteği eklendi** (`^3.0|^4.0|^5.0`). Pest 4 en az PHP 8.3, Pest 5
+  en az PHP 8.4 istiyor; bu yüzden `composer.json` PHP 8.2 bildirmesine
+  rağmen test araç zinciri 8.2'de kurulamıyordu. Kütüphane kodu 8.2
+  uyumludur — eksik olan yalnızca test bağımlılığıydı.
 * CI matrisine PHP 8.2 eklendi. `composer.json` `^8.2` bildiriyordu ancak
   testler yalnızca 8.3 ve 8.4'te koşuyordu. Laravel 13 en az PHP 8.3
   istediği için o kombinasyon matristen hariç tutuldu.

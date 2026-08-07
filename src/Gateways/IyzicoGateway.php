@@ -108,7 +108,18 @@ class IyzicoGateway implements PaymentGatewayInterface, SupportsBinQuery, Suppor
      */
     protected function initialize(CreatePaymentData $data): PaymentResponse
     {
-        $callbackUrl = (string) config('anadolupay.iyzico.callback_url');
+        // Sipariş kendi dönüş adresini bildirmişse ona öncelik veriyoruz;
+        // config'teki değer yalnızca varsayılandır. Diğer tüm driver'lar
+        // `successUrl` alanını kullanıyor, iyzico'nun ayrışması sürprizdi.
+        $callbackUrl = $data->successUrl ?? (string) config('anadolupay.iyzico.callback_url');
+
+        if ($callbackUrl === '') {
+            throw new PaymentFailedException(
+                message: 'iyzico için dönüş adresi gerekli: CreatePaymentData::$successUrl ya da anadolupay.iyzico.callback_url tanımlayın.',
+                context: ['order_id' => $data->orderId],
+            );
+        }
+
         $payload = $this->mapper->to3dsInitializePayload($data, $callbackUrl);
         $response = $this->client->post('/payment/3dsecure/initialize', $payload);
 
