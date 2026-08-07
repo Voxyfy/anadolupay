@@ -7,6 +7,7 @@ namespace Voxyfy\AnadoluPay\Support\Bank;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Psr\Log\LoggerInterface;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 
 /**
@@ -15,17 +16,31 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
  * Banka uçlarına XML, JSON veya form-encoded istek gönderir ve yanıtı
  * her zaman diziye normalize eder. Bankalar Content-Type başlığını
  * tutarsız kullandığı için yanıt tipi gövdeye bakılarak tespit edilir.
+ *
+ * Logger verildiğinde her istek ve yanıt, kart verisi maskelenerek
+ * kaydedilir. Banka entegrasyonlarında hata ayıklamanın pratikte tek
+ * yolu budur: banka yalnızca bir hata kodu döner, sorunun hangi alanda
+ * olduğunu ancak gönderilen gövdeyi görerek anlayabilirsiniz.
  */
 class BankHttpClient
 {
+    private readonly SensitiveDataScrubber $scrubber;
+
     /**
      * @param  int  $timeout  İstek zaman aşımı (saniye)
      * @param  bool  $verifySsl  TLS sertifikası doğrulansın mı (canlıda daima true olmalı)
+     * @param  LoggerInterface|null  $logger  Verilirse istek/yanıt loglanır
+     * @param  string  $bank  Log kayıtlarında görünen banka anahtarı
      */
     public function __construct(
         private readonly int $timeout = 30,
         private readonly bool $verifySsl = true,
-    ) {}
+        private readonly ?LoggerInterface $logger = null,
+        private readonly string $bank = 'unknown',
+        ?SensitiveDataScrubber $scrubber = null,
+    ) {
+        $this->scrubber = $scrubber ?? new SensitiveDataScrubber;
+    }
 
     /**
      * XML gövdeli POST isteği gönderir.
@@ -102,7 +117,12 @@ class BankHttpClient
      */
     public function postForm(string $url, array $fields, array $headers = []): array
     {
+        $this->logRequest($url, http_build_query($this->scrubber->scrubArray($fields)), scrubbed: true);
+
+        $startedAt = microtime(true);
         $response = $this->request($headers)->asForm()->post($url, $fields);
+
+        $this->logResponse($url, $response, $startedAt);
 
         return $this->decode($response, $url);
     }
@@ -129,7 +149,12 @@ class BankHttpClient
      */
     public function send(string $url, string $body, array $headers = []): array
     {
+        $this->logRequest($url, $body);
+
+        $startedAt = microtime(true);
         $response = $this->request($headers)->withBody($body, $headers['Content-Type'] ?? 'text/plain')->post($url);
+
+        $this->logResponse($url, $response, $startedAt);
 
         return $this->decode($response, $url);
     }
@@ -152,11 +177,59 @@ class BankHttpClient
     ): string {
         $body = Xml::encode($data, $root, $encoding);
 
+        $this->logRequest($url, $body);
+
+        $startedAt = microtime(true);
         $response = $this->request($headers + [
             'Content-Type' => 'application/xml; charset='.strtolower($encoding),
         ])->withBody($body, 'application/xml')->post($url);
 
+        // Yanıt bir HTML sayfası; gövdesini loglamak hem gereksiz hem çok
+        // hacimli olacağı için yalnızca boyutunu kaydediyoruz.
+        $this->logResponse($url, $response, $startedAt, logBody: false);
+
         return $response->body();
+    }
+
+    /**
+     * Giden isteği maskeleyerek loglar.
+     *
+     * @param  bool  $scrubbed  Gövde çağıran tarafından zaten temizlendiyse true
+     */
+    private function logRequest(string $url, string $body, bool $scrubbed = false): void
+    {
+        $this->logger?->debug('AnadoluPay banka isteği', [
+            'bank' => $this->bank,
+            'url' => $url,
+            'body' => $scrubbed ? $body : $this->scrubber->scrubBody($body),
+        ]);
+    }
+
+    /**
+     * Gelen yanıtı maskeleyerek loglar.
+     */
+    private function logResponse(string $url, Response $response, float $startedAt, bool $logBody = true): void
+    {
+        if ($this->logger === null) {
+            return;
+        }
+
+        $context = [
+            'bank' => $this->bank,
+            'url' => $url,
+            'status' => $response->status(),
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ];
+
+        $context[$logBody ? 'body' : 'body_length'] = $logBody
+            ? $this->scrubber->scrubBody($response->body())
+            : strlen($response->body());
+
+        // Başarısız HTTP yanıtları uyarı seviyesinde: bunlar genellikle
+        // yapılandırma veya ağ sorununa işaret eder ve gözden kaçmamalıdır.
+        $response->successful()
+            ? $this->logger->debug('AnadoluPay banka yanıtı', $context)
+            : $this->logger->warning('AnadoluPay banka yanıtı başarısız', $context);
     }
 
     /**

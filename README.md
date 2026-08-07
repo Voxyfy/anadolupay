@@ -1,96 +1,175 @@
 # AnadoluPay
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/voxyfy/anadolupay.svg?style=flat-square)](https://packagist.org/packages/voxyfy/anadolupay)
-[![GitHub Tests Action Status](https://img.shields.io/github/actions/workflow/status/voxyfy/anadolupay/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/voxyfy/anadolupay/actions?query=workflow%3Arun-tests+branch%3Amain)
+[![Tests](https://img.shields.io/github/actions/workflow/status/voxyfy/anadolupay/run-tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/voxyfy/anadolupay/actions?query=workflow%3Arun-tests+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/voxyfy/anadolupay.svg?style=flat-square)](https://packagist.org/packages/voxyfy/anadolupay)
 
-Türk bankalarının sanal POS'ları ve ödeme kuruluşları için tek arayüzlü Laravel
-ödeme soyutlaması. Her bankanın kendi hash algoritması, XML/JSON şeması ve 3D
-Secure akışı vardır; AnadoluPay bunları tek bir `PaymentGatewayInterface`
-arkasında toplar. Bankayı değiştirmek için yalnızca driver adını değiştirirsiniz.
+Türk bankalarının sanal POS'ları için tek arayüz.
 
-Paket ödeme akışını yürütür ve yanıtları normalleştirir; arayüz render etme ve
-iş kuralları (sipariş onayı, stok, fatura) uygulamada kalır.
+Türkiye'de banka entegrasyonu yazmak, aynı işi on yedi kez farklı şekilde
+yapmaktır. Garanti tutarı kuruş cinsinden tam sayı ister, NestPay ondalıklı
+dizgi. Garanti hash'i ayraçsız birleştirip büyük harfe çevirir, NestPay alanları
+sıralayıp `|` ile birleştirir, PosNet `;` kullanır. Kuveyt Türk size form
+alanları değil hazır bir HTML sayfası döner. VakıfBank provizyon adımında kart
+bilgisini bir daha ister. Bunların hiçbiri dokümantasyonda yan yana yazmaz;
+her birini ayrı ayrı öğrenirsiniz.
 
-## Gereksinimler
+Bu paket o farkları tek bir sözleşmenin arkasına alır:
 
-- PHP 8.2 veya üzeri
-- Laravel 12.x veya 13.x
+```php
+$response = AnadoluPay::driver('garanti')->createPayment($data);
+
+return response($response->toHtmlForm());
+```
+
+Bankayı değiştirmek için `'garanti'` yerine `'akbank'` yazmak yeterlidir.
+
+**Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
+kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
+uygulamanızın işi.
+
+---
+
+> ### Canlıya çıkmadan önce okuyun
+>
+> Bu paketteki protokoller bankaların public dokümantasyonuna göre yazıldı ve
+> istek üretimi, imza ve yanıt eşlemesi birim testleriyle kilitlendi. **Ancak
+> hiçbir driver gerçek bir bankaya karşı çalıştırılmadı.**
+>
+> Testler benim yazdığım algoritmayı doğrular, bankanın beklediğini değil. Bir
+> alanın sırası yanlışsa test yeşil kalır, banka işlemi reddeder. Kullanacağınız
+> her banka için kendi test üye işyeri bilgilerinizle **en az bir 3D Secure satış
+> ve bir iade** çalıştırın. Hash hesabında bankalar zaman zaman kuruluma özel
+> farklılıklar tanımlıyor.
+>
+> `iyzico` driver'ının imza şeması ayrıca doğrulanmamıştır — bkz.
+> [Yol haritası](#yol-haritası).
+
+---
+
+**İçindekiler**
+[Kurulum](#kurulum) ·
+[Desteklenen bankalar](#desteklenen-bankalar) ·
+[Nasıl çalışır](#nasıl-çalışır) ·
+[Yapılandırma](#yapılandırma) ·
+[Ödeme akışı](#ödeme-akışı) ·
+[İade ve iptal](#iade-ve-iptal) ·
+[Ödeme modelleri](#ödeme-modelleri) ·
+[Bankaların tuhaflıkları](#bankaların-tuhaflıkları) ·
+[Loglama](#loglama) ·
+[Test ortamı](#test-ortamı) ·
+[Güvenlik](#güvenlik) ·
+[Yeni banka eklemek](#yeni-banka-eklemek) ·
+[Yol haritası](#yol-haritası)
 
 ## Kurulum
 
 ```bash
 composer require voxyfy/anadolupay
-```
-
-Laravel auto-discovery varsayılan olarak aktiftir; ek bir adım gerekmez.
-
-```bash
 php artisan vendor:publish --tag="anadolupay-config"
 ```
 
-## Desteklenen bankalar ve altyapılar
+PHP 8.2+, Laravel 12 veya 13. Auto-discovery açıktır, ek adım yoktur.
 
-Türkiye'deki sanal POS'lar birkaç ortak altyapı ailesine iner. Aşağıdaki her
-satır `AnadoluPay::driver('<anahtar>')` ile çözümlenir.
+## Desteklenen bankalar
 
-### Bankalar
+Türkiye'deki sanal POS'lar birkaç ortak altyapı ailesine iner. Aynı aileyi
+kullanan bankalar aynı driver'ı paylaşır; aralarındaki fark yalnızca uç nokta
+ve kimlik bilgisidir.
 
-| Driver anahtarı | Banka | Altyapı | 3D Secure | 3D Pay | 3D Host | Non-secure | İade | İptal |
+| Driver | Banka | Altyapı | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank` | Akbank | Asseco / Payten (NestPay) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `isbank` | Türkiye İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `akbank` | Akbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `isbank` | İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `qnb` | QNB Finansbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `teb` | TEB | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `sekerbank` | Şekerbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `garanti` | Garanti BBVA | Garanti VPOS (GVPS) | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| `garanti` | Garanti BBVA | GVPS | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ✅ | — | ✅ | ✅ | ✅ | ✅ |
-| `vakifbank` | VakıfBank | PayFlex V4 (MPI) | ✅ | — | — | ✅ | ✅ | ✅ |
-| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 (MPI) | ✅ | — | — | ✅ | ✅ | ✅ |
-| `denizbank` | DenizBank | InterPos (Intertech) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb-payfor` | QNB Finansbank / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `vakifbank` | VakıfBank | PayFlex V4 | ✅ | — | — | ✅ | ✅ | ✅ |
+| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ✅ | — | — | ✅ | ✅ | ✅ |
+| `denizbank` | DenizBank | InterPos | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb-payfor` | QNB / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat-katilim` | Ziraat Katılım | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `kuveytturk` | Kuveyt Türk | BOA / TDV2.0 | ✅ | — | — | ✅ | — | — |
 | `vakif-katilim` | Vakıf Katılım | BOA | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 
-### Ödeme kuruluşları
+Ödeme kuruluşları:
 
-| Driver anahtarı | Kuruluş | Protokol | 3D Secure | 3D Pay | 3D Host | Non-secure | İade | İptal |
-|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank-pos` | Akbank (yeni JSON API) | REST / JSON | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `paytr` | PayTR | REST / form | — | ✅ | ✅ | ✅ | ✅ | — |
-| `param` | Param (TURK Elektronik Para) | SOAP | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| `tosla` | Tosla (AkÖde) | REST / JSON | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `iyzico` | iyzico | REST / JSON | ✅ | — | — | — | — | — |
-| `fake` | — (geliştirme) | — | — | — | — | ✅ | ✅ | — |
+| Driver | Kuruluş | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
+|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `akbank-pos` | Akbank (yeni JSON API) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `paytr` | PayTR | — | ✅ | ✅ | ✅ | ✅ | — |
+| `param` | Param | ✅ | ✅ | — | ✅ | ✅ | — |
+| `tosla` | Tosla (AkÖde) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `iyzico` | iyzico | ✅ | — | — | — | — | — |
+| `fake` | geliştirme için sahte driver | — | — | — | ✅ | ✅ | — |
 
-Bir bankanın hem eski hem yeni altyapısı varsa ikisi ayrı anahtarla sunulur:
-Akbank için `akbank` (NestPay) ve `akbank-pos` (yeni API), Ziraat için `ziraat`
-(NestPay) ve `ziraat-payflex` (PayFlex), QNB için `qnb` (NestPay) ve
-`qnb-payfor` (PayFor). Bankanızın hangisini tanımladığını sanal POS
-sözleşmenizden teyit edin.
+**Aynı bankanın iki driver'ı varsa** ikisi de gerçektir; hangisinin
+tanımlandığını sanal POS sözleşmenizden teyit edin:
 
-> **Sipay** bu sürümde yok. Protokolünün imza şeması güvenilir bir public
-> kaynaktan doğrulanamadı; ödeme yoluna doğrulanmamış bir imza algoritması
-> koymamak için implement edilmedi.
+- Akbank → `akbank` (eski NestPay) veya `akbank-pos` (yeni JSON API)
+- Ziraat → `ziraat` (NestPay) veya `ziraat-payflex` (PayFlex)
+- QNB Finansbank → `qnb` (NestPay) veya `qnb-payfor` (PayFor)
+
+## Nasıl çalışır
+
+Bankalar arasındaki fark yüzeyde protokol (XML / JSON / SOAP / form), derinde
+imza algoritmasıdır. Paket bu iki katmanı ayırır:
+
+```
+CreatePaymentData ─┐
+                   ├─► AnadoluPay::driver('garanti')
+CardData ──────────┘            │
+                                ▼
+                  ┌─────────────────────────────┐
+                  │   AbstractBankGateway       │  ortak akış:
+                  │   createPayment / verify    │  form → hash → provizyon
+                  │   refund                    │
+                  └──────────────┬──────────────┘
+                                 │  banka-özel eşleme
+          ┌──────────────────────┼──────────────────────┐
+          ▼                      ▼                      ▼
+   AssecoGateway          GarantiGateway         PosNetGateway   … (13 driver)
+   sha512 + '|'           sha512 UPPER           sha256 + ';'
+   CC5Request XML         GVPSRequest XML        posnetRequest XML
+          │                      │                      │
+          └──────────────────────┼──────────────────────┘
+                                 ▼
+                        BankHttpClient
+              XML/JSON/form kodlama · maskeli loglama
+```
+
+Bir driver yalnızca yedi metodu doldurur: `build3dFormFields()`,
+`checkCallbackHash()`, `is3dAuthSuccess()`, `provision()`,
+`mapCallbackResponse()`, `mapProvisionResponse()`, `extractOrderId()`.
+
+Akış kontrolü, hata yönetimi, HTTP ve loglama temel sınıfta tek yerde durur.
+Bir bankada düzeltilen akış hatası hepsinde düzelir; bu, on yedi kopyanın
+ayrı ayrı bakımını yapmaktan farkı.
+
+Dönen `PaymentResponse` ve `VerificationResponse` bankadan bağımsızdır: hangi
+driver'ı kullanırsanız kullanın `success`, `paymentId` ve `status` aynı anlama
+gelir. Bankanın ham yanıtı `raw` içinde korunur — normalleştirme bilgi kaybı
+yaratmaz.
 
 ## Yapılandırma
 
-Yalnızca kullandığınız bankanın değişkenlerini doldurmanız yeterlidir.
-Alanların bankalara göre karşılığı:
+Yalnızca kullandığınız bankanın değişkenlerini doldurun. Diğer preset'ler boş
+kalabilir; yalnızca çağrıldıklarında hata verirler.
 
-| Config alanı | Bankadaki karşılığı |
+Aynı kavramın bankalarda farklı adları var:
+
+| Config | Bankadaki karşılığı |
 |---|---|
-| `merchant_id` | ClientId / MerchantId / ShopCode / merchantSafeId |
-| `terminal_id` | TerminalId / TerminalNo / terminalSafeId |
-| `username` | API kullanıcı adı (Name / UserCode / ProvUserID) |
+| `merchant_id` | ClientId · MerchantId · ShopCode · merchantSafeId |
+| `terminal_id` | TerminalId · TerminalNo · terminalSafeId |
+| `username` | Name · UserCode · ProvUserID |
 | `password` | API şifresi |
-| `secret_key` | 3D anahtarı (store key / hash key / GUID) |
-
-Örnek `.env`:
+| `secret_key` | store key · hash key · GUID (3D anahtarı) |
 
 ```env
 # Garanti BBVA
@@ -99,7 +178,7 @@ GARANTI_TERMINAL_ID=30690000
 GARANTI_USERNAME=PROVAUT
 GARANTI_PASSWORD=xxxxxxx
 GARANTI_SECRET_KEY=xxxxxxx
-GARANTI_REFUND_USERNAME=PROVRFN
+GARANTI_REFUND_USERNAME=PROVRFN      # iade/iptal ayrı kullanıcı ister
 GARANTI_REFUND_PASSWORD=xxxxxxx
 
 # Akbank (NestPay)
@@ -108,27 +187,28 @@ AKBANK_USERNAME=xxxxxxx
 AKBANK_PASSWORD=xxxxxxx
 AKBANK_SECRET_KEY=xxxxxxx
 
-# Yapı Kredi PosNet
+# Yapı Kredi PosNet — posnet_id ayrı bir alandır, merchant_id değildir
 YAPIKREDI_MERCHANT_ID=xxxxxxx
 YAPIKREDI_TERMINAL_ID=xxxxxxx
 YAPIKREDI_POSNET_ID=xxxxxxx
 YAPIKREDI_SECRET_KEY=xxxxxxx
 ```
 
-Tüm anahtarların listesi için yayınladığınız `config/anadolupay.php` dosyasına
-bakın.
+Tüm anahtarlar için yayınladığınız `config/anadolupay.php` dosyasına bakın.
 
 ## Ödeme akışı
 
-Türk banka sanal POS'larında 3D Secure bir GET yönlendirmesi değil, bankanın 3D
-geçidine yapılan bir **form POST**'udur. Akış üç adımdır:
+Türk banka sanal POS'larında 3D Secure bir GET yönlendirmesi değil, bankanın
+3D geçidine yapılan bir **form POST**'udur. Akış üç adımdır:
 
-1. `createPayment()` imzalı form alanlarını üretir.
-2. Form kullanıcının tarayıcısından bankaya POST edilir, kullanıcı doğrulama yapar.
-3. Banka `successUrl`'inize POST eder; `verify()` hash'i doğrular ve gerekiyorsa
-   provizyon isteğini gönderir.
+```
+  [1] createPayment()          [2] tarayıcı            [3] verify()
+      imzalı form üret    ──►   bankaya POST      ──►   hash doğrula
+                                kullanıcı SMS/          + provizyon iste
+                                app onayı
+```
 
-### 1. Ödemeyi başlatma
+### 1 · Ödemeyi başlat
 
 ```php
 use Voxyfy\AnadoluPay\DTO\CardData;
@@ -140,7 +220,7 @@ $data = new CreatePaymentData(
     currency: 'TRY',
     orderId: 'SIPARIS-123',
     customer: [
-        'name' => 'Ahmet Yılmaz',
+        'name'  => 'Ahmet Yılmaz',
         'email' => 'ahmet@example.com',
         'phone' => '5551112233',
     ],
@@ -160,24 +240,24 @@ $data = new CreatePaymentData(
 
 $response = AnadoluPay::driver('garanti')->createPayment($data);
 
-// Bankaya otomatik POST eden HTML sayfası
 return response($response->toHtmlForm());
 ```
 
-`toHtmlForm()` kullanmak istemezseniz alanları kendiniz render edebilirsiniz:
+`toHtmlForm()` otomatik gönderilen bir sayfa üretir. Formu kendiniz render
+etmek isterseniz:
 
 ```php
-$response->formAction;  // bankanın 3D geçidi
-$response->formMethod;  // 'POST'
-$response->formFields;  // imzalı gizli alanlar
+$response->formAction;   // bankanın 3D geçidi
+$response->formMethod;   // 'POST'
+$response->formFields;   // imzalı gizli alanlar
 ```
 
-Kuveyt Türk, Vakıf Katılım ve Param gibi bazı sağlayıcılar form alanları yerine
-hazır bir HTML sayfası döner; bu durumda `formFields` boştur ve içerik
-`$response->htmlContent` içinde gelir. `toHtmlForm()` her iki durumu da doğru
-şekilde ele alır, bu yüzden onu kullanmak en güvenlisidir.
+**Kuveyt Türk, Vakıf Katılım ve Param** form alanı yerine hazır bir HTML sayfası
+döner; bu durumda `formFields` boştur ve içerik `$response->htmlContent`
+içindedir. `toHtmlForm()` iki durumu da doğru ele alır — elle uğraşmak yerine
+onu kullanın.
 
-### 2. Banka dönüşünü doğrulama
+### 2 · Dönüşü doğrula
 
 ```php
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
@@ -189,96 +269,157 @@ $result = AnadoluPay::driver('garanti')->verify(new VerifyPaymentData(
 ));
 
 if ($result->success) {
-    // $result->paymentId bankanın işlem referansıdır — saklayın,
-    // iade/iptal için gerekecek.
+    // $result->paymentId bankanın işlem referansıdır.
+    // Saklayın — iade ve iptal için gerekecek.
 }
 ```
 
-`verify()` sırasıyla şunları yapar: dönüş hash'ini doğrular (eşleşmezse
-`InvalidSignatureException`), 3D doğrulama durumunu (`mdStatus`) kontrol eder ve
-klasik 3D Secure modelinde bankaya provizyon isteğini gönderir. 3D Pay / 3D Host
-modellerinde provizyon banka tarafında tamamlandığı için ikinci istek atılmaz.
+`verify()` sırayla: dönüş hash'ini doğrular (eşleşmezse
+`InvalidSignatureException`), 3D doğrulama durumunu kontrol eder, klasik 3D
+Secure modelinde bankaya provizyon isteğini gönderir. 3D Pay ve 3D Host'ta
+provizyon banka tarafında tamamlandığı için ikinci istek atılmaz.
 
-**Sipariş bağlamı gerektiren bankalar.** VakıfBank/Ziraat PayFlex, provizyon
-isteğinde kart bilgisini ve sipariş tutarını yeniden ister; banka bunları
-dönüşte göndermez. Bu bankalar için sipariş bağlamını siz sağlarsınız:
+**PayFlex (VakıfBank / Ziraat) sipariş bağlamı ister.** Banka provizyon
+adımında kart bilgisini ve tutarı yeniden sorar ama bunları dönüşte
+göndermez — siz sağlarsınız:
 
 ```php
 $result = AnadoluPay::driver('vakifbank')->verify(new VerifyPaymentData(
     payload: $request->all(),
     order: [
-        'id' => 'SIPARIS-123',
-        'amount' => 199.90,
+        'id'       => 'SIPARIS-123',
+        'amount'   => 199.90,
         'currency' => 'TRY',
-        'installment' => 1,
-        'ip' => $request->ip(),
-        'card' => ['number' => '...', 'expire_month' => '12', 'expire_year' => '30', 'cvv' => '123'],
+        'ip'       => $request->ip(),
+        'card'     => ['number' => '...', 'expire_month' => '12',
+                       'expire_year' => '30', 'cvv' => '123'],
     ],
 ));
 ```
 
-### 3. İade ve iptal
+## İade ve iptal
 
 ```php
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 
-// Tam iade
-AnadoluPay::driver('akbank')->refund(new RefundPaymentData('SIPARIS-123'));
-
-// Kısmi iade
-AnadoluPay::driver('akbank')->refund(new RefundPaymentData('SIPARIS-123', 49.90));
+AnadoluPay::driver('akbank')->refund(new RefundPaymentData('SIPARIS-123'));         // tam
+AnadoluPay::driver('akbank')->refund(new RefundPaymentData('SIPARIS-123', 49.90));  // kısmi
 ```
 
-Bazı bankalar iadeyi sipariş numarasıyla değil, orijinal işlemin banka
-referansıyla eşler. Bu referansı `metadata` ile geçin:
-
-```php
-// Garanti: RetrefNum
-new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['ref_ret_num' => '...']);
-
-// Yapı Kredi PosNet: hostLogKey
-new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['host_ref_num' => '...']);
-
-// PayFlex: TransactionId
-new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['transaction_id' => '...']);
-
-// Vakıf Katılım: bankanın OrderId'si
-new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['remote_order_id' => '...']);
-```
-
-Gün sonu öncesi iptal için driver'ların `cancel()` metodunu kullanın
-(`PaymentGatewayInterface` dışında, banka driver'larına özeldir):
+Gün sonu kapanmadan önce iade değil **iptal** kullanın — daha hızlı ve
+komisyonsuzdur:
 
 ```php
 AnadoluPay::driver('akbank')->cancel(new RefundPaymentData('SIPARIS-123'));
-AnadoluPay::driver('garanti')->cancel(new RefundPaymentData('SIPARIS-123', metadata: ['ref_ret_num' => '...']));
 ```
+
+Bazı bankalar işlemi sipariş numarasıyla değil, kendi referanslarıyla eşler.
+Bu referansı ödeme sırasında saklayıp `metadata` ile geçin:
+
+| Banka | Gereken alan | Nereden gelir |
+|---|---|---|
+| Garanti | `ref_ret_num` | provizyon yanıtı `Transaction.RetrefNum` |
+| Yapı Kredi | `host_ref_num` | provizyon yanıtı `hostlogkey` |
+| PayFlex | `transaction_id` | provizyon yanıtı `TransactionId` |
+| Vakıf Katılım | `remote_order_id` | provizyon yanıtı `OrderId` |
+
+```php
+new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['ref_ret_num' => '...']);
+```
+
+> `cancel()` ve `status()` şu an `PaymentGatewayInterface`'de değil, driver'lara
+> özel metotlardır. Yani statik tip güvenliği yoktur; desteklemeyen bir
+> driver'da çağırırsanız runtime'da patlar. Hangi driver'ın hangisini
+> desteklediği [tabloda](#desteklenen-bankalar) yazıyor.
 
 ## Ödeme modelleri
 
-| Sabit | Anlamı |
-|---|---|
-| `MODEL_3D_SECURE` | Kimlik doğrulama sonrası ayrı bir provizyon isteği atılır (en yaygın) |
-| `MODEL_3D_PAY` | Doğrulama ve provizyon tek adımda banka tarafında yapılır |
-| `MODEL_3D_HOST` | Kart bilgileri de dahil tüm form banka sayfasında toplanır — kart verisi sitenize hiç uğramaz |
-| `MODEL_NON_SECURE` | 3D doğrulaması olmadan doğrudan provizyon |
+| Sabit | Ne yapar | Ne zaman |
+|---|---|---|
+| `MODEL_3D_SECURE` | Doğrulama sonrası ayrı provizyon isteği | Varsayılan; en yaygın |
+| `MODEL_3D_PAY` | Doğrulama ve provizyon tek adımda bankada | Daha az round-trip isteyen kurulumlar |
+| `MODEL_3D_HOST` | Kart formu da bankada toplanır | **Kart verisi sunucunuza hiç uğramaz** — PCI kapsamını daraltır |
+| `MODEL_NON_SECURE` | 3D yok, doğrudan provizyon | Mail order / abonelik |
 
 3D Host modelinde `card` vermeniz gerekmez.
 
-## Taksit
+## Bankaların tuhaflıkları
 
-```php
-new CreatePaymentData(..., installment: 6);
+Driver'lar bunları sizin için hallediyor. Burada olmalarının sebebi, bir şey
+ters gittiğinde nereye bakacağınızı bilmeniz.
+
+**Tutar formatı üç farklı.** Garanti, PosNet, Kuveyt Türk ve Tosla kuruş
+cinsinden tam sayı ister (`199.90` → `19990`). NestPay ve PayFor PHP'nin doğal
+float gösterimini ister (`199.9` → `"199.9"`, `100.0` → `"100"`). Akbank POS ve
+PayFlex iki ondalıklı dizgi ister (`"199.90"`). **Hash tam olarak gönderilen
+dizgi üzerinden hesaplandığı için bu formatlar değiştirilemez.**
+
+**Taksit alanı tek çekimde bile dört farklı.** NestPay boş dizgi, PosNet `'00'`,
+PayFor ve Kuveyt Türk `'0'`, Param `'1'` bekler. PayFlex alanı hiç göndermez.
+
+**Para birimi kodu her yerde ISO 4217 sayısal değil.** Kuveyt Türk dört haneli
+kullanır (`0949`), PosNet V1 harf kısaltması (`TL`, `US`, `EU`).
+
+**Garanti iade için ayrı kullanıcı ister.** `refund` ve `void` işlemlerinde
+`securityData` normal şifreyle değil iade şifresiyle hesaplanır. İki ayrı
+kullanıcı tanımlamazsanız iadeler reddedilir.
+
+**PosNet üç sunucu isteği yapar.** Önce `oosRequestData` ile veri paketleri
+alınır, sonra 3D geçidine POST edilir, dönüşte `oosResolveMerchantData` ile
+çözülüp `oosTranData` ile provizyon tamamlanır. Sipariş numarası 20 haneye
+sıfırla doldurulur; iade/iptalde 24 hane olur ve 3D siparişler `TDSC` ön eki
+alır.
+
+**Ziraat Katılım'ın dönüş hash'i banka tarafında tutarsız üretiliyor.** Bu
+yüzden o preset'te `verify_hash` varsayılan olarak kapalıdır. Bankanız
+düzelttiyse `ZIRAAT_KATILIM_VERIFY_HASH=true` yapın.
+
+**PayTR bildirimi `OK` yanıtı bekler.** Webhook'unuz gövdede düz metin `OK`
+döndürmezse PayTR bildirimi tekrar tekrar gönderir.
+
+**NestPay hash'i alanları sıralar.** Alanlar doğal sırada (harf duyarsız)
+sıralanır, `hash`/`encoding`/`nationalidno` çıkarılır, sona secret key eklenir,
+`|` ve `\` karakterleri kaçırılır. Forma yeni bir alan eklerseniz hash'e de
+girer — banka bunu bilmiyorsa işlem reddedilir.
+
+## Loglama
+
+Banka bir işlemi reddettiğinde size yalnızca bir kod döner
+(`ProcReturnCode=99`). Sorunun hangi alanda olduğunu ancak gönderdiğiniz
+gövdeyi görerek anlarsınız. Entegrasyon geliştirirken açın:
+
+```env
+ANADOLUPAY_LOGGING=true
+ANADOLUPAY_LOG_CHANNEL=anadolupay   # boşsa uygulamanın varsayılan kanalı
 ```
 
-Taksit alanının biçimi bankadan bankaya değişir (NestPay tek çekimde boş dizgi,
-PosNet `'00'`, PayFor `'0'` bekler); driver'lar bunu kendi içinde normalleştirir.
+```
+[debug] AnadoluPay banka isteği  {"bank":"garanti","url":"…","body":"<GVPSRequest>…
+                                  <Number>415565******6111</Number>
+                                  <CVV2>[gizlendi]</CVV2>…"}
+[debug] AnadoluPay banka yanıtı  {"bank":"garanti","status":200,"duration_ms":412,…}
+```
+
+Maskeleme iki katmanlıdır. Birincisi alan adına göre (`cvv`, `password`,
+`secret_key`…). İkincisi değerin biçimine göre: **Luhn kontrolünden geçen her
+13–19 haneli sayı, alan adı ne olursa olsun maskelenir.** İkinci katman
+olmadan, on altı driver'ın farklı adlandırdığı kart alanlarından birini
+gözden kaçırmak kart verisini loga düşürürdü.
+
+Luhn kontrolü yanlış pozitifleri de eler — PosNet'in 20 haneye doldurulmuş
+sipariş numaraları ve NestPay'in MD taşıyan `Number` alanı okunabilir kalır.
+
+Başarısız HTTP yanıtları `warning`, gerisi `debug` seviyesindedir.
+
+> Loglama **varsayılan olarak kapalıdır**. Maskeleme uygulansa bile bu
+> kayıtların nereye yazıldığı bilinçli bir tercih olmalıdır: kalıcı bir kanal
+> seçiyorsanız erişimini kısıtlayın ve saklama süresi tanımlayın.
 
 ## Test ortamı
 
-Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için `.env`'de ilgili
+Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
-değiştirin ve `*_TEST_MODE=true` yapın:
+değiştirin ve `*_TEST_MODE=true` yapın.
 
 ```env
 GARANTI_TEST_MODE=true
@@ -307,133 +448,112 @@ PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
 ```
 
-Geliştirme sırasında gerçek istek atmadan akışı denemek için `fake` driver'ını
-kullanabilirsiniz.
+Gerçek istek atmadan akışı denemek için `fake` driver'ını kullanın.
 
-> **Doğrulama notu.** Bu paketteki protokol implementasyonları bankaların public
-> dokümantasyonuna göre yazılmış ve istek üretimi / hash / yanıt eşlemesi birim
-> testleriyle kilitlenmiştir. Canlıya çıkmadan önce **her banka için kendi test
-> üye işyeri bilgilerinizle uçtan uca bir işlem** yapın: hash algoritmalarında
-> bankalar zaman zaman kuruluma özel farklılıklar tanımlayabiliyor.
+## Güvenlik
 
-## Webhook endpoint'i
-
-Paket `/anadolupay/webhook/{driver}` rotasını kaydeder ve gelen isteği ilgili
-driver'ın `verify()` metoduna verir. Kendi callback controller'ınızı yazmak
-isterseniz yukarıdaki `verify()` örneğini kullanın.
-
-PayTR bildirimi işlendiğinde yanıt gövdesinde düz metin `OK` bekler; PayTR için
-kendi rotanızı yazıp bunu döndürmeniz gerekir.
-
-## Güvenlik notları
-
-- Kart verisi (`CardData`) asla loglanmamalı veya saklanmamalıdır. Loglama için
-  `CardData::masked()` kullanın.
-- `verify_hash` ayarını yalnızca bankanın hash'i tutarsız ürettiği bilinen
-  kurulumlarda kapatın (varsayılan olarak yalnızca Ziraat Katılım'da kapalıdır).
+- Kart verisi (`CardData`) **saklanmamalıdır**. Kendi loglarınızda göstermeniz
+  gerekiyorsa `CardData::masked()` kullanın; paketin istek/yanıt logları zaten
+  maskelidir.
+- `CardData` nesnelerini `dd()`, `var_dump()` veya exception raporlarına
+  vermeyin — bunlar maskelemeden geçmez.
+- `verify_hash` yalnızca bankanın hash'i tutarsız ürettiği bilinen kurulumlarda
+  kapatılmalıdır. Kapalıyken sahte callback'lere açıksınızdır.
 - `verify_ssl` her zaman `true` kalmalıdır.
+- 3D Host modeli kart verisini sunucunuzdan tamamen uzak tutar; PCI kapsamını
+  daraltmak istiyorsanız en iyi seçenektir.
 
-## Yeni bir banka eklemek
+Güvenlik açığı bildirimi: security@voxyfy.com
 
-`AbstractBankGateway` sınıfını genişletin ve altı metodu implement edin:
-`build3dFormFields()`, `checkCallbackHash()`, `is3dAuthSuccess()`,
-`provision()`, `mapCallbackResponse()`, `mapProvisionResponse()`,
-`extractOrderId()`. Ardından `config/anadolupay.php` içindeki `banks` dizisine
-bir preset ekleyin. Akış, hata yönetimi ve HTTP katmanı temel sınıftan gelir.
+## Yeni banka eklemek
+
+`AbstractBankGateway` sınıfını genişletin ve yedi metodu implement edin:
+
+```php
+class YeniBankaGateway extends AbstractBankGateway
+{
+    protected function build3dFormFields(CreatePaymentData $data): array { … }
+    protected function checkCallbackHash(array $payload): bool { … }
+    protected function is3dAuthSuccess(array $payload): bool { … }
+    protected function provision(array $payload): array { … }
+    protected function mapCallbackResponse(array $payload): VerificationResponse { … }
+    protected function mapProvisionResponse(array $payload, array $provision): VerificationResponse { … }
+    protected function extractOrderId(array $payload): ?string { … }
+}
+```
+
+Sonra `config/anadolupay.php` içindeki `banks` dizisine bir preset ekleyin.
+Akış, hata yönetimi, HTTP ve loglama temel sınıftan gelir.
+
+**İmza için test yazın.** Sabit girdilerle üretilmiş bir özet değerine
+kilitleyin — mevcut driver'ların hepsinde örneği var (`tests/Bank/HashTest.php`).
+İmza sessizce bozulabilen tek şeydir.
 
 ## Yol haritası
 
-Bilinen eksikler ve planlanan işler. Katkıya açıktır; bir maddeye başlamadan
-önce issue açmanız çakışmayı önler.
+Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı önler.
 
-### Öncelikli — bilinen riskler
+### Öncelikli
 
 - [ ] **iyzico imza şemasını doğrula.** `IyzicoHttpClient` ve
-      `IyzicoSignatureValidator` içindeki imza algoritması iyzico'nun resmi
+      `IyzicoSignatureValidator` içindeki algoritma iyzico'nun resmi
       dokümantasyonuyla teyit edilmemiştir (kodda `TODO` olarak işaretli).
       Yanlış algoritma ya geçerli bildirimleri reddeder ya da
       `IYZICO_VALIDATE_SIGNATURE=false` kullanımında sahte bildirimlerin
-      kabul edilmesine yol açar. Banka driver'larının imzaları testle
-      kilitlidir, iyzico'nunki değildir.
-- [ ] **iyzico iadesi.** Şu an `UnsupportedOperationException` fırlatıyor.
+      kabul edilmesine yol açar.
+- [ ] **iyzico iadesi** — şu an `UnsupportedOperationException` fırlatıyor.
 - [ ] **Tutarları kuruş cinsinden `int` olarak taşı.** `CreatePaymentData::$amount`
-      `float`; kuruşa çevirim `round($amount * 100)` ile yapılıyor. Para için
-      float prensipte risklidir. Geriye dönük uyumluluğu kıracağı için ayrı bir
-      major sürümde ele alınmalı.
+      `float`; para için prensipte risklidir. BC kıracağı için ayrı bir major
+      sürümde.
 
 ### İşlem kapsamı
 
-- [ ] **`cancel()` ve `status()`'ü sözleşmeye taşı.** İkisi de şu an driver'lara
-      özel metotlar; `PaymentGatewayInterface`'de olmadıkları için çağrı statik
-      olarak tip güvenli değil. Ayrı `SupportsCancellation` /
-      `SupportsStatusQuery` arayüzleri uygun olabilir.
-- [ ] **Eksik `cancel()`**: Kuveyt Türk, Param, PayTR.
-- [ ] **Eksik `status()`**: Asseco, PayFor ve PayTR dışındaki tüm driver'lar.
-- [ ] **Kuveyt Türk iade/iptal.** Ayrı bir SOAP servisinde (`query_api`) yürüyor
-      ve farklı kimlik doğrulama istiyor.
-- [ ] Ön provizyon / provizyon kapama (pre-auth / post-auth) — hiçbir driver'da yok.
-- [ ] İşlem geçmişi sorgulama (order / transaction history).
-- [ ] Taksit oranı sorgulama.
-- [ ] BIN sorgulama (kart bankası ve tipi tespiti).
-- [ ] Tekrarlayan ödeme (recurring).
+- [ ] `cancel()` ve `status()`'ü sözleşmeye taşı (`SupportsCancellation` /
+      `SupportsStatusQuery` arayüzleri).
+- [ ] Eksik `cancel()`: Kuveyt Türk, Param, PayTR.
+- [ ] Eksik `status()`: Asseco, PayFor ve PayTR dışındaki tüm driver'lar.
+- [ ] Kuveyt Türk iade/iptal — ayrı SOAP servisi, farklı kimlik doğrulama.
+- [ ] Ön provizyon / provizyon kapama.
+- [ ] İşlem geçmişi, taksit oranı ve BIN sorgulama.
+- [ ] Tekrarlayan ödeme.
 
 ### Yeni bankalar
 
-Aşağıdakilerin çoğu hâlihazırda yazılmış olan NestPay driver'ını kullanır;
-yeni kod değil, yalnızca `config/anadolupay.php` içine preset ve doğrulanmış
-uç nokta eklemek gerekir.
+Çoğu mevcut NestPay driver'ını kullanır; yeni kod değil, preset ve doğrulanmış
+uç nokta gerekir.
 
-- [ ] ING Bank
-- [ ] Anadolubank
-- [ ] Alternatif Bank
-- [ ] Odeabank
-- [ ] Türkiye Finans
-- [ ] Fibabanka
-- [ ] Burgan Bank
+- [ ] ING Bank · Anadolubank · Alternatif Bank · Odeabank · Türkiye Finans ·
+      Fibabanka · Burgan Bank
 - [ ] Emlak Katılım — hangi altyapıyı kullandığı araştırılmalı
 
 ### Yeni ödeme kuruluşları
 
 - [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
       için bilinçli olarak eklenmedi.
-- [ ] Craftgate
-- [ ] Moka
-- [ ] Paratika / MSU
-- [ ] PayU Türkiye
-- [ ] Vallet
-- [ ] Paycell
-- [ ] Papara, Ozan, Hepsipay
+- [ ] Craftgate · Moka · Paratika/MSU · PayU Türkiye · Vallet · Paycell
 
-### Paket altyapısı
+### Altyapı
 
-- [ ] **Event'ler**: `PaymentInitiated`, `PaymentVerified`, `PaymentFailed`,
-      `RefundIssued`. Şu an tüketen uygulama her şeyi kendi izlemek zorunda.
-- [ ] **PSR-3 loglama.** Kart verisi maskelenmiş istek/yanıt logu; banka
-      entegrasyonlarında hata ayıklamanın pratikte tek yolu.
-- [ ] **Idempotency.** Aynı `orderId` ile ikinci kez `createPayment()`
-      çağrılmasına karşı koruma yok.
-- [ ] **Retry politikası.** Timeout var (30 sn), yeniden deneme yok.
-- [ ] **Hata sınıflandırması.** Ağ/HTTP hatası ile bankanın iş kuralı reddi
-      şu an ikisi de `PaymentFailedException`; ayrıştırılmalı.
+- [x] ~~PSR-3 loglama (maskeli)~~ — bkz. [Loglama](#loglama)
+- [ ] Event'ler: `PaymentInitiated`, `PaymentVerified`, `PaymentFailed`,
+      `RefundIssued`.
+- [ ] Idempotency — aynı `orderId` ile ikinci `createPayment()` çağrısına karşı
+      koruma yok.
+- [ ] Retry politikası — timeout var (30 sn), yeniden deneme yok.
+- [ ] Hata sınıflandırması — ağ/HTTP hatası ile bankanın iş kuralı reddi şu an
+      ikisi de `PaymentFailedException`.
 
-## Testler
+## Katkı
 
 ```bash
-composer test
+composer test        # Pest
+composer format      # Pint
+vendor/bin/phpstan   # Larastan, level 5
 ```
 
-## Değişiklik Günlüğü
-
-Son değişiklikler hakkında daha fazla bilgi için [CHANGELOG](CHANGELOG.md) dosyasına bakın.
-
-## Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! Detaylar için [CONTRIBUTING](CONTRIBUTING.md) dosyasına bakın.
-
-## Güvenlik Açıkları
-
-Bir güvenlik açığı keşfederseniz, lütfen security@voxyfy.com adresine e-posta gönderin.
+Detaylar için [CONTRIBUTING](CONTRIBUTING.md), sürüm geçmişi için
+[CHANGELOG](CHANGELOG.md).
 
 ## Lisans
 
-MIT Lisansı (MIT). Daha fazla bilgi için [Lisans Dosyası](LICENSE.md)'na bakın.
+MIT — bkz. [LICENSE](LICENSE.md).

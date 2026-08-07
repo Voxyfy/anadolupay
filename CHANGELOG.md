@@ -29,6 +29,16 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 * `config/anadolupay.php` içinde banka preset'leri; `AnadoluPay::driver()`
   artık banka anahtarlarını da çözümlüyor.
 * Her altyapının imza algoritması için regresyon testleri.
+* **PSR-3 loglama** (`anadolupay.logging`). Her banka isteği ve yanıtı, kart
+  numarası maskelenip CVV/şifre gizlenerek kaydedilir. Maskeleme hem alan adına
+  hem de değerin biçimine (Luhn doğrulamalı) göre çalışır. Varsayılan kapalıdır.
+
+### Düzeltildi
+
+* `Currency::alphabetic()` her iki dalı aynı olan bir koşul içeriyordu ve
+  sıfırla doldurulmuş kodları (Kuveyt Türk `0949`) çözemiyordu.
+* `AbstractBankGateway::paymentModelOf()` hiçbir yerde yazılmayan bir
+  `anadolupay_payment_model` anahtarını okuyordu; kaldırıldı.
 
 ### Değişti
 

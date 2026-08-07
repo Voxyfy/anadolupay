@@ -186,3 +186,12 @@ it('banka hazır HTML döndürdüğünde onu olduğu gibi kullanır', function (
     expect($response->requiresForm())->toBeTrue()
         ->and($response->toHtmlForm())->toBe('<html>banka sayfası</html>');
 });
+
+it('sayısal para birimi kodunu alfabetik koda çevirir', function () {
+    expect(Currency::alphabetic('949'))->toBe('TRY')
+        // Kuveyt Türk kodu sıfırla doldurulmuş gönderir
+        ->and(Currency::alphabetic('0949'))->toBe('TRY')
+        ->and(Currency::alphabetic('840'))->toBe('USD')
+        // Tanınmayan kod ham haliyle korunur, hata fırlatılmaz
+        ->and(Currency::alphabetic('999'))->toBe('999');
+});

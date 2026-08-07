@@ -39,6 +39,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Loglama
+    |--------------------------------------------------------------------------
+    |
+    | Açıldığında her banka isteği ve yanıtı, kart numarası ve CVV
+    | maskelenerek kaydedilir. Banka yalnızca bir hata kodu döndüğü için
+    | entegrasyon sorunlarını ayıklamanın pratikte tek yolu budur.
+    |
+    | Varsayılan olarak kapalıdır: maskeleme uygulansa bile bu kayıtların
+    | nereye yazıldığı bilinçli bir tercih olmalıdır. Kalıcı log tutan bir
+    | kanal seçiyorsanız erişimini kısıtlayın ve saklama süresi tanımlayın.
+    |
+    */
+
+    'logging' => [
+        'enabled' => env('ANADOLUPAY_LOGGING', false),
+        // Boş bırakılırsa uygulamanın varsayılan log kanalı kullanılır.
+        'channel' => env('ANADOLUPAY_LOG_CHANNEL'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Banka Sanal POS Preset'leri
     |--------------------------------------------------------------------------
     |

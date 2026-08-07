@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\DTO\CardData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
@@ -49,10 +51,32 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
         $client = new BankHttpClient(
             timeout: (int) ($config['timeout'] ?? 30),
             verifySsl: (bool) ($config['verify_ssl'] ?? true),
+            logger: static::resolveLogger(),
+            bank: $bank,
         );
 
         // @phpstan-ignore-next-line new.static — alt sınıflar ek kurucu parametresi tanımlamaz.
         return new static($bankConfig, $client);
+    }
+
+    /**
+     * Yapılandırmaya göre log kanalını çözümler.
+     *
+     * Loglama varsayılan olarak kapalıdır: banka istekleri kart verisi
+     * taşır ve maskeleme yapılsa bile bu kayıtların nereye yazıldığı
+     * bilinçli bir tercih olmalıdır.
+     */
+    protected static function resolveLogger(): ?LoggerInterface
+    {
+        if (! (bool) config('anadolupay.logging.enabled', false)) {
+            return null;
+        }
+
+        $channel = config('anadolupay.logging.channel');
+
+        return is_string($channel) && $channel !== ''
+            ? Log::channel($channel)
+            : Log::getFacadeRoot();
     }
 
     /**
@@ -174,15 +198,19 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
     /**
      * Banka dönüşünden ödeme modelini çıkarır.
      *
+     * Çoğu banka kullanılan modeli dönüşte geri gönderir (NestPay
+     * `storetype`, PayFor/InterPos `SecureType`, Akbank `paymentModel`);
+     * bu driver'lar metodu kendi alan adlarıyla override eder.
+     *
+     * Modeli bildirmeyen bankalar için en güvenli varsayım klasik 3D
+     * Secure'dur: provizyon isteği fazladan gönderilirse banka mükerrer
+     * işlemi reddeder, gönderilmezse ödeme sessizce alınmamış olur.
+     *
      * @param  array<string, mixed>  $payload
      */
     protected function paymentModelOf(array $payload): string
     {
-        $model = $payload['anadolupay_payment_model'] ?? null;
-
-        return is_string($model) && $model !== ''
-            ? $model
-            : CreatePaymentData::MODEL_3D_SECURE;
+        return CreatePaymentData::MODEL_3D_SECURE;
     }
 
     /**

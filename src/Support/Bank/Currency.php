@@ -46,7 +46,7 @@ final class Currency
         if (! isset(self::NUMERIC[$code])) {
             throw new PaymentFailedException(
                 message: "Desteklenmeyen para birimi: '{$currency}'.",
-                context: ['supported' => array_keys(self::NUMERIC)],
+                context: ['supported' => self::supported()],
             );
         }
 
@@ -56,12 +56,22 @@ final class Currency
     /**
      * Sayısal ISO 4217 kodunu alfabetik koda çevirir.
      *
-     * Bilinmeyen kodlarda girdiyi olduğu gibi döndürür; yanıt
-     * eşlemesinde hata fırlatmak yerine ham değeri korumak istiyoruz.
+     * Bankalar kodu sıfırla doldurulmuş gönderebilir (Kuveyt Türk '0949'
+     * kullanır); baştaki sıfırlar yok sayılır.
+     *
+     * Bilinmeyen kodlarda girdiyi olduğu gibi döndürür: yanıt eşlemesinde
+     * hata fırlatmak, yalnızca para birimi tanınmadığı için başarılı bir
+     * ödemenin kaybedilmesine yol açardı.
      */
     public static function alphabetic(string $numeric): string
     {
-        $found = array_search(ltrim($numeric, '0') === '' ? $numeric : $numeric, self::NUMERIC, true);
+        $normalized = ltrim(trim($numeric), '0');
+
+        if ($normalized === '') {
+            return $numeric;
+        }
+
+        $found = array_search($normalized, self::NUMERIC, true);
 
         return is_string($found) ? $found : $numeric;
     }
