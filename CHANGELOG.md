@@ -2,6 +2,10 @@
 
 All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
+## v1.0.3 - 2026-08-07
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.2...v1.0.3
+
 ## v1.0.2 - 2026-08-07
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.1...v1.0.2
