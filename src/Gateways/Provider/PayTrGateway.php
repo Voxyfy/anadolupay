@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsBinQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsInstallmentQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\BinResponse;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
+use Voxyfy\AnadoluPay\DTO\InstallmentOption;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
@@ -28,7 +35,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - Yapılandırmada `merchant_id` => merchant id, `secret_key` => merchant key,
  *     `password` => merchant salt olarak eşlenir.
  */
-class PayTrGateway extends AbstractBankGateway
+class PayTrGateway extends AbstractBankGateway implements SupportsBinQuery, SupportsInstallmentQuery, SupportsStatusQuery
 {
     /**
      * PayTR doğrudan ödeme formu; kart alanları da PayTR'ye POST edilir.
@@ -204,9 +211,11 @@ class PayTrGateway extends AbstractBankGateway
     /**
      * Sipariş durumunu sorgular.
      *
-     * @return array<string, mixed>
+     * PayTR iptal (void) işlemi sunmaz; gün sonu öncesi bile olsa tek
+     * seçenek iadedir. Bu yüzden bu driver `SupportsCancellation`
+     * arayüzünü uygulamaz.
      */
-    public function status(string $orderId): array
+    public function status(string $orderId, array $context = []): StatusResponse
     {
         $fields = [
             'merchant_id' => $this->config->merchantId,
@@ -215,9 +224,36 @@ class PayTrGateway extends AbstractBankGateway
 
         $fields['paytr_token'] = $this->hmac(implode('', $fields).$this->config->password);
 
-        return $this->client->postForm(
+        $response = $this->client->postForm(
             url: rtrim($this->config->endpoint('payment_api'), '/').'/odeme/durum',
             fields: $fields,
+        );
+
+        if ($this->pick($response, ['status']) !== 'success') {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $returned = $this->pick($response, ['returned_amount']);
+        $refunded = $returned !== null && (float) $returned > 0
+            // PayTR tutarları kuruş cinsinden bildirir.
+            ? Money::fromMinorUnits((int) $returned)
+            : null;
+
+        return new StatusResponse(
+            found: true,
+            status: match ($this->pick($response, ['payment_status'])) {
+                'success' => $refunded !== null ? StatusResponse::STATUS_REFUNDED : StatusResponse::STATUS_PAID,
+                'failed' => StatusResponse::STATUS_FAILED,
+                'waiting' => StatusResponse::STATUS_PENDING,
+                default => StatusResponse::STATUS_UNKNOWN,
+            },
+            orderId: $orderId,
+            amount: ($amount = $this->pick($response, ['total_amount', 'payment_amount'])) !== null
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            refundedAmount: $refunded,
+            transactionTime: $this->pick($response, ['payment_date']),
+            raw: $response,
         );
     }
 
@@ -311,5 +347,86 @@ class PayTrGateway extends AbstractBankGateway
     protected function hmac(string $value): string
     {
         return base64_encode(hash_hmac('sha256', $value, $this->config->secretKey, true));
+    }
+
+    /**
+     * BIN sorgusu.
+     *
+     * PayTR bu istekte farklı bir imza şeması kullanır: alanlar arasında
+     * ayraç yoktur ve merchant salt sona eklenir.
+     */
+    public function binLookup(string $bin, array $context = []): BinResponse
+    {
+        $fields = [
+            'merchant_id' => $this->config->merchantId,
+            'bin_number' => $bin,
+        ];
+
+        $fields['paytr_token'] = $this->hmac($bin.$this->config->merchantId.$this->config->password);
+
+        $response = $this->client->postForm(
+            url: rtrim($this->config->endpoint('payment_api'), '/').'/odeme/api/bin-detail',
+            fields: $fields,
+        );
+
+        if ($this->pick($response, ['status']) !== 'success') {
+            return BinResponse::notFound($response);
+        }
+
+        return new BinResponse(
+            found: true,
+            bankName: $this->pick($response, ['bankName', 'bank_name']),
+            brand: strtolower((string) ($this->pick($response, ['brand', 'schema']) ?? '')) ?: null,
+            type: strtolower((string) ($this->pick($response, ['cardType', 'card_type']) ?? '')) ?: null,
+            commercial: ($c = $this->pick($response, ['businessCard'])) !== null ? $c === '1' : null,
+            raw: $response,
+        );
+    }
+
+    /**
+     * Taksit oranlarını sorgular.
+     *
+     * @return list<InstallmentOption>
+     */
+    public function installmentOptions(Money $amount, ?string $bin = null): array
+    {
+        $fields = [
+            'merchant_id' => $this->config->merchantId,
+            'request_id' => $this->randomString(16),
+        ];
+
+        $fields['paytr_token'] = $this->hmac(implode('', $fields).$this->config->password);
+
+        $response = $this->client->postForm(
+            url: rtrim($this->config->endpoint('payment_api'), '/').'/odeme/taksit-oranlari',
+            fields: $fields,
+        );
+
+        $rates = $response['oranlar'] ?? [];
+
+        if (! is_array($rates)) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach ($rates as $count => $rate) {
+            if (! is_numeric($count) || ! is_numeric($rate)) {
+                continue;
+            }
+
+            $commission = (float) $rate;
+            $total = (int) round($amount->minorUnits * (1 + $commission / 100));
+
+            $options[] = new InstallmentOption(
+                count: (int) $count,
+                totalPrice: $amount->withAmount($total),
+                monthlyPrice: $amount->withAmount((int) round($total / max(1, (int) $count))),
+                commissionRate: $commission,
+                raw: ['rate' => $rate],
+            );
+        }
+
+        return $options;
     }
 }

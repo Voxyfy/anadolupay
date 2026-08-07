@@ -11,6 +11,7 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\DTO\CardData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
@@ -217,6 +218,27 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
         $this->dispatch(RefundIssued::from($this->config->bank, $data, $response));
 
         return $response;
+    }
+
+    /**
+     * Ödeme verisindeki tekrarlayan ödeme planını okur.
+     */
+    protected function recurringPlan(CreatePaymentData $data): ?RecurringPlan
+    {
+        $plan = $data->metadata['recurring'] ?? null;
+
+        return $plan instanceof RecurringPlan ? $plan : null;
+    }
+
+    /**
+     * Ön provizyon alır.
+     *
+     * Akış normal ödemeyle aynıdır; yalnızca işlem tipi değişir. Bu yüzden
+     * driver'lar `txType()` metodunu override ederek ayrımı yapar.
+     */
+    public function preAuthorize(CreatePaymentData $data): PaymentResponse
+    {
+        return $this->createPayment($data->asPreAuthorization());
     }
 
     /**

@@ -4,8 +4,14 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsRecurringPayments;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
@@ -15,6 +21,10 @@ use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Akbank Sanal POS (yeni JSON API) Driver'ı
+ *
+ * Not: Akbank'ın yeni API'si tekil sipariş durumu sorgusu sunmaz; bunun
+ * yerine tarih aralığına göre işlem geçmişi (`txnCode 1009/1010`) döner.
+ * Bu yüzden driver `SupportsStatusQuery` arayüzünü uygulamaz.
  *
  * Akbank'ın Asseco tabanlı eski sanal POS'unun yerini alan REST/JSON
  * API'sidir. Eski kurulum için `AssecoGateway` kullanılır.
@@ -27,7 +37,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *     birleştirilir.
  *   - Başarı kodu `VPS-0000`.
  */
-class AkbankPosGateway extends AbstractBankGateway
+class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellation, SupportsOrderHistory, SupportsPreAuthorization, SupportsRecurringPayments
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = 'VPS-0000';
@@ -40,6 +50,22 @@ class AkbankPosGateway extends AbstractBankGateway
 
     protected const TXN_CODE_NON_SECURE = '1000';
 
+    /** Ön provizyon işlem kodları. */
+    protected const TXN_CODE_3D_PRE_AUTH = '3004';
+
+    protected const TXN_CODE_NON_SECURE_PRE_AUTH = '1004';
+
+    /** Akbank tekrar frekansı kodları. */
+    protected const RECURRING_FREQUENCIES = [
+        RecurringPlan::FREQUENCY_DAY => 'D',
+        RecurringPlan::FREQUENCY_WEEK => 'W',
+        RecurringPlan::FREQUENCY_MONTH => 'M',
+        RecurringPlan::FREQUENCY_YEAR => 'Y',
+    ];
+
+    /** Provizyon kapama işlem kodu. */
+    protected const TXN_CODE_CAPTURE = '1005';
+
     /**
      * @return array<string, mixed>
      */
@@ -49,7 +75,7 @@ class AkbankPosGateway extends AbstractBankGateway
 
         $inputs = [
             'paymentModel' => $this->paymentModelCode($data->paymentModel),
-            'txnCode' => self::TXN_CODE_3D,
+            'txnCode' => $data->preAuthorization ? self::TXN_CODE_3D_PRE_AUTH : self::TXN_CODE_3D,
             'merchantSafeId' => $this->config->merchantId,
             'terminalSafeId' => $this->config->terminalId,
             'orderId' => $data->orderId,
@@ -220,7 +246,7 @@ class AkbankPosGateway extends AbstractBankGateway
                 'terminalSafeId' => $this->config->terminalId,
             ],
             'version' => self::API_VERSION,
-            'txnCode' => self::TXN_CODE_NON_SECURE,
+            'txnCode' => $data->preAuthorization ? self::TXN_CODE_NON_SECURE_PRE_AUTH : self::TXN_CODE_NON_SECURE,
             'requestDateTime' => $this->requestDateTime(),
             'randomNumber' => $this->randomString(128),
             'card' => [
@@ -236,7 +262,7 @@ class AkbankPosGateway extends AbstractBankGateway
                 'installCount' => $data->installments(),
             ],
             'customer' => ['ipAddress' => $data->clientIp()],
-        ]);
+        ] + $this->recurringRequest($data));
 
         $approved = $this->pick($response, ['responseCode']) === self::SUCCESS_CODE;
 
@@ -247,6 +273,38 @@ class AkbankPosGateway extends AbstractBankGateway
             raw: $response,
             errorCode: $approved ? null : $this->pick($response, ['responseCode']),
         );
+    }
+
+    /**
+     * Akbank tekrar frekansları.
+     *
+     * @return list<string>
+     */
+    public function supportedRecurringFrequencies(): array
+    {
+        return array_keys(self::RECURRING_FREQUENCIES);
+    }
+
+    /**
+     * Tekrarlayan ödeme bloğu.
+     *
+     * @return array<string, mixed>
+     */
+    protected function recurringRequest(CreatePaymentData $data): array
+    {
+        $plan = $this->recurringPlan($data);
+
+        if ($plan === null) {
+            return [];
+        }
+
+        return [
+            'recurring' => [
+                'frequencyInterval' => $plan->interval,
+                'frequencyCycle' => $plan->frequencyCode(self::RECURRING_FREQUENCIES),
+                'numberOfPayments' => $plan->paymentCount,
+            ],
+        ];
     }
 
     /**
@@ -389,5 +447,61 @@ class AkbankPosGateway extends AbstractBankGateway
                 'auth-hash' => $this->hmac($body),
             ],
         );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`txnCode 1005`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $response = $this->postJson([
+            'terminal' => [
+                'merchantSafeId' => $this->config->merchantId,
+                'terminalSafeId' => $this->config->terminalId,
+            ],
+            'version' => self::API_VERSION,
+            'txnCode' => self::TXN_CODE_CAPTURE,
+            'requestDateTime' => $this->requestDateTime(),
+            'randomNumber' => $this->randomString(128),
+            'order' => ['orderId' => $data->orderId],
+            'transaction' => [
+                'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+                'currencyCode' => (int) Currency::numeric($data->currency),
+            ],
+            'customer' => ['ipAddress' => $data->clientIp()],
+        ]);
+
+        $approved = $this->pick($response, ['responseCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->transactionField($response, 'rrn') ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['hostMessage', 'responseMessage']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['responseCode']),
+        );
+    }
+
+    /**
+     * Siparişin hareket dökümü (`txnCode 1010`).
+     *
+     * Akbank tekil durum sorgusu sunmadığı için siparişin son durumu da
+     * bu dökümden okunur.
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        return $this->postJson([
+            'terminal' => [
+                'merchantSafeId' => $this->config->merchantId,
+                'terminalSafeId' => $this->config->terminalId,
+            ],
+            'version' => self::API_VERSION,
+            'txnCode' => '1010',
+            'requestDateTime' => $this->requestDateTime(),
+            'randomNumber' => $this->randomString(128),
+            'order' => ['orderId' => $orderId],
+        ]);
     }
 }

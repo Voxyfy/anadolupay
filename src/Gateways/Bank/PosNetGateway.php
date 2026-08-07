@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
@@ -30,7 +35,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  * Tüm istekler `posnetRequest` kök elemanlı XML'in `xmldata` form alanı
  * içinde gönderilir. Hash algoritması sha256 + base64, ayraç `;`.
  */
-class PosNetGateway extends AbstractBankGateway
+class PosNetGateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** PosNet onaylı işlem için '1' döner. */
     protected const SUCCESS_CODE = '1';
@@ -70,7 +75,7 @@ class PosNetGateway extends AbstractBankGateway
                 'installment' => $this->formatInstallment($data->installments()),
                 'XID' => $this->formatOrderId($data->orderId),
                 'cardHolderName' => $card->holderName ?? '',
-                'tranType' => 'Sale',
+                'tranType' => $data->preAuthorization ? 'Auth' : 'Sale',
             ],
         ]);
 
@@ -229,7 +234,7 @@ class PosNetGateway extends AbstractBankGateway
             'mid' => $this->config->merchantId,
             'tid' => $this->config->terminalId,
             'tranDateRequired' => '1',
-            'sale' => [
+            ($data->preAuthorization ? 'auth' : 'sale') => [
                 'orderID' => $this->formatOrderId($data->orderId),
                 'installment' => $this->formatInstallment($data->installments()),
                 'amount' => $this->formatAmount($data->money()),
@@ -500,6 +505,98 @@ class PosNetGateway extends AbstractBankGateway
             data: $request,
             root: 'posnetRequest',
             encoding: 'ISO-8859-9',
+        );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`agreement`).
+     *
+     * 3D Secure ile alınan siparişler sorguda 'TDSC' ön eki taşır; model
+     * `$context['payment_model']` ile bildirilebilir.
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $paymentModel = (string) ($context['payment_model'] ?? CreatePaymentData::MODEL_3D_SECURE);
+
+        $response = $this->postXml([
+            'mid' => $this->config->merchantId,
+            'tid' => $this->config->terminalId,
+            'agreement' => [
+                'orderID' => $this->formatReversalOrderId($orderId, $paymentModel),
+            ],
+        ]);
+
+        if ($this->pick($response, ['approved']) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $transactions = $response['transactions'] ?? [];
+        $transaction = is_array($transactions) ? ($transactions['transaction'] ?? $transactions) : [];
+        $transaction = is_array($transaction) ? $transaction : [];
+
+        // Aynı sipariş için birden çok işlem dönebilir; sonuncusu geçerlidir.
+        if ($transaction !== [] && array_is_list($transaction)) {
+            $transaction = (array) end($transaction);
+        }
+
+        $state = strtolower((string) ($this->pick($transaction, ['state']) ?? ''));
+
+        return new StatusResponse(
+            found: true,
+            status: match ($state) {
+                'sale' => StatusResponse::STATUS_PAID,
+                'reverse', 'void' => StatusResponse::STATUS_CANCELLED,
+                'return' => StatusResponse::STATUS_REFUNDED,
+                'auth' => StatusResponse::STATUS_PRE_AUTHORIZED,
+                default => StatusResponse::STATUS_PAID,
+            },
+            orderId: $orderId,
+            paymentId: $this->hostLogKey($transaction) ?? $this->hostLogKey($response),
+            amount: ($amount = $this->pick($transaction, ['amount'])) !== null && is_numeric($amount)
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            transactionTime: $this->pick($transaction, ['tranDate']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`capt`).
+     *
+     * PosNet kapamayı `hostLogKey` ile eşler; bu değeri ödeme yanıtından
+     * saklayıp `metadata['host_ref_num']` ile geçin.
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $hostLogKey = $data->meta('host_ref_num') ?? $data->meta('host_log_key');
+
+        if (! is_string($hostLogKey) || $hostLogKey === '') {
+            throw new PaymentFailedException(
+                message: "PosNet provizyon kapama için metadata['host_ref_num'] zorunludur.",
+                context: ['bank' => $this->config->bank, 'order_id' => $data->orderId],
+            );
+        }
+
+        $response = $this->postXml([
+            'mid' => $this->config->merchantId,
+            'tid' => $this->config->terminalId,
+            'tranDateRequired' => '1',
+            'capt' => [
+                'hostLogKey' => $hostLogKey,
+                'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+                'currencyCode' => Currency::numeric($data->currency),
+                'installment' => $this->formatInstallment(1),
+            ],
+        ]);
+
+        $approved = $this->pick($response, ['approved']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->hostLogKey($response) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['respText']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['respCode']),
         );
     }
 }

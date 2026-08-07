@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Bank\Xml;
 use Voxyfy\AnadoluPay\Support\Money;
 
@@ -29,7 +35,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - 3D Secure adımında Param hazır bir HTML (`UCD_HTML`) döner.
  *   - Dönüş imzası: islemGUID + md + mdStatus + orderId + GUID → sha1 + base64.
  */
-class ParamGateway extends AbstractBankGateway
+class ParamGateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** SOAP servisinin ad alanı. */
     protected const NAMESPACE = 'https://turkpos.com.tr/';
@@ -43,9 +49,11 @@ class ParamGateway extends AbstractBankGateway
             return $this->nonSecurePayment($data);
         }
 
-        $operation = $data->paymentModel === CreatePaymentData::MODEL_3D_PAY
-            ? 'Pos_Odeme'
-            : 'TP_WMD_UCD';
+        $operation = match (true) {
+            $data->preAuthorization => 'TP_Islem_Odeme_OnProv_WMD',
+            $data->paymentModel === CreatePaymentData::MODEL_3D_PAY => 'Pos_Odeme',
+            default => 'TP_WMD_UCD',
+        };
 
         $response = $this->call($operation, $this->paymentRequest($data, $operation));
         $result = $this->result($response, $operation);
@@ -403,6 +411,89 @@ class ParamGateway extends AbstractBankGateway
             url: $this->config->endpoint('payment_api'),
             envelope: $envelope,
             soapAction: self::NAMESPACE.$operation,
+        );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`TP_Islem_Sorgulama4`).
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $response = $this->call('TP_Islem_Sorgulama4', $this->accountData() + [
+            '@xmlns' => self::NAMESPACE,
+            'Siparis_ID' => $orderId,
+        ]);
+
+        $result = $this->result($response, 'TP_Islem_Sorgulama4');
+        $records = $result['DT_Bilgi'] ?? null;
+
+        if (! is_array($records) || $records === []) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        // Param sonuçları bir tablo olarak döndürür; son satır geçerli durumdur.
+        $rows = $records['Temp'] ?? $records;
+        $row = is_array($rows) && array_is_list($rows) ? (array) end($rows) : (array) $rows;
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map($this->pick($row, ['Islem_Durum', 'Durum']), OrderStatus::PARAM),
+            orderId: $orderId,
+            paymentId: $this->pick($row, ['Dekont_ID', 'Islem_ID']),
+            amount: ($amount = $this->pick($row, ['Odeme_Tutari', 'Islem_Tutar'])) !== null
+                ? Money::fromDecimal($amount)
+                : null,
+            transactionTime: $this->pick($row, ['Tarih', 'Islem_Tarih']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Gün sonu öncesi işlem iptali.
+     *
+     * Param iptal ve iadeyi aynı serviste yürütür; ayrım `Durum` alanındadır.
+     */
+    public function cancel(RefundPaymentData $data): RefundResponse
+    {
+        $response = $this->call('TP_Islem_Iptal_Iade_Kismi2', $this->accountData() + [
+            '@xmlns' => self::NAMESPACE,
+            'Durum' => 'IPTAL',
+            'Siparis_ID' => $data->paymentId,
+            'Tutar' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->toDecimalString(),
+        ]);
+
+        $result = $this->result($response, 'TP_Islem_Iptal_Iade_Kismi2');
+        $approved = (string) ($result['Sonuc'] ?? '') === '1';
+
+        return new RefundResponse(
+            success: $approved,
+            refundId: isset($result['Dekont_ID']) ? (string) $result['Dekont_ID'] : null,
+            errorMessage: $approved ? null : (string) ($result['Sonuc_Str'] ?? ''),
+            raw: $result,
+        );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`TP_Islem_Odeme_OnProv_Kapa`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $response = $this->call('TP_Islem_Odeme_OnProv_Kapa', $this->accountData() + [
+            '@xmlns' => self::NAMESPACE,
+            'Prov_ID' => (string) ($data->meta('prov_id') ?? ''),
+            'Prov_Tutar' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->toDecimalString(),
+            'Siparis_ID' => $data->orderId,
+        ]);
+
+        $result = $this->result($response, 'TP_Islem_Odeme_OnProv_Kapa');
+        $approved = (string) ($result['Sonuc'] ?? '') === '1';
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: isset($result['Dekont_ID']) ? (string) $result['Dekont_ID'] : $data->orderId,
+            errorMessage: $approved ? null : (string) ($result['Sonuc_Str'] ?? ''),
+            raw: $result,
+            errorCode: $approved ? null : (string) ($result['Sonuc'] ?? ''),
         );
     }
 }

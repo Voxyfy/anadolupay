@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsRecurringPayments;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CardData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
@@ -33,10 +40,17 @@ use Voxyfy\AnadoluPay\Support\Money;
  * İstekler `VposRequest` kök elemanlı XML'in `prmstr` form alanı içinde
  * gönderilir. Hash kullanılmaz; kimlik doğrulama MerchantId + Password iledir.
  */
-class PayFlexGateway extends AbstractBankGateway
+class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsRecurringPayments, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '0000';
+
+    /** PayFlex tekrar frekansı kodları; haftalık desteklenmez. */
+    protected const RECURRING_FREQUENCIES = [
+        RecurringPlan::FREQUENCY_DAY => 'Day',
+        RecurringPlan::FREQUENCY_MONTH => 'Month',
+        RecurringPlan::FREQUENCY_YEAR => 'Year',
+    ];
 
     /** Kart markası kodları. */
     protected const CARD_BRANDS = [
@@ -95,6 +109,8 @@ class PayFlexGateway extends AbstractBankGateway
         if ($data->installments() > 1) {
             $request['InstallmentCount'] = (string) $data->installments();
         }
+
+        $request = array_merge($request, $this->recurringRequest($data));
 
         $response = $this->client->postForm(
             url: $this->config->endpoint('gateway_3d'),
@@ -210,7 +226,7 @@ class PayFlexGateway extends AbstractBankGateway
         $card = $this->requireCard($data);
 
         $response = $this->postXml($this->accountData() + [
-            'TransactionType' => 'Sale',
+            'TransactionType' => $this->txType($data),
             'OrderId' => $data->orderId,
             'CurrencyAmount' => $this->formatAmount($data->money()),
             'CurrencyCode' => Currency::numeric($data->currency),
@@ -441,5 +457,144 @@ class PayFlexGateway extends AbstractBankGateway
             root: $root,
             withDeclaration: false,
         );
+    }
+
+    /**
+     * Sipariş durumunu sorgular.
+     *
+     * PayFlex sorguyu ayrı bir uçtan (`query_api`) yürütür ve kimlik
+     * bilgilerini `MerchantCriteria` bloğunda ister.
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $request = [
+            'MerchantCriteria' => [
+                'HostMerchantId' => $this->config->merchantId,
+                'MerchantPassword' => $this->config->password,
+            ],
+            'TransactionCriteria' => [
+                'TransactionId' => (string) ($context['transaction_id'] ?? ''),
+                'OrderId' => $orderId,
+                'AuthCode' => '',
+            ],
+        ];
+
+        $response = $this->client->postForm(
+            url: $this->config->endpoint('query_api'),
+            fields: ['prmstr' => $this->encodeXml($request, 'SearchRequest')],
+        );
+
+        $transaction = $response['TransactionSearchResultInfo']['TransactionSearchResultInfo'] ?? null;
+
+        if (! is_array($transaction)) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $orderStatus = strtolower((string) ($this->pick($transaction, ['TransactionStatus']) ?? ''));
+
+        return new StatusResponse(
+            found: true,
+            status: match ($orderStatus) {
+                'successful', 'success' => StatusResponse::STATUS_PAID,
+                'voided', 'void' => StatusResponse::STATUS_CANCELLED,
+                'refunded' => StatusResponse::STATUS_REFUNDED,
+                'unsuccessful', 'failed' => StatusResponse::STATUS_FAILED,
+                default => StatusResponse::STATUS_UNKNOWN,
+            },
+            orderId: $orderId,
+            paymentId: $this->pick($transaction, ['TransactionId']),
+            amount: ($amount = $this->pick($transaction, ['CurrencyAmount', 'Amount'])) !== null
+                ? Money::fromDecimal($amount)
+                : null,
+            transactionTime: $this->pick($transaction, ['HostDate', 'TransactionDate']),
+            maskedCardNumber: $this->pick($transaction, ['CardNumber', 'Pan']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * İşlem tipi: PayFlex'te normal satış `Sale`, ön provizyon `Auth`tır.
+     */
+    protected function txType(CreatePaymentData $data): string
+    {
+        return $data->preAuthorization ? 'Auth' : 'Sale';
+    }
+
+    /**
+     * Ön provizyonu kapatır (`Capture`).
+     *
+     * PayFlex kapamayı orijinal işlemin `TransactionId` değeriyle eşler;
+     * `metadata['transaction_id']` zorunludur.
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $transactionId = $data->meta('transaction_id');
+
+        if (! is_string($transactionId) || $transactionId === '') {
+            throw new PaymentFailedException(
+                message: "PayFlex provizyon kapama için metadata['transaction_id'] zorunludur.",
+                context: ['bank' => $this->config->bank, 'order_id' => $data->orderId],
+            );
+        }
+
+        $response = $this->postXml($this->accountData() + [
+            'TransactionType' => 'Capture',
+            'ReferenceTransactionId' => $transactionId,
+            'CurrencyAmount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+            'CurrencyCode' => Currency::numeric($data->currency),
+            'ClientIp' => $data->clientIp(),
+        ]);
+
+        $approved = $this->resultCode($response) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['TransactionId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['ResultDetail', 'ErrorMessage']),
+            raw: $response,
+            errorCode: $approved ? null : $this->resultCode($response),
+        );
+    }
+
+    /**
+     * PayFlex tekrar frekansları (haftalık desteklenmez).
+     *
+     * @return list<string>
+     */
+    public function supportedRecurringFrequencies(): array
+    {
+        return array_keys(self::RECURRING_FREQUENCIES);
+    }
+
+    /**
+     * Tekrarlayan ödeme alanları.
+     *
+     * PayFlex plan bitiş tarihini zorunlu tutar.
+     *
+     * @return array<string, string>
+     */
+    protected function recurringRequest(CreatePaymentData $data): array
+    {
+        $plan = $this->recurringPlan($data);
+
+        if ($plan === null) {
+            return [];
+        }
+
+        if ($plan->endDate === null) {
+            throw new PaymentFailedException(
+                message: 'PayFlex tekrarlayan ödemede plan bitiş tarihi (endDate) zorunludur.',
+                context: ['bank' => $this->config->bank],
+            );
+        }
+
+        return [
+            'IsRecurring' => 'true',
+            'RecurringFrequency' => (string) $plan->interval,
+            'RecurringFrequencyType' => $plan->frequencyCode(self::RECURRING_FREQUENCIES),
+            'RecurringInstallmentCount' => (string) $plan->paymentCount,
+            'RecurringEndDate' => $plan->endDate->format('Ymd'),
+            'TriggerDate' => $plan->startDate?->format('Ymd') ?? '',
+        ];
     }
 }

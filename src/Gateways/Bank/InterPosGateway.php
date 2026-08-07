@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
 use Voxyfy\AnadoluPay\Support\Money;
@@ -23,7 +28,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - Dönüş imzası, bankanın `HASHPARAMS` alanında iki nokta ile bildirdiği
  *     alanların değerleri + secretKey üzerinden hesaplanır.
  */
-class InterPosGateway extends AbstractBankGateway
+class InterPosGateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -48,7 +53,7 @@ class InterPosGateway extends AbstractBankGateway
 
         $inputs = [
             'ShopCode' => $this->config->merchantId,
-            'TxnType' => 'Auth',
+            'TxnType' => $this->txType($data),
             'SecureType' => $this->secureType($data->paymentModel),
             'PurchAmount' => $this->formatAmount($data->money()),
             'OrderId' => $data->orderId,
@@ -191,7 +196,7 @@ class InterPosGateway extends AbstractBankGateway
         $card = $this->requireCard($data);
 
         $response = $this->postForm($this->accountData() + [
-            'TxnType' => 'Auth',
+            'TxnType' => $this->txType($data),
             'SecureType' => 'NonSecure',
             'OrderId' => $data->orderId,
             'PurchAmount' => $this->formatAmount($data->money()),
@@ -348,6 +353,84 @@ class InterPosGateway extends AbstractBankGateway
         return $this->client->postForm(
             url: $this->config->endpoint('payment_api'),
             fields: $request,
+        );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`TxnType=StatusHistory`).
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $response = $this->postForm($this->accountData() + [
+            'OrderId' => '',
+            'orgOrderId' => $orderId,
+            'TxnType' => 'StatusHistory',
+            'SecureType' => 'NonSecure',
+            'Lang' => $this->lang($this->config->lang),
+        ]);
+
+        if ($this->pick($response, ['ProcReturnCode']) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $refunded = $this->pick($response, ['RefundedAmount']);
+        $refundedMoney = $refunded !== null && (float) $refunded > 0
+            ? Money::fromDecimal($refunded)
+            : null;
+
+        $voidDate = $this->pick($response, ['VoidDate']);
+        $cancelled = $voidDate !== null && $voidDate !== '' && $voidDate !== '1.1.0001 00:00:00';
+
+        return new StatusResponse(
+            found: true,
+            status: match (true) {
+                $cancelled => StatusResponse::STATUS_CANCELLED,
+                $refundedMoney !== null => StatusResponse::STATUS_REFUNDED,
+                default => StatusResponse::STATUS_PAID,
+            },
+            orderId: $this->pick($response, ['OrderId']) ?? $orderId,
+            paymentId: $this->pick($response, ['TransId']),
+            amount: ($amount = $this->pick($response, ['PurchAmount'])) !== null
+                ? Money::fromDecimal($amount)
+                : null,
+            refundedAmount: $refundedMoney,
+            transactionTime: $this->pick($response, ['TransactionDate', 'TrxDate']),
+            errorMessage: $this->pick($response, ['ErrorMessage']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * İşlem tipi: normal satış `Auth`, ön provizyon `PreAuth`.
+     */
+    protected function txType(CreatePaymentData $data): string
+    {
+        return $data->preAuthorization ? 'PreAuth' : 'Auth';
+    }
+
+    /**
+     * Ön provizyonu kapatır (`PostAuth`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $response = $this->postForm($this->accountData() + [
+            'TxnType' => 'PostAuth',
+            'SecureType' => 'NonSecure',
+            'OrderId' => '',
+            'orgOrderId' => $data->orderId,
+            'PurchAmount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+            'Currency' => Currency::numeric($data->currency),
+            'MOTO' => self::MOTO,
+        ]);
+
+        $approved = $this->pick($response, ['ProcReturnCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['TransId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['ErrorMessage']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['ProcReturnCode']),
         );
     }
 }

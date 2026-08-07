@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
 use Voxyfy\AnadoluPay\Support\Money;
@@ -24,7 +30,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - Provizyon `PayforRequest` kök elemanlı XML ile yapılır ve 3D dönüşünde
  *     gelen `RequestGuid` üzerinden tamamlanır.
  */
-class PayForGateway extends AbstractBankGateway
+class PayForGateway extends AbstractBankGateway implements SupportsCancellation, SupportsOrderHistory, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -49,7 +55,7 @@ class PayForGateway extends AbstractBankGateway
             'OrderId' => $data->orderId,
             'Lang' => $this->lang($data->lang),
             'SecureType' => $this->secureType($data->paymentModel),
-            'TxnType' => 'Auth',
+            'TxnType' => $this->txType($data),
             'PurchAmount' => $this->formatAmount($data->money()),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
             'Currency' => Currency::numeric($data->currency),
@@ -184,7 +190,7 @@ class PayForGateway extends AbstractBankGateway
             'MOTO' => self::MOTO,
             'OrderId' => $data->orderId,
             'SecureType' => 'NonSecure',
-            'TxnType' => 'Auth',
+            'TxnType' => $this->txType($data),
             'PurchAmount' => $this->formatAmount($data->money()),
             'Currency' => Currency::numeric($data->currency),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
@@ -241,18 +247,48 @@ class PayForGateway extends AbstractBankGateway
     }
 
     /**
-     * Sipariş durumunu sorgular.
-     *
-     * @return array<string, mixed>
+     * Sipariş durumunu sorgular (`SecureType=Inquiry`).
      */
-    public function status(string $orderId): array
+    public function status(string $orderId, array $context = []): StatusResponse
     {
-        return $this->postXml($this->accountData() + [
+        $response = $this->postXml($this->accountData() + [
             'OrgOrderId' => $orderId,
             'SecureType' => 'Inquiry',
             'Lang' => $this->lang($this->config->lang),
             'TxnType' => 'OrderInquiry',
         ]);
+
+        if ($this->pick($response, ['ProcReturnCode']) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        // PayFor iade edilmiş tutarı ayrı bir alanda bildirir; sıfırdan
+        // büyükse işlem en azından kısmen iade edilmiş demektir.
+        $refunded = $this->pick($response, ['RefundedAmount', 'ReturnedAmount']);
+        $refundedMoney = $refunded !== null && (float) $refunded > 0
+            ? Money::fromDecimal($refunded)
+            : null;
+
+        $voided = $this->pick($response, ['VoidDate']);
+        $status = match (true) {
+            $voided !== null && $voided !== '' => StatusResponse::STATUS_CANCELLED,
+            $refundedMoney !== null => StatusResponse::STATUS_REFUNDED,
+            default => StatusResponse::STATUS_PAID,
+        };
+
+        return new StatusResponse(
+            found: true,
+            status: $status,
+            orderId: $orderId,
+            paymentId: $this->pick($response, ['TransId', 'AuthCode']),
+            amount: ($amount = $this->pick($response, ['PurchAmount', 'TxnAmount'])) !== null
+                ? Money::fromDecimal($amount)
+                : null,
+            refundedAmount: $refundedMoney,
+            transactionTime: $this->pick($response, ['TxnDateTime', 'InsertDatetime']),
+            maskedCardNumber: $this->pick($response, ['CardMask']),
+            raw: $response,
+        );
     }
 
     /**
@@ -359,5 +395,53 @@ class PayForGateway extends AbstractBankGateway
             data: $request,
             root: 'PayforRequest',
         );
+    }
+
+    /**
+     * İşlem tipi: normal satış `Auth`, ön provizyon `PreAuth`.
+     */
+    protected function txType(CreatePaymentData $data): string
+    {
+        return $data->preAuthorization ? 'PreAuth' : 'Auth';
+    }
+
+    /**
+     * Ön provizyonu kapatır (`PostAuth`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $response = $this->postXml($this->accountData() + [
+            'OrgOrderId' => $data->orderId,
+            'SecureType' => 'NonSecure',
+            'TxnType' => 'PostAuth',
+            'PurchAmount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+            'Currency' => Currency::numeric($data->currency),
+            'Lang' => $this->lang($this->config->lang),
+        ]);
+
+        $approved = $this->pick($response, ['ProcReturnCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['TransId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['ErrMsg']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['ProcReturnCode']),
+        );
+    }
+
+    /**
+     * Siparişin hareket dökümü (`SecureType=Report`).
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        return $this->postXml($this->accountData() + [
+            'SecureType' => 'Report',
+            'OrderId' => $orderId,
+            'TxnType' => 'TxnHistory',
+            'Lang' => $this->lang($this->config->lang),
+        ]);
     }
 }

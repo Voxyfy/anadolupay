@@ -27,6 +27,20 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Eklendi
 
+* **Yetenek sözleşmeleri.** `SupportsStatusQuery`, `SupportsCancellation`,
+  `SupportsPreAuthorization`, `SupportsOrderHistory`, `SupportsBinQuery`,
+  `SupportsInstallmentQuery`, `SupportsRecurringPayments`. Desteklenmeyen
+  bir işlem artık `instanceof` ile önceden anlaşılıyor.
+* **Sipariş durumu sorgusu** 13 driver'a yayıldı ve `StatusResponse` ile
+  normalleştirildi. Bankaların birbirine benzemeyen durum kodları tek
+  sözlüğe indirgeniyor; tanınmayan kod `unknown` döner.
+* **Eksik iptaller**: Kuveyt Türk (ayrı BOA sorgu servisi) ve Param.
+* **Kuveyt Türk iade** — ayrı SOAP servisi üzerinden.
+* **Ön provizyon ve provizyon kapama** 12 driver'da; `CapturePaymentData`.
+* **İşlem geçmişi** (6 driver), **BIN sorgusu** (Garanti, PayTR, iyzico),
+  **taksit seçenekleri** (PayTR, Tosla, iyzico).
+* **Tekrarlayan ödeme** (`RecurringPlan`): Asseco, Garanti, PayFlex,
+  Akbank POS. Bankanın desteklemediği frekans hata verir.
 * **Hata sınıflandırması.** `TransportException` (ve alt tipleri
   `GatewayUnreachableException`, `GatewayHttpException`) bankanın kesin
   reddi olan `PaymentFailedException`'dan ayrıldı. Taşıma hataları
@@ -66,6 +80,13 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 * **iyzico webhook imzası** yanlış başlıktan (`x-iyzi-signature`) okunuyordu.
   Doğrusu `X-IYZ-SIGNATURE-V3`'tür ve HPP bildirimlerinde `token` da imzaya
   girer.
+
+### Belgelendi
+
+* Bazı işlemler sağlayıcı tarafından sunulmuyor; bunlar artık arayüz
+  uygulanmayarak açıkça bildiriliyor: PayTR iptal ve ön provizyon sunmaz,
+  Akbank POS tekil durum sorgusu sunmaz (yerine işlem geçmişi), Kuveyt
+  Türk ön provizyon sunmaz.
 
 ### Düzeltildi
 

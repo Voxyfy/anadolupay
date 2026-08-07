@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
+use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Bank\Xml;
 use Voxyfy\AnadoluPay\Support\Money;
 
@@ -27,7 +33,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  * MerchantId + MerchantOrderId + Amount + OkUrl + FailUrl + UserName +
  * hash'lenmiş şifre ayraçsız birleştirilip tekrar hash'lenir.
  */
-class KuveytPosGateway extends AbstractBankGateway
+class KuveytPosGateway extends AbstractBankGateway implements SupportsCancellation, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -397,6 +403,192 @@ class KuveytPosGateway extends AbstractBankGateway
             data: $request,
             root: self::XML_ROOT,
             encoding: 'ISO-8859-1',
+        );
+    }
+
+    /**
+     * Sipariş durumunu sorgular.
+     *
+     * Kuveyt Türk sorgu, iade ve iptal işlemlerini ödeme ucundan değil
+     * ayrı bir BOA servisinden (`query_api`) yürütür. İstek gövdesi de
+     * farklıdır: `VPosMessage` bloğu bir zarfın içine sarılır.
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $response = $this->postQuery('GetMerchantOrderDetail', $this->queryEnvelope(
+            operation: 'GetMerchantOrderDetail',
+            orderId: $orderId,
+            context: $context,
+        ));
+
+        $order = $response['Value']['OrderContract'] ?? $response['OrderContract'] ?? null;
+
+        if (! is_array($order)) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map($this->pick($order, ['LastOrderStatus', 'OrderStatus']), OrderStatus::BOA),
+            orderId: $orderId,
+            paymentId: $this->pick($order, ['OrderId', 'ProvisionNumber']),
+            amount: ($amount = $this->pick($order, ['FEC', 'Amount'])) !== null && is_numeric($amount)
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            installment: ($i = $this->pick($order, ['InstallmentCount'])) !== null ? (int) $i : null,
+            transactionTime: $this->pick($order, ['OrderDate', 'TransactionDate']),
+            maskedCardNumber: $this->pick($order, ['MaskedPAN', 'MaskedCardNumber']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Gün sonu öncesi işlem iptali (`SaleReversal`).
+     *
+     * Kuveyt Türk iptali sipariş numarasıyla değil kendi referanslarıyla
+     * eşler; bunları ödeme yanıtından saklayıp `metadata` ile geçin:
+     * `remote_order_id`, `ref_ret_num`, `auth_code`, `transaction_id`.
+     */
+    public function cancel(RefundPaymentData $data): RefundResponse
+    {
+        return $this->mapReversal($this->postQuery('SaleReversal', $this->reversalEnvelope('SaleReversal', $data)));
+    }
+
+    /**
+     * Tam veya kısmi iade (`DrawBack` / `PartialDrawback`).
+     */
+    protected function performRefund(RefundPaymentData $data): RefundResponse
+    {
+        $operation = $data->money() !== null ? 'PartialDrawback' : 'DrawBack';
+
+        return $this->mapReversal($this->postQuery($operation, $this->reversalEnvelope($operation, $data)));
+    }
+
+    /**
+     * Sorgu isteğinin zarfı.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    protected function queryEnvelope(string $operation, string $orderId, array $context): array
+    {
+        $vposMessage = $this->accountData() + [
+            'APIVersion' => self::API_VERSION,
+            'InstallmentMaturityCommisionFlag' => 0,
+            'HashData' => '',
+            'SubMerchantId' => 0,
+            'BatchID' => 0,
+            'TransactionType' => $operation,
+            'InstallmentCount' => 0,
+            'Amount' => 0,
+            'DisplayAmount' => 0,
+            'CancelAmount' => 0,
+            'MerchantOrderId' => $orderId,
+            'CurrencyCode' => $this->currencyCode((string) ($context['currency'] ?? 'TRY')),
+            'FECAmount' => 0,
+            'QeryId' => 0,
+            'DebtId' => 0,
+            'SurchargeAmount' => 0,
+            'SGKDebtAmount' => 0,
+            'TransactionSecurity' => 1,
+        ];
+
+        $vposMessage['HashData'] = $this->createHash($vposMessage);
+
+        return [
+            'IsFromExternalNetwork' => true,
+            'BusinessKey' => 0,
+            'ResourceId' => 0,
+            'ActionId' => 0,
+            'LanguageId' => 0,
+            'CustomerId' => (string) ($this->config->extra('customer_id') ?? $this->config->terminalId),
+            'MailOrTelephoneOrder' => true,
+            'Amount' => 0,
+            'MerchantId' => $this->config->merchantId,
+            'MerchantOrderId' => $orderId,
+            'OrderId' => (string) ($context['remote_order_id'] ?? 0),
+            'TransactionType' => 0,
+            'VPosMessage' => $vposMessage,
+        ];
+    }
+
+    /**
+     * İade/iptal isteğinin zarfı.
+     *
+     * @return array<string, mixed>
+     */
+    protected function reversalEnvelope(string $operation, RefundPaymentData $data): array
+    {
+        $amount = $data->money()?->toMinorUnitsString() ?? '0';
+
+        $vposMessage = $this->accountData() + [
+            'APIVersion' => self::API_VERSION,
+            'InstallmentMaturityCommisionFlag' => 0,
+            'HashData' => '',
+            'SubMerchantId' => 0,
+            'BatchID' => 0,
+            'TransactionType' => $operation,
+            'InstallmentCount' => 0,
+            'Amount' => $amount,
+            'DisplayAmount' => $amount,
+            'CancelAmount' => $amount,
+            'MerchantOrderId' => $data->paymentId,
+            'FECAmount' => 0,
+            'CurrencyCode' => $this->currencyCode($data->currency),
+            'QeryId' => 0,
+            'DebtId' => 0,
+            'SurchargeAmount' => 0,
+            'SGKDebtAmount' => 0,
+            'TransactionSecurity' => 1,
+        ];
+
+        $vposMessage['HashData'] = $this->createHash($vposMessage);
+
+        return [
+            'IsFromExternalNetwork' => true,
+            'BusinessKey' => 0,
+            'ResourceId' => 0,
+            'ActionId' => 0,
+            'LanguageId' => 0,
+            'CustomerId' => (string) ($this->config->extra('customer_id') ?? $this->config->terminalId),
+            'MailOrTelephoneOrder' => true,
+            'Amount' => $amount,
+            'MerchantId' => $this->config->merchantId,
+            'OrderId' => (string) ($data->meta('remote_order_id') ?? ''),
+            'RRN' => (string) ($data->meta('ref_ret_num') ?? ''),
+            'Stan' => (string) ($data->meta('transaction_id') ?? ''),
+            'ProvisionNumber' => (string) ($data->meta('auth_code') ?? ''),
+            'VPosMessage' => $vposMessage,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $response
+     */
+    protected function mapReversal(array $response): RefundResponse
+    {
+        $approved = $this->responseCode($response) === self::SUCCESS_CODE
+            || $this->responseCode($response['Value'] ?? []) === self::SUCCESS_CODE;
+
+        return new RefundResponse(
+            success: $approved,
+            refundId: $this->pick($response, ['OrderId', 'ProvisionNumber']),
+            errorMessage: $approved ? null : $this->pick($response, ['ResponseMessage', 'ErrorMessage']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * BOA sorgu servisine JSON isteği gönderir.
+     *
+     * @param  array<string, mixed>  $request
+     * @return array<string, mixed>
+     */
+    protected function postQuery(string $operation, array $request): array
+    {
+        return $this->client->postJson(
+            url: rtrim($this->config->endpoint('query_api'), '/').'/'.$operation,
+            data: ['request' => $request],
         );
     }
 }

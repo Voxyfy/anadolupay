@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsBinQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsRecurringPayments;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\BinResponse;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Money;
 
 /**
@@ -25,13 +36,20 @@ use Voxyfy\AnadoluPay\Support\Money;
  *     yine BÜYÜK HARF. İptal/iade işlemlerinde `refund_password` kullanılır.
  *   - Provizyon istekleri `GVPSRequest` kök elemanlı XML'dir.
  */
-class GarantiGateway extends AbstractBankGateway
+class GarantiGateway extends AbstractBankGateway implements SupportsBinQuery, SupportsCancellation, SupportsOrderHistory, SupportsPreAuthorization, SupportsRecurringPayments, SupportsStatusQuery
 {
     /** Bankanın başarılı işlem için döndürdüğü yanıt kodu. */
     protected const SUCCESS_CODE = '00';
 
     /** Garanti API sürümü. */
     protected const API_VERSION = '512';
+
+    /** Garanti tekrar frekansı kodları; günlük tekrar desteklenmez. */
+    protected const RECURRING_FREQUENCIES = [
+        RecurringPlan::FREQUENCY_DAY => 'D',
+        RecurringPlan::FREQUENCY_WEEK => 'W',
+        RecurringPlan::FREQUENCY_MONTH => 'M',
+    ];
 
     /** MotoInd: N => e-ticaret işlemi, Y => mail order. */
     protected const MOTO = 'N';
@@ -53,7 +71,7 @@ class GarantiGateway extends AbstractBankGateway
             'terminaluserid' => $this->config->username,
             'terminalmerchantid' => $this->config->merchantId,
             'terminalid' => $this->config->terminalId,
-            'txntype' => 'sales',
+            'txntype' => $this->txType($data),
             'txnamount' => $this->formatAmount($data->money()),
             'txncurrencycode' => Currency::numeric($data->currency),
             'txninstallmentcount' => $this->formatInstallment($data->installments()),
@@ -224,7 +242,7 @@ class GarantiGateway extends AbstractBankGateway
             ],
             'Order' => ['OrderID' => $data->orderId],
             'Transaction' => [
-                'Type' => 'sales',
+                'Type' => $this->txType($data),
                 'InstallmentCnt' => $this->formatInstallment($data->installments()),
                 'Amount' => $this->formatAmount($data->money()),
                 'CurrencyCode' => Currency::numeric($data->currency),
@@ -232,6 +250,10 @@ class GarantiGateway extends AbstractBankGateway
                 'MotoInd' => self::MOTO,
             ],
         ];
+
+        if (($recurring = $this->recurringRequest($data)) !== []) {
+            $request['Recurring'] = $recurring;
+        }
 
         $request['Terminal']['HashData'] = $this->createRequestHash($request);
 
@@ -465,5 +487,230 @@ class GarantiGateway extends AbstractBankGateway
             data: $request,
             root: 'GVPSRequest',
         );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`orderinq`).
+     *
+     * Garanti sorgu isteğinde de tutar alanını zorunlu tutar; sabit
+     * 1 kuruş gönderilir ve yanıttaki gerçek tutar okunur.
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $request = [
+            'Mode' => $this->mode(),
+            'Version' => self::API_VERSION,
+            'Terminal' => $this->terminalData(),
+            'Customer' => ['IPAddress' => (string) ($context['ip'] ?? '127.0.0.1')],
+            'Order' => ['OrderID' => $orderId],
+            'Transaction' => [
+                'Type' => 'orderinq',
+                'InstallmentCnt' => '',
+                'Amount' => $this->formatAmount(Money::fromMinorUnits(1)),
+                'CurrencyCode' => Currency::numeric((string) ($context['currency'] ?? 'TRY')),
+                'CardholderPresentCode' => '0',
+                'MotoInd' => self::MOTO,
+            ],
+        ];
+
+        $request['Terminal']['HashData'] = $this->createRequestHash($request, 'orderinq');
+
+        $response = $this->postXml($request);
+
+        if ($this->responseCode($response) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $inquiry = $response['Order']['OrderInqResult'] ?? [];
+        $inquiry = is_array($inquiry) ? $inquiry : [];
+
+        $authAmount = $this->pick($inquiry, ['AuthAmount']);
+        $preAuthAmount = $this->pick($inquiry, ['PreAuthAmount']);
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map($this->pick($inquiry, ['Status']), OrderStatus::GARANTI),
+            orderId: $orderId,
+            paymentId: $this->pick($inquiry, ['RetrefNum', 'AuthCode']),
+            // Garanti tutarları kuruş cinsinden döndürür.
+            amount: $this->minorUnitsToMoney($authAmount !== null && $authAmount !== '0' ? $authAmount : $preAuthAmount),
+            installment: $this->pick($inquiry, ['InstallmentCnt']) !== null
+                ? (int) $this->pick($inquiry, ['InstallmentCnt'])
+                : null,
+            transactionTime: $this->pick($inquiry, ['ProvDate', 'PreAuthDate', 'AuthDate']),
+            maskedCardNumber: $this->pick($inquiry, ['CardNumberMasked']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Kuruş cinsinden gelen bir tutarı `Money`ye çevirir.
+     */
+    protected function minorUnitsToMoney(?string $amount): ?Money
+    {
+        return $amount === null || $amount === '' || ! is_numeric($amount)
+            ? null
+            : Money::fromMinorUnits((int) $amount);
+    }
+
+    /**
+     * İşlem tipi: normal satış `sales`, ön provizyon `preauth`.
+     */
+    protected function txType(CreatePaymentData $data): string
+    {
+        return $data->preAuthorization ? 'preauth' : 'sales';
+    }
+
+    /**
+     * Ön provizyonu kapatır (`postauth`).
+     *
+     * Garanti kapamayı orijinal işlemin `RetrefNum` değeriyle eşler;
+     * `metadata['ref_ret_num']` zorunludur.
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $refRetNum = $data->meta('ref_ret_num');
+
+        if (! is_string($refRetNum) || $refRetNum === '') {
+            throw new PaymentFailedException(
+                message: "Garanti provizyon kapama için metadata['ref_ret_num'] zorunludur.",
+                context: ['bank' => $this->config->bank, 'order_id' => $data->orderId],
+            );
+        }
+
+        $request = [
+            'Mode' => $this->mode(),
+            'Version' => self::API_VERSION,
+            'Terminal' => $this->terminalData(),
+            'Customer' => ['IPAddress' => $data->clientIp()],
+            'Order' => ['OrderID' => $data->orderId],
+            'Transaction' => [
+                'Type' => 'postauth',
+                'Amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(1, $data->currency)),
+                'CurrencyCode' => Currency::numeric($data->currency),
+                'OriginalRetrefNum' => $refRetNum,
+            ],
+        ];
+
+        $request['Terminal']['HashData'] = $this->createRequestHash($request, 'postauth');
+
+        $response = $this->postXml($request);
+        $approved = $this->responseCode($response) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->refRetNum($response) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->errorMessage($response),
+            raw: $response,
+            errorCode: $approved ? null : $this->responseCode($response),
+        );
+    }
+
+    /**
+     * BIN sorgusu (`bininq`).
+     */
+    public function binLookup(string $bin, array $context = []): BinResponse
+    {
+        $request = [
+            'Mode' => $this->mode(),
+            'Version' => 'v0.1',
+            'Terminal' => $this->terminalData(),
+            'Customer' => ['IPAddress' => (string) ($context['ip'] ?? '127.0.0.1')],
+            'Order' => ['OrderID' => $this->randomString(16)],
+            'Transaction' => [
+                'Type' => 'bininq',
+                'Amount' => $this->formatAmount(Money::fromMinorUnits(1)),
+                'BINInq' => [
+                    // A: tüm gruplar, A: tüm kart tipleri
+                    'Group' => 'A',
+                    'CardType' => 'A',
+                    'BINNum' => $bin,
+                ],
+            ],
+        ];
+
+        $request['Terminal']['HashData'] = $this->createRequestHash($request, 'bininq');
+
+        $response = $this->postXml($request);
+
+        if ($this->responseCode($response) !== self::SUCCESS_CODE) {
+            return BinResponse::notFound($response);
+        }
+
+        $card = $response['Transaction']['BINList']['BINInfo'] ?? [];
+        $card = is_array($card) ? (array_is_list($card) ? (array) ($card[0] ?? []) : $card) : [];
+
+        return new BinResponse(
+            found: $card !== [],
+            bankName: $this->pick($card, ['BankName', 'Bank']),
+            brand: strtolower((string) ($this->pick($card, ['CardBrand', 'Brand']) ?? '')) ?: null,
+            type: match (strtoupper((string) ($this->pick($card, ['CardType']) ?? ''))) {
+                'C', 'CREDIT' => 'credit',
+                'D', 'DEBIT' => 'debit',
+                default => null,
+            },
+            raw: $response,
+        );
+    }
+
+    /**
+     * Siparişin hareket dökümü (`orderhistoryinq`).
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        $request = [
+            'Mode' => $this->mode(),
+            'Version' => self::API_VERSION,
+            'Terminal' => $this->terminalData(),
+            'Customer' => ['IPAddress' => (string) ($context['ip'] ?? '127.0.0.1')],
+            'Order' => ['OrderID' => $orderId],
+            'Transaction' => [
+                'Type' => 'orderhistoryinq',
+                'InstallmentCnt' => '',
+                'Amount' => $this->formatAmount(Money::fromMinorUnits(1)),
+                'CurrencyCode' => Currency::numeric((string) ($context['currency'] ?? 'TRY')),
+                'CardholderPresentCode' => '0',
+                'MotoInd' => self::MOTO,
+            ],
+        ];
+
+        $request['Terminal']['HashData'] = $this->createRequestHash($request, 'orderhistoryinq');
+
+        return $this->postXml($request);
+    }
+
+    /**
+     * Garanti tekrar frekansları (yıllık desteklenmez).
+     *
+     * @return list<string>
+     */
+    public function supportedRecurringFrequencies(): array
+    {
+        return array_keys(self::RECURRING_FREQUENCIES);
+    }
+
+    /**
+     * Tekrarlayan ödeme bloğu (`Recurring`).
+     *
+     * @return array<string, string>
+     */
+    protected function recurringRequest(CreatePaymentData $data): array
+    {
+        $plan = $this->recurringPlan($data);
+
+        if ($plan === null) {
+            return [];
+        }
+
+        return [
+            'TotalPaymentNum' => (string) $plan->paymentCount,
+            'FrequencyType' => $plan->frequencyCode(self::RECURRING_FREQUENCIES),
+            'FrequencyInterval' => (string) $plan->interval,
+            // R: sabit tutarlı, G: değişken tutarlı
+            'Type' => 'R',
+            'StartDate' => $plan->startDate?->format('Ymd') ?? '',
+        ];
     }
 }

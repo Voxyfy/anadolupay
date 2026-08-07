@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsInstallmentQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
+use Voxyfy\AnadoluPay\DTO\InstallmentOption;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Money;
 
 /**
@@ -26,7 +35,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *     alanların değerleri üzerinden hesaplanır (secretKey öne eklenir).
  *   - Tutarlar kuruş cinsindendir, başarı kodu `00`dır.
  */
-class ToslaGateway extends AbstractBankGateway
+class ToslaGateway extends AbstractBankGateway implements SupportsCancellation, SupportsInstallmentQuery, SupportsOrderHistory, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -90,7 +99,7 @@ class ToslaGateway extends AbstractBankGateway
 
         $request['hash'] = $this->createHash($request);
 
-        $response = $this->postJson('threeDPayment', $request);
+        $response = $this->postJson($data->preAuthorization ? 'threeDPreAuth' : 'threeDPayment', $request);
         $sessionId = $this->pick($response, ['ThreeDSessionId']);
 
         if ($sessionId === null) {
@@ -349,5 +358,148 @@ class ToslaGateway extends AbstractBankGateway
             url: rtrim($this->config->endpoint('payment_api'), '/').'/'.$operation,
             data: $request,
         );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`inquiry`).
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $request = $this->accountData() + [
+            'orderId' => $orderId,
+            'rnd' => $this->randomString(),
+            'timeSpan' => $this->timeSpan(),
+        ];
+
+        $request['hash'] = $this->createHash($request);
+
+        $response = $this->postJson('inquiry', $request);
+
+        $orderStatus = $this->pick($response, ['RequestStatus', 'OrderStatus']);
+
+        if ($orderStatus === null) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map($orderStatus, OrderStatus::TOSLA),
+            orderId: $orderId,
+            paymentId: $this->pick($response, ['TransactionId']),
+            amount: ($amount = $this->pick($response, ['Amount'])) !== null && is_numeric($amount)
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            transactionTime: $this->pick($response, ['CreateDate', 'TransactionDate']),
+            maskedCardNumber: $this->pick($response, ['MaskedPan']),
+            errorMessage: $this->pick($response, ['BankResponseMessage', 'Message']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`postAuth`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $request = $this->accountData() + [
+            'orderId' => $data->orderId,
+            'amount' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->minorUnits,
+            'rnd' => $this->randomString(),
+            'timeSpan' => $this->timeSpan(),
+        ];
+
+        $request['hash'] = $this->createHash($request);
+
+        $response = $this->postJson('postAuth', $request);
+        $approved = $this->pick($response, ['BankResponseCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['TransactionId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['BankResponseMessage', 'Message']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['BankResponseCode']),
+        );
+    }
+
+    /**
+     * Taksit seçeneklerini sorgular.
+     *
+     * BIN verilirse karta özel oranlar, verilmezse genel tablo döner.
+     *
+     * @return list<InstallmentOption>
+     */
+    public function installmentOptions(Money $amount, ?string $bin = null): array
+    {
+        $request = $this->accountData() + [
+            'rnd' => $this->randomString(),
+            'timeSpan' => $this->timeSpan(),
+        ];
+
+        if ($bin !== null && $bin !== '') {
+            $request['bin'] = $bin;
+            $operation = 'GetCommissionAndInstallmentInfo';
+        } else {
+            $request['amount'] = $amount->minorUnits;
+            $request['isCommission'] = 1;
+            $operation = 'GetInstallmentOptions';
+        }
+
+        $request['hash'] = $this->createHash($request);
+
+        $response = $this->postJson($operation, $request);
+        $rows = $response['Installments'] ?? $response['CommissionInfo'] ?? [];
+
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $count = (int) ($this->pick($row, ['Count', 'InstallmentCount']) ?? 0);
+
+            if ($count < 1) {
+                continue;
+            }
+
+            $total = $this->pick($row, ['TotalAmount', 'Amount']);
+
+            $options[] = new InstallmentOption(
+                count: $count,
+                // Tosla tutarları kuruş cinsinden döndürür.
+                totalPrice: $total !== null && is_numeric($total)
+                    ? $amount->withAmount((int) $total)
+                    : null,
+                commissionRate: ($rate = $this->pick($row, ['CommissionRate', 'Rate'])) !== null
+                    ? (float) $rate
+                    : null,
+                raw: $row,
+            );
+        }
+
+        return $options;
+    }
+
+    /**
+     * Siparişin hareket dökümü (`history`).
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        $request = $this->accountData() + [
+            'orderId' => $orderId,
+            'rnd' => $this->randomString(),
+            'timeSpan' => $this->timeSpan(),
+        ];
+
+        $request['hash'] = $this->createHash($request);
+
+        return $this->postJson('history', $request);
     }
 }

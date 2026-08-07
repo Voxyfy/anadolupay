@@ -4,12 +4,21 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsRecurringPayments;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
+use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Money;
 
 /**
@@ -26,10 +35,18 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - Provizyon/iade/iptal istekleri `CC5Request` kök elemanlı XML'dir.
  *   - Başarı kriteri `ProcReturnCode === '00'`.
  */
-class AssecoGateway extends AbstractBankGateway
+class AssecoGateway extends AbstractBankGateway implements SupportsCancellation, SupportsOrderHistory, SupportsPreAuthorization, SupportsRecurringPayments, SupportsStatusQuery
 {
     /** Bankanın başarılı işlem için döndürdüğü prosedür kodu. */
     protected const SUCCESS_CODE = '00';
+
+    /** NestPay tekrar frekansı kodları. */
+    protected const RECURRING_FREQUENCIES = [
+        RecurringPlan::FREQUENCY_DAY => 'D',
+        RecurringPlan::FREQUENCY_WEEK => 'W',
+        RecurringPlan::FREQUENCY_MONTH => 'M',
+        RecurringPlan::FREQUENCY_YEAR => 'Y',
+    ];
 
     /** Hash hesabından her zaman çıkarılan alanlar. */
     protected const HASH_EXCLUDED_FIELDS = ['hash', 'encoding', 'nationalidno'];
@@ -53,7 +70,7 @@ class AssecoGateway extends AbstractBankGateway
             'lang' => $data->lang !== '' ? $data->lang : $this->config->lang,
             'currency' => Currency::numeric($data->currency),
             'taksit' => $this->formatInstallment($data->installments()),
-            'TranType' => 'Auth',
+            'TranType' => $this->txType($data),
         ];
 
         // 3D Host modelinde kart bilgileri banka sayfasında toplanır.
@@ -65,6 +82,10 @@ class AssecoGateway extends AbstractBankGateway
             $inputs['Ecom_Payment_Card_ExpDate_Year'] = $card->expireYearShort();
             $inputs['cv2'] = $card->cvv;
         }
+
+        // NestPay tekrarlayan ödeme planını 3D formunda değil provizyon
+        // isteğinde taşır; plan varlığı burada yalnızca doğrulanır.
+        $this->recurringPlan($data);
 
         $inputs['hash'] = $this->createHash($inputs);
 
@@ -197,7 +218,7 @@ class AssecoGateway extends AbstractBankGateway
         $card = $this->requireCard($data);
 
         $response = $this->postXml($this->accountData() + [
-            'Type' => 'Auth',
+            'Type' => $this->txType($data),
             'IPAddress' => $data->clientIp(),
             'OrderId' => $data->orderId,
             'Total' => $this->formatAmount($data->money()),
@@ -207,7 +228,7 @@ class AssecoGateway extends AbstractBankGateway
             'Expires' => $card->expiry('m/y'),
             'Cvv2Val' => $card->cvv,
             'Mode' => 'P',
-        ]);
+        ] + $this->recurringRequest($data));
 
         $approved = $this->pick($response, ['ProcReturnCode']) === self::SUCCESS_CODE;
 
@@ -268,14 +289,48 @@ class AssecoGateway extends AbstractBankGateway
     /**
      * Sipariş durumunu sorgular.
      *
-     * @return array<string, mixed>
+     * NestPay durumu `Extra.ORDERSTATUS` alanında tek harfle bildirir.
      */
-    public function status(string $orderId): array
+    public function status(string $orderId, array $context = []): StatusResponse
     {
-        return $this->postXml($this->accountData() + [
+        $response = $this->postXml($this->accountData() + [
             'OrderId' => $orderId,
             'Extra' => ['ORDERSTATUS' => 'QUERY'],
         ]);
+
+        $extra = is_array($response['Extra'] ?? null) ? $response['Extra'] : [];
+        $orderStatus = $this->pick($extra, ['ORDERSTATUS', 'ORD_STAT']);
+
+        // Banka siparişi tanımıyorsa ProcReturnCode başarılı olsa bile
+        // durum alanı boş döner.
+        if ($orderStatus === null && $this->pick($extra, ['TRANS_STAT']) === null) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map(
+                $orderStatus ?? $this->pick($extra, ['TRANS_STAT']),
+                OrderStatus::NESTPAY,
+            ),
+            orderId: $orderId,
+            paymentId: $this->pick($response, ['TransId']),
+            amount: $this->parseAmount($this->pick($extra, ['ORIG_TRANS_AMT'])),
+            transactionTime: $this->pick($extra, ['TRXDATE', 'AUTH_DTTM']),
+            maskedCardNumber: $this->pick($extra, ['NUMCODE']) === null
+                ? $this->pick($response, ['MaskedPan'])
+                : null,
+            errorMessage: $this->pick($response, ['ErrMsg']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * NestPay tutarı kuruşsuz ondalıklı dizgi olarak döndürür.
+     */
+    protected function parseAmount(?string $amount): ?Money
+    {
+        return $amount === null || $amount === '' ? null : Money::fromDecimal($amount);
     }
 
     /**
@@ -380,5 +435,93 @@ class AssecoGateway extends AbstractBankGateway
             root: 'CC5Request',
             encoding: 'ISO-8859-9',
         );
+    }
+
+    /**
+     * İşlem tipi: normal satış `Auth`, ön provizyon `PreAuth`.
+     */
+    protected function txType(CreatePaymentData $data): string
+    {
+        return $data->preAuthorization ? 'PreAuth' : 'Auth';
+    }
+
+    /**
+     * Ön provizyonu kapatır (`PostAuth`).
+     *
+     * Kapama tutarı ön provizyondan küçükse NestPay farkı `Extra.PREAMT`
+     * alanında ister.
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $request = $this->accountData() + [
+            'Type' => 'PostAuth',
+            'OrderId' => $data->orderId,
+        ];
+
+        if (($amount = $data->money()) !== null) {
+            $request['Total'] = $this->formatAmount($amount);
+
+            if (($preAuth = $data->meta('pre_auth_amount')) !== null) {
+                $request['Extra'] = ['PREAMT' => $this->formatAmount(Money::of($preAuth, $data->currency))];
+            }
+        }
+
+        $response = $this->postXml($request);
+        $approved = $this->pick($response, ['ProcReturnCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['TransId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['ErrMsg']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['ProcReturnCode']),
+        );
+    }
+
+    /**
+     * Siparişin hareket dökümü (`Extra.ORDERHISTORY`).
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        return $this->postXml($this->accountData() + [
+            'OrderId' => $orderId,
+            'Extra' => ['ORDERHISTORY' => 'QUERY'],
+        ]);
+    }
+
+    /**
+     * NestPay tekrar frekansları.
+     *
+     * @return list<string>
+     */
+    public function supportedRecurringFrequencies(): array
+    {
+        return array_keys(self::RECURRING_FREQUENCIES);
+    }
+
+    /**
+     * Tekrarlayan ödeme bloğu (`PbOrder`).
+     *
+     * @return array<string, mixed>
+     */
+    protected function recurringRequest(CreatePaymentData $data): array
+    {
+        $plan = $this->recurringPlan($data);
+
+        if ($plan === null) {
+            return [];
+        }
+
+        return [
+            'PbOrder' => [
+                // 0: taksitsiz varsayılan sipariş tipi
+                'OrderType' => '0',
+                'OrderFrequencyInterval' => (string) $plan->interval,
+                'OrderFrequencyCycle' => $plan->frequencyCode(self::RECURRING_FREQUENCIES),
+                'TotalNumberPayments' => (string) $plan->paymentCount,
+            ],
+        ];
     }
 }

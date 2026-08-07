@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\Money;
 
 /**
@@ -21,7 +28,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *
  * İstekler `VPosMessageContract` kök elemanlı XML'dir (ISO-8859-1).
  */
-class VakifKatilimGateway extends AbstractBankGateway
+class VakifKatilimGateway extends AbstractBankGateway implements SupportsCancellation, SupportsOrderHistory, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -202,7 +209,7 @@ class VakifKatilimGateway extends AbstractBankGateway
 
         $request['HashData'] = $this->createHash($request);
 
-        $response = $this->postXml('Non3DPayGate', $request);
+        $response = $this->postXml($data->preAuthorization ? 'PreAuthorizaten' : 'Non3DPayGate', $request);
         $approved = $this->pick($response, ['ResponseCode']) === self::SUCCESS_CODE;
 
         return new PaymentResponse(
@@ -335,5 +342,79 @@ class VakifKatilimGateway extends AbstractBankGateway
             root: self::XML_ROOT,
             encoding: 'ISO-8859-1',
         );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`SelectOrderByMerchantOrderId`).
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $request = $this->accountData() + ['MerchantOrderId' => $orderId];
+        $request['HashData'] = $this->createHash($request);
+
+        $response = $this->postXml('SelectOrderByMerchantOrderId', $request);
+
+        if ($this->pick($response, ['ResponseCode']) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $order = $response['VPosOrderData']['OrderContract'] ?? [];
+        $order = is_array($order) ? $order : [];
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map($this->pick($order, ['LastOrderStatus', 'OrderStatus']), OrderStatus::BOA),
+            orderId: $orderId,
+            paymentId: $this->pick($order, ['OrderId', 'ProvisionNumber']),
+            amount: ($amount = $this->pick($order, ['FEC', 'Amount'])) !== null && is_numeric($amount)
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            installment: ($i = $this->pick($order, ['InstallmentCount'])) !== null ? (int) $i : null,
+            transactionTime: $this->pick($order, ['OrderDate', 'TransactionDate']),
+            maskedCardNumber: $this->pick($order, ['MaskedPAN', 'MaskedCardNumber']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`PreAuthorizatenClose`).
+     *
+     * Vakıf Katılım ön provizyonu yalnızca 3D'siz modelde destekler.
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $request = $this->accountData() + [
+            'HashPassword' => $this->hash($this->config->secretKey),
+            'MerchantOrderId' => $data->orderId,
+            'OrderId' => (string) ($data->meta('remote_order_id') ?? ''),
+            'CustomerIPAddress' => $data->clientIp(),
+            'Amount' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->toMinorUnitsString(),
+        ];
+
+        $request['HashData'] = $this->createHash($request);
+
+        $response = $this->postXml('PreAuthorizatenClose', $request);
+        $approved = $this->pick($response, ['ResponseCode']) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['OrderId']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->pick($response, ['ResponseMessage']),
+            raw: $response,
+            errorCode: $approved ? null : $this->pick($response, ['ResponseCode']),
+        );
+    }
+
+    /**
+     * Siparişin hareket dökümü (`SelectOrder`).
+     *
+     * @return array<string, mixed>
+     */
+    public function orderHistory(string $orderId, array $context = []): array
+    {
+        $request = $this->accountData() + ['MerchantOrderId' => $orderId];
+        $request['HashData'] = $this->createHash($request);
+
+        return $this->postXml('SelectOrder', $request);
     }
 }

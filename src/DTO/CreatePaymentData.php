@@ -45,6 +45,9 @@ final readonly class CreatePaymentData
      * @param  string  $paymentModel  Ödeme modeli; self::MODEL_* sabitlerinden biri
      * @param  string|null  $ip  Müşterinin IP adresi (birçok banka zorunlu tutar)
      * @param  string  $lang  Banka ödeme sayfasının dili (tr/en)
+     * @param  bool  $preAuthorization  Ön provizyon mu? true ise tutar bloke
+     *                                  edilir ama tahsil edilmez; tahsilat
+     *                                  `capture()` ile yapılır.
      */
     public function __construct(
         public float|Money $amount,
@@ -59,7 +62,32 @@ final readonly class CreatePaymentData
         public string $paymentModel = self::MODEL_3D_SECURE,
         public ?string $ip = null,
         public string $lang = 'tr',
+        public bool $preAuthorization = false,
     ) {}
+
+    /**
+     * Aynı veriden ön provizyon isteği üretir.
+     *
+     * DTO değişmez olduğu için mevcut nesne kopyalanır.
+     */
+    public function asPreAuthorization(): self
+    {
+        return new self(
+            amount: $this->amount,
+            currency: $this->currency,
+            orderId: $this->orderId,
+            customer: $this->customer,
+            successUrl: $this->successUrl,
+            failUrl: $this->failUrl,
+            metadata: $this->metadata,
+            card: $this->card,
+            installment: $this->installment,
+            paymentModel: $this->paymentModel,
+            ip: $this->ip,
+            lang: $this->lang,
+            preAuthorization: true,
+        );
+    }
 
     /**
      * Tutarı kuruş cinsinden taşıyan `Money` nesnesi olarak döndürür.

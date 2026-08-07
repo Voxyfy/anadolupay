@@ -7,10 +7,16 @@ namespace Voxyfy\AnadoluPay\Gateways;
 use Illuminate\Support\Facades\Event;
 use Throwable;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
+use Voxyfy\AnadoluPay\Contracts\SupportsBinQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsInstallmentQuery;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\BinResponse;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
+use Voxyfy\AnadoluPay\DTO\InstallmentOption;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Events\PaymentFailed;
@@ -18,11 +24,13 @@ use Voxyfy\AnadoluPay\Events\PaymentInitiated;
 use Voxyfy\AnadoluPay\Events\PaymentVerified;
 use Voxyfy\AnadoluPay\Events\RefundIssued;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Support\Bank\OrderStatus;
 use Voxyfy\AnadoluPay\Support\IdempotencyGuard;
 use Voxyfy\AnadoluPay\Support\IyzicoHttpClient;
 use Voxyfy\AnadoluPay\Support\IyzicoMapper;
 use Voxyfy\AnadoluPay\Support\IyzicoSignatureValidator;
 use Voxyfy\AnadoluPay\Support\LoggerResolver;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * iyzico Ödeme Geçidi
@@ -33,7 +41,7 @@ use Voxyfy\AnadoluPay\Support\LoggerResolver;
  * Her yanıt ve callback, `IyzicoSignatureValidator` ile doğrulanır; imza
  * eşleşmezse `InvalidSignatureException` fırlatılır.
  */
-class IyzicoGateway implements PaymentGatewayInterface
+class IyzicoGateway implements PaymentGatewayInterface, SupportsBinQuery, SupportsInstallmentQuery, SupportsStatusQuery
 {
     /** iyzico'nun başarılı işlemler için döndürdüğü durum. */
     protected const STATUS_SUCCESS = 'success';
@@ -307,5 +315,132 @@ class IyzicoGateway implements PaymentGatewayInterface
     protected function statusOf(array $response): string
     {
         return strtolower((string) ($response['status'] ?? ''));
+    }
+
+    /**
+     * Ödeme durumunu sorgular (`/payment/detail`).
+     *
+     * iyzico sorguyu sipariş numarasıyla (`paymentConversationId`) ya da
+     * kendi ödeme numarasıyla yapabilir; ikincisi için
+     * `$context['payment_id']` geçin.
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $payload = array_filter([
+            'locale' => (string) ($context['locale'] ?? 'tr'),
+            'conversationId' => $orderId,
+            'paymentConversationId' => $orderId,
+            'paymentId' => isset($context['payment_id']) ? (string) $context['payment_id'] : null,
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
+
+        $response = $this->client->post('/payment/detail', $payload);
+
+        if ($this->statusOf($response) !== self::STATUS_SUCCESS) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        return new StatusResponse(
+            found: true,
+            status: OrderStatus::map(
+                isset($response['paymentStatus']) ? (string) $response['paymentStatus'] : null,
+                OrderStatus::IYZICO,
+            ),
+            orderId: $orderId,
+            paymentId: isset($response['paymentId']) ? (string) $response['paymentId'] : null,
+            amount: isset($response['paidPrice']) ? Money::fromDecimal((string) $response['paidPrice']) : null,
+            installment: isset($response['installment']) ? (int) $response['installment'] : null,
+            transactionTime: isset($response['createdDate']) ? (string) $response['createdDate'] : null,
+            maskedCardNumber: isset($response['binNumber']) ? (string) $response['binNumber'].'******' : null,
+            raw: $response,
+        );
+    }
+
+    /**
+     * BIN sorgusu (`/payment/bin/check`).
+     */
+    public function binLookup(string $bin, array $context = []): BinResponse
+    {
+        $response = $this->client->post('/payment/bin/check', [
+            'locale' => (string) ($context['locale'] ?? 'tr'),
+            'conversationId' => $bin,
+            'binNumber' => $bin,
+        ]);
+
+        if ($this->statusOf($response) !== self::STATUS_SUCCESS) {
+            return BinResponse::notFound($response);
+        }
+
+        return new BinResponse(
+            found: true,
+            bankName: isset($response['bankName']) ? (string) $response['bankName'] : null,
+            brand: isset($response['cardAssociation'])
+                ? strtolower(str_replace(' ', '', (string) $response['cardAssociation']))
+                : null,
+            type: match (strtoupper((string) ($response['cardType'] ?? ''))) {
+                'CREDIT_CARD' => 'credit',
+                'DEBIT_CARD' => 'debit',
+                'PREPAID_CARD' => 'prepaid',
+                default => null,
+            },
+            commercial: isset($response['commercial']) ? (int) $response['commercial'] === 1 : null,
+            raw: $response,
+        );
+    }
+
+    /**
+     * Taksit seçeneklerini sorgular (`/payment/iyzipos/installment`).
+     *
+     * @return list<InstallmentOption>
+     */
+    public function installmentOptions(Money $amount, ?string $bin = null): array
+    {
+        $payload = array_filter([
+            'locale' => 'tr',
+            'conversationId' => $bin ?? 'installment',
+            'price' => $amount->toDecimalString(),
+            'binNumber' => $bin,
+        ], static fn (mixed $value): bool => $value !== null && $value !== '');
+
+        $response = $this->client->post('/payment/iyzipos/installment', $payload);
+
+        if ($this->statusOf($response) !== self::STATUS_SUCCESS) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach ($response['installmentDetails'] ?? [] as $detail) {
+            if (! is_array($detail)) {
+                continue;
+            }
+
+            $bankName = isset($detail['bankName']) ? (string) $detail['bankName'] : null;
+
+            foreach ($detail['installmentPrices'] ?? [] as $price) {
+                if (! is_array($price)) {
+                    continue;
+                }
+
+                $count = (int) ($price['installmentNumber'] ?? 0);
+
+                if ($count < 1) {
+                    continue;
+                }
+
+                $options[] = new InstallmentOption(
+                    count: $count,
+                    totalPrice: isset($price['totalPrice'])
+                        ? Money::fromDecimal((string) $price['totalPrice'])
+                        : null,
+                    monthlyPrice: isset($price['installmentPrice'])
+                        ? Money::fromDecimal((string) $price['installmentPrice'])
+                        : null,
+                    bankName: $bankName,
+                    raw: $price,
+                );
+            }
+        }
+
+        return $options;
     }
 }

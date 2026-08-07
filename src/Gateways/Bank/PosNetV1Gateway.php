@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
+use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
+use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+use Voxyfy\AnadoluPay\DTO\CapturePaymentData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
+use Voxyfy\AnadoluPay\DTO\StatusResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Money;
@@ -26,7 +31,7 @@ use Voxyfy\AnadoluPay\Support\Money;
  *   - İşlem tipi hem gövdede hem de API yolunda kullanılır
  *     (örn. `.../Sale`, `.../Return`).
  */
-class PosNetV1Gateway extends AbstractBankGateway
+class PosNetV1Gateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsStatusQuery
 {
     /** Başarılı işlem kodu. */
     protected const SUCCESS_CODE = '00';
@@ -64,7 +69,7 @@ class PosNetV1Gateway extends AbstractBankGateway
             'MerchantNo' => $this->config->merchantId,
             'TerminalNo' => $this->config->terminalId,
             'PosnetID' => $this->posNetId(),
-            'TransactionType' => 'Sale',
+            'TransactionType' => $data->preAuthorization ? 'Auth' : 'Sale',
             'OrderId' => $this->formatOrderId($data->orderId),
             'Amount' => $this->formatAmount($data->money()),
             'CurrencyCode' => $this->currencyCode($data->currency),
@@ -196,7 +201,7 @@ class PosNetV1Gateway extends AbstractBankGateway
             $this->config->secretKey,
         ]));
 
-        return $this->postJson('Sale', $request);
+        return $this->postJson($this->pick($payload, ['TransactionType']) === 'Auth' ? 'Auth' : 'Sale', $request);
     }
 
     /**
@@ -498,6 +503,89 @@ class PosNetV1Gateway extends AbstractBankGateway
         return $this->client->postJson(
             url: rtrim($this->config->endpoint('payment_api'), '/').'/'.$operation,
             data: $request,
+        );
+    }
+
+    /**
+     * Sipariş durumunu sorgular (`TransactionInquiry`).
+     */
+    public function status(string $orderId, array $context = []): StatusResponse
+    {
+        $paymentModel = (string) ($context['payment_model'] ?? CreatePaymentData::MODEL_3D_SECURE);
+
+        $request = [
+            'ApiType' => 'JSON',
+            'ApiVersion' => self::API_VERSION,
+            'MerchantNo' => $this->config->merchantId,
+            'TerminalNo' => $this->config->terminalId,
+            'MACParams' => 'MerchantNo:TerminalNo',
+            'IsEncrypted' => 'N',
+            'OrderId' => $this->formatReversalOrderId($orderId, $paymentModel),
+        ];
+
+        $request['MAC'] = $this->macFromParams($request, $request['MACParams']);
+
+        $response = $this->postJson('TransactionInquiry', $request);
+
+        if ($this->responseCode($response) !== self::SUCCESS_CODE) {
+            return StatusResponse::notFound($orderId, $response);
+        }
+
+        $transactions = $response['TransactionData'] ?? [];
+        $transaction = is_array($transactions) && array_is_list($transactions)
+            ? (array) (end($transactions) ?: [])
+            : (is_array($transactions) ? $transactions : []);
+
+        return new StatusResponse(
+            found: true,
+            status: match (strtolower((string) ($this->pick($transaction, ['TransactionType']) ?? ''))) {
+                'reverse', 'void' => StatusResponse::STATUS_CANCELLED,
+                'return' => StatusResponse::STATUS_REFUNDED,
+                'auth' => StatusResponse::STATUS_PRE_AUTHORIZED,
+                default => StatusResponse::STATUS_PAID,
+            },
+            orderId: $orderId,
+            paymentId: $this->pick($transaction, ['ReferenceCode', 'AuthCode']),
+            amount: ($amount = $this->pick($transaction, ['Amount'])) !== null && is_numeric($amount)
+                ? Money::fromMinorUnits((int) $amount)
+                : null,
+            transactionTime: $this->pick($transaction, ['TransactionDate']),
+            raw: $response,
+        );
+    }
+
+    /**
+     * Ön provizyonu kapatır (`Capture`).
+     */
+    public function capture(CapturePaymentData $data): PaymentResponse
+    {
+        $referenceCode = $data->meta('ref_ret_num') ?? $data->meta('reference_code');
+
+        $request = [
+            'ApiType' => 'JSON',
+            'ApiVersion' => self::API_VERSION,
+            'MerchantNo' => $this->config->merchantId,
+            'TerminalNo' => $this->config->terminalId,
+            'MACParams' => 'MerchantNo:TerminalNo:ReferenceCode:OrderId',
+            'ReferenceCode' => is_string($referenceCode) && $referenceCode !== '' ? $referenceCode : null,
+            'OrderId' => is_string($referenceCode) && $referenceCode !== ''
+                ? null
+                : $this->formatOrderId($data->orderId),
+            'Amount' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->minorUnits,
+            'CurrencyCode' => $this->currencyCode($data->currency),
+        ];
+
+        $request['MAC'] = $this->macFromParams($request, $request['MACParams']);
+
+        $response = $this->postJson('Capture', $request);
+        $approved = $this->responseCode($response) === self::SUCCESS_CODE;
+
+        return new PaymentResponse(
+            success: $approved,
+            paymentId: $this->pick($response, ['ReferenceCode', 'AuthCode']) ?? $data->orderId,
+            errorMessage: $approved ? null : $this->responseDescription($response),
+            raw: $response,
+            errorCode: $approved ? null : $this->responseCode($response),
         );
     }
 }

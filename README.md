@@ -55,6 +55,7 @@ uygulamanızın işi.
 [Ödeme akışı](#ödeme-akışı) ·
 [İade ve iptal](#iade-ve-iptal) ·
 [Ödeme modelleri](#ödeme-modelleri) ·
+[Yetenekler](#yetenekler) ·
 [Tutarlar](#tutarlar) ·
 [Bankaların tuhaflıkları](#bankaların-tuhaflıkları) ·
 [Hata yönetimi](#hata-yönetimi-ve-yeniden-deneme) ·
@@ -345,6 +346,125 @@ new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['ref_ret_num' => '...']);
 | `MODEL_NON_SECURE` | 3D yok, doğrudan provizyon | Mail order / abonelik |
 
 3D Host modelinde `card` vermeniz gerekmez.
+
+## Yetenekler
+
+Her banka her işlemi sunmaz. Bu bir eksiklik değil, sağlayıcı sınırıdır:
+PayTR iptal (void) API'si sunmaz, Akbank'ın yeni API'si tekil durum sorgusu
+sunmaz, Kuveyt Türk ön provizyon sunmaz.
+
+Paket bunu tip düzeyinde bildirir — desteklenmeyen bir metodu çağırmadan
+önce `instanceof` ile kontrol edin:
+
+```php
+use Voxyfy\AnadoluPay\Contracts\SupportsStatusQuery;
+
+$gateway = AnadoluPay::driver('garanti');
+
+if ($gateway instanceof SupportsStatusQuery) {
+    $status = $gateway->status('SIPARIS-123');
+}
+```
+
+| Driver | Durum | İptal | Ön prov. | Geçmiş | BIN | Taksit | Tekrar |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `akbank`, `isbank`, `ziraat`, `halkbank`, `qnb`, `teb`, `sekerbank` | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
+| `garanti` | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| `yapikredi`, `albaraka` | ✅ | ✅ | ✅ | — | — | — | — |
+| `vakifbank`, `ziraat-payflex` | ✅ | ✅ | ✅ | — | — | — | ✅ |
+| `denizbank` | ✅ | ✅ | ✅ | — | — | — | — |
+| `qnb-payfor`, `ziraat-katilim` | ✅ | ✅ | ✅ | ✅ | — | — | — |
+| `kuveytturk` | ✅ | ✅ | — | — | — | — | — |
+| `vakif-katilim` | ✅ | ✅ | ✅ | ✅ | — | — | — |
+| `akbank-pos` | — | ✅ | ✅ | ✅ | — | — | ✅ |
+| `paytr` | ✅ | — | — | — | ✅ | ✅ | — |
+| `param` | ✅ | ✅ | ✅ | — | — | — | — |
+| `tosla` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
+| `iyzico` | ✅ | — | — | — | ✅ | ✅ | — |
+
+Arayüzler: `SupportsStatusQuery`, `SupportsCancellation`,
+`SupportsPreAuthorization`, `SupportsOrderHistory`, `SupportsBinQuery`,
+`SupportsInstallmentQuery`, `SupportsRecurringPayments`.
+
+### Durum sorgusu
+
+Zaman aşımı gibi belirsiz durumları kapatmanın tek yolu budur.
+
+```php
+$status = AnadoluPay::driver('garanti')->status('SIPARIS-123');
+
+$status->found;        // banka bu siparişi tanıyor mu
+$status->isPaid();     // para tahsil edildi mi
+$status->isPending();  // 3D doğrulaması bekleniyor
+$status->amount;       // Money
+$status->refundedAmount;
+```
+
+Bankaların birbirine benzemeyen durum kodları (`A`, `1`, `SUCCESS`,
+`Başarılı`) tek bir sözlüğe indirgenir. Tanınmayan bir kod **`unknown`**
+döner — sessizce "başarılı" sayılmaz.
+
+Ön provizyon `isPaid()` için `false` döndürür: tutar bloke edilmiştir ama
+tahsil edilmemiştir.
+
+### Ön provizyon
+
+```php
+$gateway = AnadoluPay::driver('garanti');
+
+// Bloke et
+$response = $gateway->preAuthorize($data);
+
+// Nihai tutar belli olunca tahsil et
+$gateway->capture(new CapturePaymentData(
+    orderId: 'SIPARIS-123',
+    amount: 149.90,                          // blokeden küçük olabilir
+    metadata: ['ref_ret_num' => '...'],      // Garanti bu referansı ister
+));
+```
+
+Bloke süresiz değildir; bankaya göre 1-30 gün içinde kapatılmazsa düşer.
+
+### Taksit ve BIN
+
+```php
+$bin = AnadoluPay::driver('iyzico')->binLookup('415565');
+$bin->bankName;   // "Garanti BBVA"
+$bin->isCredit();
+
+$options = AnadoluPay::driver('paytr')->installmentOptions(
+    Money::fromMinorUnits(19990),
+);
+
+foreach ($options as $option) {
+    $option->count;         // 3
+    $option->totalPrice;    // Money — komisyon dâhil
+    $option->monthlyPrice;
+}
+```
+
+BIN sorgusuna kart numarasının **tamamını göndermeyin**; ilk 6-8 hane yeter.
+
+### Tekrarlayan ödeme
+
+Plan ilk ödemeyle birlikte bankaya bildirilir; sonraki çekimleri banka
+kendisi başlatır.
+
+```php
+new CreatePaymentData(
+    amount: 49.90,
+    // …
+    metadata: ['recurring' => new RecurringPlan(
+        interval: 1,
+        frequency: RecurringPlan::FREQUENCY_MONTH,
+        paymentCount: 12,
+    )],
+);
+```
+
+Desteklenen frekanslar bankaya göre değişir — Garanti yıllık, PayFlex
+haftalık tekrar sunmaz. `supportedRecurringFrequencies()` ile sorgulayın;
+desteklenmeyen bir frekans `PaymentFailedException` fırlatır.
 
 ## Tutarlar
 
@@ -674,14 +794,16 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 
 ### İşlem kapsamı
 
-- [ ] `cancel()` ve `status()`'ü sözleşmeye taşı (`SupportsCancellation` /
-      `SupportsStatusQuery` arayüzleri).
-- [ ] Eksik `cancel()`: Kuveyt Türk, Param, PayTR.
-- [ ] Eksik `status()`: Asseco, PayFor ve PayTR dışındaki tüm driver'lar.
-- [ ] Kuveyt Türk iade/iptal — ayrı SOAP servisi, farklı kimlik doğrulama.
-- [ ] Ön provizyon / provizyon kapama.
-- [ ] İşlem geçmişi, taksit oranı ve BIN sorgulama.
-- [ ] Tekrarlayan ödeme.
+- [x] ~~`cancel()` ve `status()`'ü sözleşmeye taşı.~~ Yetenekler artık
+      arayüzlerle bildiriliyor — bkz. [Yetenekler](#yetenekler).
+- [x] ~~Eksik `cancel()`.~~ Kuveyt Türk (ayrı SOAP servisi) ve Param eklendi.
+      PayTR iptal API'si **sunmuyor**; sağlayıcı sınırı.
+- [x] ~~Eksik `status()`.~~ 13 driver'a yayıldı. Akbank POS tekil durum
+      sorgusu **sunmuyor**; yerine işlem geçmişi var.
+- [x] ~~Kuveyt Türk iade/iptal.~~
+- [x] ~~Ön provizyon / provizyon kapama.~~ 12 driver.
+- [x] ~~İşlem geçmişi, taksit oranı ve BIN sorgulama.~~
+- [x] ~~Tekrarlayan ödeme.~~ Asseco, Garanti, PayFlex, Akbank POS.
 
 ### Yeni bankalar
 
