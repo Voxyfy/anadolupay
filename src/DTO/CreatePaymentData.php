@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\DTO;
 
+use Voxyfy\AnadoluPay\Support\Money;
+
 /**
  * Ödeme Oluşturma Verisi DTO
  *
@@ -28,7 +30,10 @@ final readonly class CreatePaymentData
     public const MODEL_NON_SECURE = 'regular';
 
     /**
-     * @param  float  $amount  Ödeme tutarı (örn: 199.99)
+     * @param  float|Money  $amount  Ödeme tutarı. Kuruş kaybı olmaması için
+     *                               `Money::fromMinorUnits(19990)` tercih edilir;
+     *                               float (199.90) geriye dönük uyumluluk için
+     *                               kabul edilir ve iki ondalık haneye yuvarlanır.
      * @param  string  $currency  ISO para birimi kodu (örn: TRY, USD)
      * @param  string  $orderId  Satıcı sistemindeki benzersiz sipariş referansı
      * @param  array<string, mixed>  $customer  Müşteri bilgileri
@@ -42,7 +47,7 @@ final readonly class CreatePaymentData
      * @param  string  $lang  Banka ödeme sayfasının dili (tr/en)
      */
     public function __construct(
-        public float $amount,
+        public float|Money $amount,
         public string $currency,
         public string $orderId,
         public array $customer,
@@ -55,6 +60,18 @@ final readonly class CreatePaymentData
         public ?string $ip = null,
         public string $lang = 'tr',
     ) {}
+
+    /**
+     * Tutarı kuruş cinsinden taşıyan `Money` nesnesi olarak döndürür.
+     *
+     * Driver'lar tutara her zaman buradan erişir; `$amount` alanına
+     * doğrudan bakmazlar. Böylece float ile Money arasındaki fark
+     * yalnızca tek bir yerde ele alınır.
+     */
+    public function money(): Money
+    {
+        return Money::of($this->amount, $this->currency);
+    }
 
     /**
      * Kart bilgisini döndürür; `card` verilmemişse `customer['card']`

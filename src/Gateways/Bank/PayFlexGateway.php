@@ -14,6 +14,7 @@ use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
 use Voxyfy\AnadoluPay\Support\Bank\Xml;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * VakıfBank PayFlex V4 (MPI VPOS) Driver'ı
@@ -80,7 +81,7 @@ class PayFlexGateway extends AbstractBankGateway
             'MerchantId' => $this->config->merchantId,
             'MerchantPassword' => $this->config->password,
             'MerchantType' => (string) ($this->config->extra('merchant_type') ?? '0'),
-            'PurchaseAmount' => $this->formatAmount($data->amount),
+            'PurchaseAmount' => $this->formatAmount($data->money()),
             'VerifyEnrollmentRequestId' => $this->randomString(),
             'Currency' => Currency::numeric($data->currency),
             'SuccessUrl' => $this->successUrl($data),
@@ -176,7 +177,7 @@ class PayFlexGateway extends AbstractBankGateway
         $request = $this->accountData() + [
             'TransactionType' => 'Sale',
             'TransactionId' => $orderId,
-            'CurrencyAmount' => $this->formatAmount((float) $amount),
+            'CurrencyAmount' => $this->formatAmount(Money::of($amount, $currency)),
             'CurrencyCode' => Currency::numeric($currency),
             'ECI' => $this->pick($payload, ['Eci'], '') ?? '',
             'CAVV' => $this->pick($payload, ['Cavv'], '') ?? '',
@@ -211,7 +212,7 @@ class PayFlexGateway extends AbstractBankGateway
         $response = $this->postXml($this->accountData() + [
             'TransactionType' => 'Sale',
             'OrderId' => $data->orderId,
-            'CurrencyAmount' => $this->formatAmount($data->amount),
+            'CurrencyAmount' => $this->formatAmount($data->money()),
             'CurrencyCode' => Currency::numeric($data->currency),
             'ClientIp' => $data->clientIp(),
             'TransactionDeviceSource' => '0',
@@ -247,8 +248,8 @@ class PayFlexGateway extends AbstractBankGateway
             'ClientIp' => (string) ($data->meta('ip') ?? '127.0.0.1'),
         ];
 
-        if ($data->amount !== null) {
-            $request['CurrencyAmount'] = $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['CurrencyAmount'] = $this->formatAmount($amount);
         }
 
         return $this->mapReversal($this->postXml($request));

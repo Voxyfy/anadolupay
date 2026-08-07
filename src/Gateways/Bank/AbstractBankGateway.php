@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Bank;
 
-use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\DTO\CardData;
@@ -19,6 +18,8 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Exceptions\UnsupportedOperationException;
 use Voxyfy\AnadoluPay\Support\Bank\BankConfig;
 use Voxyfy\AnadoluPay\Support\Bank\BankHttpClient;
+use Voxyfy\AnadoluPay\Support\LoggerResolver;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Banka Sanal POS Driver'ları İçin Temel Sınıf
@@ -61,22 +62,10 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
 
     /**
      * Yapılandırmaya göre log kanalını çözümler.
-     *
-     * Loglama varsayılan olarak kapalıdır: banka istekleri kart verisi
-     * taşır ve maskeleme yapılsa bile bu kayıtların nereye yazıldığı
-     * bilinçli bir tercih olmalıdır.
      */
     protected static function resolveLogger(): ?LoggerInterface
     {
-        if (! (bool) config('anadolupay.logging.enabled', false)) {
-            return null;
-        }
-
-        $channel = config('anadolupay.logging.channel');
-
-        return is_string($channel) && $channel !== ''
-            ? Log::channel($channel)
-            : Log::getFacadeRoot();
+        return LoggerResolver::resolve();
     }
 
     /**
@@ -291,19 +280,14 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
     }
 
     /**
-     * Bankanın beklediği tutar formatı. Varsayılan: iki ondalıklı nokta ayraçlı.
+     * Bankanın beklediği tutar biçimi.
+     *
+     * Varsayılan iki ondalıklı gösterimdir; kuruş cinsinden tam sayı veya
+     * doğal gösterim isteyen bankalar bu metodu override eder.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return number_format($amount, 2, '.', '');
-    }
-
-    /**
-     * Tutarı kuruş cinsinden tam sayı olarak döndürür (örn: 1.99 => 199).
-     */
-    protected function amountInMinorUnits(float $amount): string
-    {
-        return (string) (int) round($amount * 100);
+        return $money->toDecimalString();
     }
 
     /**

@@ -11,6 +11,7 @@ use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Akbank Sanal POS (yeni JSON API) Driver'ı
@@ -53,7 +54,7 @@ class AkbankPosGateway extends AbstractBankGateway
             'terminalSafeId' => $this->config->terminalId,
             'orderId' => $data->orderId,
             'lang' => strtoupper($data->lang) === 'EN' ? 'EN' : 'TR',
-            'amount' => $this->formatAmount($data->amount),
+            'amount' => $this->formatAmount($data->money()),
             'currencyCode' => Currency::numeric($data->currency),
             'installCount' => (string) $data->installments(),
             'okUrl' => $this->successUrl($data),
@@ -229,7 +230,7 @@ class AkbankPosGateway extends AbstractBankGateway
             ],
             'order' => ['orderId' => $data->orderId],
             'transaction' => [
-                'amount' => $this->formatAmount($data->amount),
+                'amount' => $this->formatAmount($data->money()),
                 'currencyCode' => (int) Currency::numeric($data->currency),
                 'motoInd' => 0,
                 'installCount' => $data->installments(),
@@ -264,7 +265,7 @@ class AkbankPosGateway extends AbstractBankGateway
             'randomNumber' => $this->randomString(128),
             'order' => ['orderId' => $data->paymentId],
             'transaction' => [
-                'amount' => $this->formatAmount($data->amount ?? 0.0),
+                'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
                 'currencyCode' => (int) Currency::numeric($data->currency),
             ],
             'customer' => ['ipAddress' => (string) ($data->meta('ip') ?? '127.0.0.1')],
@@ -334,11 +335,11 @@ class AkbankPosGateway extends AbstractBankGateway
     }
 
     /**
-     * Akbank tutarları iki ondalıklı ondalık ayraçla bekler.
+     * Akbank tutarları iki ondalıklı gösterimle bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return number_format($amount, 2, '.', '');
+        return $money->toDecimalString();
     }
 
     protected function requestDateTime(): string

@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Vakıf Katılım Sanal POS (BOA) Driver'ı
@@ -67,8 +68,8 @@ class VakifKatilimGateway extends AbstractBankGateway
             'HashPassword' => $this->hash($this->config->secretKey),
             'TransactionSecurity' => '3',
             'InstallmentCount' => $this->formatInstallment($data->installments()),
-            'Amount' => $this->formatAmount($data->amount),
-            'DisplayAmount' => $this->formatAmount($data->amount),
+            'Amount' => $this->formatAmount($data->money()),
+            'DisplayAmount' => $this->formatAmount($data->money()),
             'FECCurrencyCode' => Currency::numeric($data->currency),
             'MerchantOrderId' => $data->orderId,
             'OkUrl' => $this->successUrl($data),
@@ -188,7 +189,7 @@ class VakifKatilimGateway extends AbstractBankGateway
             'HashPassword' => $this->hash($this->config->secretKey),
             'MerchantOrderId' => $data->orderId,
             'InstallmentCount' => $this->formatInstallment($data->installments()),
-            'Amount' => $this->formatAmount($data->amount),
+            'Amount' => $this->formatAmount($data->money()),
             'FECCurrencyCode' => Currency::numeric($data->currency),
             'CurrencyCode' => Currency::numeric($data->currency),
             'TransactionSecurity' => '1',
@@ -220,7 +221,7 @@ class VakifKatilimGateway extends AbstractBankGateway
      */
     public function refund(RefundPaymentData $data): RefundResponse
     {
-        $operation = $data->amount !== null ? 'PartialDrawBack' : 'DrawBack';
+        $operation = $data->money() !== null ? 'PartialDrawBack' : 'DrawBack';
 
         return $this->mapReversal($this->postXml($operation, $this->reversalRequest($data)));
     }
@@ -244,8 +245,8 @@ class VakifKatilimGateway extends AbstractBankGateway
             'OrderId' => (string) ($data->meta('remote_order_id') ?? ''),
         ];
 
-        if ($data->amount !== null) {
-            $request['Amount'] = $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['Amount'] = $this->formatAmount($amount);
         }
 
         $request['HashData'] = $this->createHash($request);
@@ -294,9 +295,9 @@ class VakifKatilimGateway extends AbstractBankGateway
     /**
      * Vakıf Katılım tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     protected function formatInstallment(int $installment): string

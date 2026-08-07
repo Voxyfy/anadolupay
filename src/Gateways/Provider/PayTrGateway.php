@@ -12,6 +12,7 @@ use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * PayTR Ödeme Kuruluşu Driver'ı
@@ -180,7 +181,7 @@ class PayTrGateway extends AbstractBankGateway
         $fields = [
             'merchant_id' => $this->config->merchantId,
             'merchant_oid' => $data->paymentId,
-            'return_amount' => number_format($data->amount ?? 0.0, 2, '.', ''),
+            'return_amount' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->toDecimalString(),
         ];
 
         $fields['paytr_token'] = $this->hmac(implode('', $fields).$this->config->password);
@@ -236,7 +237,7 @@ class PayTrGateway extends AbstractBankGateway
             'user_ip' => $data->clientIp(),
             'merchant_oid' => $data->orderId,
             'email' => (string) ($customer['email'] ?? ''),
-            'payment_amount' => number_format($data->amount, 2, '.', ''),
+            'payment_amount' => $data->money()->toDecimalString(),
             'installment_count' => $installment,
             'currency' => strtoupper($data->currency) === 'TRY' ? 'TL' : strtoupper($data->currency),
             'non_3d' => $secure ? 0 : 1,
@@ -296,7 +297,7 @@ class PayTrGateway extends AbstractBankGateway
         if (! is_array($items) || $items === []) {
             $items = [[
                 'Sipariş '.$data->orderId,
-                number_format($data->amount, 2, '.', ''),
+                $data->money()->toDecimalString(),
                 1,
             ]];
         }

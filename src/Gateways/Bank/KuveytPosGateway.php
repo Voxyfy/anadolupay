@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\Xml;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Kuveyt Türk Sanal POS (BOA / TDV2.0) Driver'ı
@@ -96,9 +97,9 @@ class KuveytPosGateway extends AbstractBankGateway
             'TransactionType' => 'Sale',
             'TransactionSecurity' => '3',
             'InstallmentCount' => $this->formatInstallment($data->installments()),
-            'Amount' => $this->formatAmount($data->amount),
+            'Amount' => $this->formatAmount($data->money()),
             // DisplayAmount, Amount ile aynı olmalıdır.
-            'DisplayAmount' => $this->formatAmount($data->amount),
+            'DisplayAmount' => $this->formatAmount($data->money()),
             'CurrencyCode' => $this->currencyCode($data->currency),
             'MerchantOrderId' => $data->orderId,
             'OkUrl' => $this->successUrl($data),
@@ -212,8 +213,8 @@ class KuveytPosGateway extends AbstractBankGateway
             'TransactionType' => 'Sale',
             'TransactionSecurity' => '1',
             'MerchantOrderId' => $data->orderId,
-            'Amount' => $this->formatAmount($data->amount),
-            'DisplayAmount' => $this->formatAmount($data->amount),
+            'Amount' => $this->formatAmount($data->money()),
+            'DisplayAmount' => $this->formatAmount($data->money()),
             'CurrencyCode' => $this->currencyCode($data->currency),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
             'CardHolderName' => $card->holderName ?? '',
@@ -333,9 +334,9 @@ class KuveytPosGateway extends AbstractBankGateway
     /**
      * Kuveyt Türk tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     protected function formatInstallment(int $installment): string

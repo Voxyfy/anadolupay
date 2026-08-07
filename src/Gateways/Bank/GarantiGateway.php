@@ -11,6 +11,7 @@ use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Garanti BBVA Sanal POS (GVPS) Driver'ı
@@ -53,7 +54,7 @@ class GarantiGateway extends AbstractBankGateway
             'terminalmerchantid' => $this->config->merchantId,
             'terminalid' => $this->config->terminalId,
             'txntype' => 'sales',
-            'txnamount' => $this->formatAmount($data->amount),
+            'txnamount' => $this->formatAmount($data->money()),
             'txncurrencycode' => Currency::numeric($data->currency),
             'txninstallmentcount' => $this->formatInstallment($data->installments()),
             'orderid' => $data->orderId,
@@ -225,7 +226,7 @@ class GarantiGateway extends AbstractBankGateway
             'Transaction' => [
                 'Type' => 'sales',
                 'InstallmentCnt' => $this->formatInstallment($data->installments()),
-                'Amount' => $this->formatAmount($data->amount),
+                'Amount' => $this->formatAmount($data->money()),
                 'CurrencyCode' => Currency::numeric($data->currency),
                 'CardholderPresentCode' => '0',
                 'MotoInd' => self::MOTO,
@@ -290,7 +291,8 @@ class GarantiGateway extends AbstractBankGateway
             'Transaction' => [
                 'Type' => $txType,
                 'InstallmentCnt' => '',
-                'Amount' => $this->formatAmount($data->amount ?? 0.01),
+                // Garanti iptal/iade isteklerinde tutar alanını sabit 1 kuruş bekler.
+                'Amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(1, $data->currency)),
                 'CurrencyCode' => Currency::numeric($data->currency),
                 'CardholderPresentCode' => '0',
                 'MotoInd' => self::MOTO,
@@ -373,9 +375,9 @@ class GarantiGateway extends AbstractBankGateway
     /**
      * Garanti tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     /**

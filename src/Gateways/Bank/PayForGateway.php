@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * PayFor (Finansbank / Enpara / Ziraat Katılım) Sanal POS Driver'ı
@@ -49,7 +50,7 @@ class PayForGateway extends AbstractBankGateway
             'Lang' => $this->lang($data->lang),
             'SecureType' => $this->secureType($data->paymentModel),
             'TxnType' => 'Auth',
-            'PurchAmount' => $this->formatAmount($data->amount),
+            'PurchAmount' => $this->formatAmount($data->money()),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
             'Currency' => Currency::numeric($data->currency),
             'OkUrl' => $this->successUrl($data),
@@ -184,7 +185,7 @@ class PayForGateway extends AbstractBankGateway
             'OrderId' => $data->orderId,
             'SecureType' => 'NonSecure',
             'TxnType' => 'Auth',
-            'PurchAmount' => $this->formatAmount($data->amount),
+            'PurchAmount' => $this->formatAmount($data->money()),
             'Currency' => Currency::numeric($data->currency),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
             'Lang' => $this->lang($data->lang),
@@ -218,8 +219,8 @@ class PayForGateway extends AbstractBankGateway
             'Currency' => Currency::numeric($data->currency),
         ];
 
-        if ($data->amount !== null) {
-            $request['PurchAmount'] = $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['PurchAmount'] = $this->formatAmount($amount);
         }
 
         return $this->mapReversal($this->postXml($request));
@@ -295,11 +296,11 @@ class PayForGateway extends AbstractBankGateway
     }
 
     /**
-     * PayFor tutarı PHP'nin doğal float gösterimiyle bekler.
+     * PayFor tutarı doğal gösterimle bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return (string) $amount;
+        return $money->toNaturalString();
     }
 
     /**

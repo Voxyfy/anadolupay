@@ -41,7 +41,7 @@ class FakeGateway implements PaymentGatewayInterface
                 message: 'Fake payment failed.',
                 context: [
                     'order_id' => $data->orderId,
-                    'amount' => $data->amount,
+                    'amount' => $data->money()->toDecimalString(),
                 ],
             );
         }
@@ -55,7 +55,7 @@ class FakeGateway implements PaymentGatewayInterface
             raw: [
                 'payment_id' => $paymentId,
                 'order_id' => $data->orderId,
-                'amount' => $data->amount,
+                'amount' => $data->money()->toDecimalString(),
                 'currency' => $data->currency,
             ],
         );
@@ -94,7 +94,7 @@ class FakeGateway implements PaymentGatewayInterface
                 message: 'Fake refund failed.',
                 context: [
                     'payment_id' => $data->paymentId,
-                    'amount' => $data->amount,
+                    'amount' => $data->money()?->toDecimalString(),
                 ],
             );
         }
@@ -107,7 +107,7 @@ class FakeGateway implements PaymentGatewayInterface
             raw: [
                 'refund_id' => $refundId,
                 'payment_id' => $data->paymentId,
-                'amount' => $data->amount,
+                'amount' => $data->money()?->toDecimalString(),
             ],
         );
     }

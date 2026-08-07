@@ -23,6 +23,33 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Eklendi
 
+* **`Money` value object.** Tutarlar artık paket içinde kuruş cinsinden tam
+  sayı olarak taşınır; float aritmetiği ödeme yolundan çıkarıldı.
+  `CreatePaymentData` ve `RefundPaymentData` hem `Money` hem `float` kabul
+  eder, mevcut çağrılar değişmeden çalışır.
+* **iyzico iadesi** — `/v2/payment/refund` ile tam ve kısmi iade.
+
+### Düzeltildi — güvenlik
+
+* **iyzico `Authorization` başlığı üç noktada birden yanlıştı**: imzalanan
+  dizgi (`apiKey + rnd + gövde` yerine `randomKey + uriPath + gövde`),
+  kodlama (base64 yerine hex) ve başlık biçimi. Ayrıca gövde imzalandıktan
+  sonra HTTP istemcisi tarafından yeniden kodlanıyordu; artık imzalanan
+  dizginin aynısı gönderiliyor.
+* **iyzico yanıt ve callback imzası** doğrulanmamış bir alan sırası
+  kullanıyordu. Resmi dokümantasyondaki sıralar uygulandı; her uç için ayrı
+  doğrulama eklendi (initialize, 3DS auth, callback, refund).
+* **iyzico webhook imzası** yanlış başlıktan (`x-iyzi-signature`) okunuyordu.
+  Doğrusu `X-IYZ-SIGNATURE-V3`'tür ve HPP bildirimlerinde `token` da imzaya
+  girer.
+
+### Düzeltildi
+
+* `IyzicoMapper` kart bilgisini yalnızca eski `customer['card']` dizisinden
+  okuyordu; birinci sınıf `CardData` alanı yok sayılıyordu.
+
+### Eklendi
+
 * Türk bankaları için native sanal POS driver'ları: Asseco/Payten NestPay
   (Akbank, İş Bankası, Ziraat, Halkbank, QNB Finansbank, TEB, Şekerbank),
   Garanti BBVA, Yapı Kredi PosNet, Albaraka PosNet V1, VakıfBank/Ziraat PayFlex

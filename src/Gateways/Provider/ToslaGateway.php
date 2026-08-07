@@ -12,6 +12,7 @@ use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Tosla (AkÖde A.Ş.) Driver'ı
@@ -80,7 +81,7 @@ class ToslaGateway extends AbstractBankGateway
         $request = $this->accountData() + [
             'callbackUrl' => $this->successUrl($data),
             'orderId' => $data->orderId,
-            'amount' => (int) $this->formatAmount($data->amount),
+            'amount' => $data->money()->minorUnits,
             'currency' => (int) Currency::numeric($data->currency),
             'installmentCount' => $data->installments() > 1 ? $data->installments() : 0,
             'rnd' => $this->randomString(),
@@ -214,7 +215,7 @@ class ToslaGateway extends AbstractBankGateway
 
         $request = $this->accountData() + [
             'orderId' => $data->orderId,
-            'amount' => (int) $this->formatAmount($data->amount),
+            'amount' => $data->money()->minorUnits,
             'currency' => (int) Currency::numeric($data->currency),
             'installmentCount' => $data->installments() > 1 ? $data->installments() : 0,
             'rnd' => $this->randomString(),
@@ -250,8 +251,8 @@ class ToslaGateway extends AbstractBankGateway
             'timeSpan' => $this->timeSpan(),
         ];
 
-        if ($data->amount !== null) {
-            $request['amount'] = (int) $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['amount'] = $amount->minorUnits;
         }
 
         $request['hash'] = $this->createHash($request);
@@ -314,9 +315,9 @@ class ToslaGateway extends AbstractBankGateway
     /**
      * Tosla tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     /**

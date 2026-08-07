@@ -42,8 +42,8 @@ uygulamanızın işi.
 > ve bir iade** çalıştırın. Hash hesabında bankalar zaman zaman kuruluma özel
 > farklılıklar tanımlıyor.
 >
-> `iyzico` driver'ının imza şeması ayrıca doğrulanmamıştır — bkz.
-> [Yol haritası](#yol-haritası).
+> Bu uyarı banka driver'ları içindir. `iyzico` driver'ının imza şeması resmi
+> dokümantasyondan doğrulanmış ve testle kilitlenmiştir.
 
 ---
 
@@ -55,6 +55,7 @@ uygulamanızın işi.
 [Ödeme akışı](#ödeme-akışı) ·
 [İade ve iptal](#iade-ve-iptal) ·
 [Ödeme modelleri](#ödeme-modelleri) ·
+[Tutarlar](#tutarlar) ·
 [Bankaların tuhaflıkları](#bankaların-tuhaflıkları) ·
 [Loglama](#loglama) ·
 [Test ortamı](#test-ortamı) ·
@@ -343,6 +344,32 @@ new RefundPaymentData('SIPARIS-123', 49.90, metadata: ['ref_ret_num' => '...']);
 
 3D Host modelinde `card` vermeniz gerekmez.
 
+## Tutarlar
+
+Tutarlar paket içinde her zaman **kuruş cinsinden tam sayı** olarak taşınır.
+`0.1 + 0.2 !== 0.3` olduğu için float ile hesaplanan bir tutar imzaya giren
+dizgiyi bir kuruş kaydırabilir ve banka işlemi reddeder.
+
+```php
+use Voxyfy\AnadoluPay\Support\Money;
+
+new CreatePaymentData(amount: Money::fromMinorUnits(19990), ...);  // 199,90 TL
+new CreatePaymentData(amount: 199.90, ...);                        // eşdeğer
+```
+
+`float` vermek çalışmaya devam eder — iki ondalık haneye yuvarlanıp kuruşa
+çevrilir. Tutarı zaten kuruş olarak tutuyorsanız (veritabanında `int` kolon
+gibi) `Money::fromMinorUnits()` kesinlik kaybı olmayan tek yoldur.
+
+Driver'lar tutara yalnızca `$data->money()` üzerinden erişir ve bankanın
+istediği biçime orada çevirir:
+
+| | Örnek (199,90 TL) | Kullanan |
+|---|---|---|
+| `toMinorUnitsString()` | `"19990"` | Garanti, PosNet, Kuveyt Türk, Tosla |
+| `toDecimalString()` | `"199.90"` | Akbank POS, PayFlex, iyzico |
+| `toNaturalString()` | `"199.9"` | NestPay, PayFor, InterPos |
+
 ## Bankaların tuhaflıkları
 
 Driver'lar bunları sizin için hallediyor. Burada olmalarının sebebi, bir şey
@@ -414,6 +441,43 @@ Başarısız HTTP yanıtları `warning`, gerisi `debug` seviyesindedir.
 > Loglama **varsayılan olarak kapalıdır**. Maskeleme uygulansa bile bu
 > kayıtların nereye yazıldığı bilinçli bir tercih olmalıdır: kalıcı bir kanal
 > seçiyorsanız erişimini kısıtlayın ve saklama süresi tanımlayın.
+
+## iyzico
+
+iyzico bankalardan iki noktada ayrılır ve paket ikisini de sizin yerinize
+halleder:
+
+- 3D adımında form alanı değil, base64 kodlanmış hazır bir HTML sayfası döner.
+  Paket bunu çözer; `toHtmlForm()` doğrudan basılabilir HTML verir.
+- Her yanıt, callback ve webhook ayrı bir imza şeması kullanır. Üçü de
+  HMAC-SHA256 üretir ve sonucu **onaltılık** kodlar:
+
+| İmza | Nerede | İmzalanan |
+|---|---|---|
+| `Authorization` | istek başlığı | `randomKey + uriPath + gövde` → `IYZWSv2 base64(apiKey:…&randomKey:…&signature:…)` |
+| Yanıt / callback | gövdedeki `signature` | uca göre değişen alanlar, `:` ayraçlı |
+| Webhook | `X-IYZ-SIGNATURE-V3` başlığı | `secretKey + eventType + …`, ayraçsız |
+
+Yanıt imzasında alan sırası uca göre sabittir; örneğin 3DS callback'i
+`conversationData:conversationId:mdStatus:paymentId:status` sırasını kullanır.
+Tutarlardaki sondaki sıfırlar imzadan önce atılır (`10.50` → `10.5`).
+
+```env
+IYZICO_API_KEY=xxx
+IYZICO_SECRET_KEY=xxx
+IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
+IYZICO_CALLBACK_URL=https://shop.test/anadolupay/webhook/iyzico
+```
+
+İade `/v2/payment/refund` ucundan yapılır:
+
+```php
+AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
+    paymentId: '12345',
+    amount: 49.90,
+    metadata: ['conversation_id' => 'SIPARIS-123'],
+));
+```
 
 ## Test ortamı
 
@@ -495,16 +559,11 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 
 ### Öncelikli
 
-- [ ] **iyzico imza şemasını doğrula.** `IyzicoHttpClient` ve
-      `IyzicoSignatureValidator` içindeki algoritma iyzico'nun resmi
-      dokümantasyonuyla teyit edilmemiştir (kodda `TODO` olarak işaretli).
-      Yanlış algoritma ya geçerli bildirimleri reddeder ya da
-      `IYZICO_VALIDATE_SIGNATURE=false` kullanımında sahte bildirimlerin
-      kabul edilmesine yol açar.
-- [ ] **iyzico iadesi** — şu an `UnsupportedOperationException` fırlatıyor.
-- [ ] **Tutarları kuruş cinsinden `int` olarak taşı.** `CreatePaymentData::$amount`
-      `float`; para için prensipte risklidir. BC kıracağı için ayrı bir major
-      sürümde.
+- [x] ~~iyzico imza şemasını doğrula.~~ Üç şema da (Authorization, yanıt/callback,
+      webhook) resmi dokümantasyondan teyit edilip düzeltildi ve testle kilitlendi.
+- [x] ~~iyzico iadesi.~~ `/v2/payment/refund` ile tam ve kısmi iade.
+- [x] ~~Tutarları kuruş cinsinden tam sayıya taşı.~~ [`Money`](#tutarlar) value
+      object; `float` girdi geriye dönük uyumlu olarak destekleniyor.
 
 ### İşlem kapsamı
 

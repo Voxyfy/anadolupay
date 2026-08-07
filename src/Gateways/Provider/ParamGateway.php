@@ -12,6 +12,7 @@ use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 use Voxyfy\AnadoluPay\Support\Bank\Xml;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Param (TURK Elektronik Para A.Ş.) Driver'ı
@@ -104,7 +105,7 @@ class ParamGateway extends AbstractBankGateway
         $this->config->require(['merchantId', 'username', 'password', 'secretKey']);
 
         $card = $this->requireCard($data);
-        $amount = $this->formatAmount($data->amount);
+        $amount = $this->formatAmount($data->money());
 
         $request = $this->accountData() + [
             '@xmlns' => self::NAMESPACE,
@@ -254,9 +255,9 @@ class ParamGateway extends AbstractBankGateway
     {
         $request = $this->accountData() + [
             '@xmlns' => self::NAMESPACE,
-            'Durum' => $data->amount !== null ? 'IADE' : 'IPTAL',
+            'Durum' => $data->money() !== null ? 'IADE' : 'IPTAL',
             'Siparis_ID' => $data->paymentId,
-            'Tutar' => number_format($data->amount ?? 0.0, 2, '.', ''),
+            'Tutar' => ($data->money() ?? Money::fromMinorUnits(0, $data->currency))->toDecimalString(),
         ];
 
         $response = $this->call('TP_Islem_Iptal_Iade_Kismi2', $request);
@@ -330,9 +331,9 @@ class ParamGateway extends AbstractBankGateway
     /**
      * Param tutarları virgüllü ondalıkla bekler ("19,90").
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return number_format($amount, 2, ',', '');
+        return str_replace('.', ',', $money->toDecimalString());
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Support;
 
+use Voxyfy\AnadoluPay\DTO\CardData;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 
@@ -20,9 +21,12 @@ class IyzicoMapper
     public function to3dsInitializePayload(CreatePaymentData $data, string $callbackUrl): array
     {
         $customer = $data->customer;
-        $card = $customer['card'] ?? null;
 
-        if (! is_array($card)) {
+        // CreatePaymentData::card() hem birinci sınıf `card` alanını hem de
+        // paketin ilk sürümündeki `customer['card']` dizisini destekler.
+        $card = $data->card();
+
+        if (! $card instanceof CardData) {
             throw new PaymentFailedException('3DS başlatma için kart bilgileri gereklidir.');
         }
 
@@ -34,21 +38,22 @@ class IyzicoMapper
 
         return [
             'locale' => (string) ($customer['locale'] ?? 'tr'),
-            'price' => (string) $data->amount,
-            'paidPrice' => (string) $data->amount,
+            'price' => $data->money()->toNaturalString(),
+            'paidPrice' => $data->money()->toNaturalString(),
             'currency' => $data->currency,
-            'installment' => (int) ($customer['installment'] ?? 1),
+            'installment' => $data->installments(),
             'conversationId' => $data->orderId,
             'basketId' => $data->orderId,
             'paymentChannel' => (string) ($customer['paymentChannel'] ?? 'WEB'),
             'paymentGroup' => (string) ($customer['paymentGroup'] ?? 'PRODUCT'),
             'callbackUrl' => $callbackUrl,
             'paymentCard' => [
-                'cardHolderName' => (string) ($card['cardHolderName'] ?? $fullName ?: 'Customer'),
-                'cardNumber' => (string) ($card['cardNumber'] ?? ''),
-                'expireYear' => (string) ($card['expireYear'] ?? ''),
-                'expireMonth' => (string) ($card['expireMonth'] ?? ''),
-                'cvc' => (string) ($card['cvc'] ?? ''),
+                'cardHolderName' => $card->holderName ?? ($fullName !== '' ? $fullName : 'Customer'),
+                'cardNumber' => $card->number,
+                // iyzico son kullanma yılını dört haneli bekler.
+                'expireYear' => $card->expireYearLong(),
+                'expireMonth' => $card->expireMonth,
+                'cvc' => $card->cvv,
             ],
             'buyer' => [
                 'id' => (string) ($customer['id'] ?? $data->orderId),
@@ -83,7 +88,7 @@ class IyzicoMapper
                     'name' => 'Order '.$data->orderId,
                     'category1' => 'Payment',
                     'itemType' => 'VIRTUAL',
-                    'price' => (string) $data->amount,
+                    'price' => $data->money()->toNaturalString(),
                 ],
             ],
         ];

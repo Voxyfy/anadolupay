@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\DTO;
 
+use Voxyfy\AnadoluPay\Support\Money;
+
 /**
  * İade Verisi DTO
  *
@@ -18,18 +20,26 @@ readonly class RefundPaymentData
 {
     /**
      * @param  string  $paymentId  Sağlayıcıya özel ödeme tanımlayıcısı
-     * @param  float|null  $amount  İade tutarı (null = tam iade)
+     * @param  float|Money|null  $amount  İade tutarı (null = tam iade)
      * @param  string|null  $reason  İsteğe bağlı iade nedeni
      * @param  array<string, mixed>  $metadata  Sağlayıcıya özel ek alanlar
      * @param  string  $currency  İade para birimi (banka sanal POS'ları zorunlu tutar)
      */
     public function __construct(
         public string $paymentId,
-        public ?float $amount = null,
+        public float|Money|null $amount = null,
         public ?string $reason = null,
         public array $metadata = [],
         public string $currency = 'TRY',
     ) {}
+
+    /**
+     * İade tutarını `Money` olarak döndürür; tam iadede null.
+     */
+    public function money(): ?Money
+    {
+        return $this->amount === null ? null : Money::of($this->amount, $this->currency);
+    }
 
     /**
      * Sağlayıcıya özel ek alanı okur.

@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Denizbank InterPos (Intertech VPOS) Driver'ı
@@ -49,7 +50,7 @@ class InterPosGateway extends AbstractBankGateway
             'ShopCode' => $this->config->merchantId,
             'TxnType' => 'Auth',
             'SecureType' => $this->secureType($data->paymentModel),
-            'PurchAmount' => $this->formatAmount($data->amount),
+            'PurchAmount' => $this->formatAmount($data->money()),
             'OrderId' => $data->orderId,
             'OkUrl' => $this->successUrl($data),
             'FailUrl' => $this->failUrl($data),
@@ -193,7 +194,7 @@ class InterPosGateway extends AbstractBankGateway
             'TxnType' => 'Auth',
             'SecureType' => 'NonSecure',
             'OrderId' => $data->orderId,
-            'PurchAmount' => $this->formatAmount($data->amount),
+            'PurchAmount' => $this->formatAmount($data->money()),
             'Currency' => Currency::numeric($data->currency),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
             'MOTO' => self::MOTO,
@@ -228,8 +229,8 @@ class InterPosGateway extends AbstractBankGateway
             'MOTO' => self::MOTO,
         ];
 
-        if ($data->amount !== null) {
-            $request['PurchAmount'] = $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['PurchAmount'] = $this->formatAmount($amount);
         }
 
         return $this->mapReversal($this->postForm($request));
@@ -289,11 +290,11 @@ class InterPosGateway extends AbstractBankGateway
     }
 
     /**
-     * InterPos tutarı PHP'nin doğal float gösterimiyle bekler.
+     * InterPos tutarı doğal gösterimle bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return (string) $amount;
+        return $money->toNaturalString();
     }
 
     /**

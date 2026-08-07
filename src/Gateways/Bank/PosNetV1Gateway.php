@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Albaraka Türk PosNet V1 (JSON API) Driver'ı
@@ -65,7 +66,7 @@ class PosNetV1Gateway extends AbstractBankGateway
             'PosnetID' => $this->posNetId(),
             'TransactionType' => 'Sale',
             'OrderId' => $this->formatOrderId($data->orderId),
-            'Amount' => $this->formatAmount($data->amount),
+            'Amount' => $this->formatAmount($data->money()),
             'CurrencyCode' => $this->currencyCode($data->currency),
             'MerchantReturnURL' => $this->successUrl($data),
             'InstallmentCount' => $this->formatInstallment($data->installments()),
@@ -257,7 +258,7 @@ class PosNetV1Gateway extends AbstractBankGateway
             ],
             'IsMailOrder' => 'N',
             'PaymentInstrumentType' => 'CARD',
-            'Amount' => (int) $this->formatAmount($data->amount),
+            'Amount' => $data->money()->minorUnits,
             'CurrencyCode' => $this->currencyCode($data->currency),
             'OrderId' => $this->formatOrderId($data->orderId),
             'InstallmentCount' => $this->formatInstallment($installment),
@@ -319,8 +320,8 @@ class PosNetV1Gateway extends AbstractBankGateway
             $request['OrderId'] = $this->formatReversalOrderId($data->paymentId, $paymentModel);
         }
 
-        if ($paymentModel === CreatePaymentData::MODEL_NON_SECURE && $data->amount !== null) {
-            $request['Amount'] = (int) $this->formatAmount($data->amount);
+        if ($paymentModel === CreatePaymentData::MODEL_NON_SECURE && ($amount = $data->money()) !== null) {
+            $request['Amount'] = $amount->minorUnits;
             $request['CurrencyCode'] = $this->currencyCode($data->currency);
         }
 
@@ -396,9 +397,9 @@ class PosNetV1Gateway extends AbstractBankGateway
     /**
      * PosNet V1 tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     protected function formatInstallment(int $installment): string

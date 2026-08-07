@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Asseco / Payten (NestPay, eski adıyla EST) Sanal POS Driver'ı
@@ -44,7 +45,7 @@ class AssecoGateway extends AbstractBankGateway
             'hashAlgorithm' => 'ver3',
             'clientid' => $this->config->merchantId,
             'storetype' => $this->storeType($data->paymentModel),
-            'amount' => $this->formatAmount($data->amount),
+            'amount' => $this->formatAmount($data->money()),
             'oid' => $data->orderId,
             'okUrl' => $this->successUrl($data),
             'failUrl' => $this->failUrl($data),
@@ -199,7 +200,7 @@ class AssecoGateway extends AbstractBankGateway
             'Type' => 'Auth',
             'IPAddress' => $data->clientIp(),
             'OrderId' => $data->orderId,
-            'Total' => $this->formatAmount($data->amount),
+            'Total' => $this->formatAmount($data->money()),
             'Currency' => Currency::numeric($data->currency),
             'Taksit' => $this->formatInstallment($data->installments()),
             'Number' => $card->number,
@@ -229,8 +230,8 @@ class AssecoGateway extends AbstractBankGateway
             'OrderId' => $data->paymentId,
         ];
 
-        if ($data->amount !== null) {
-            $request['Total'] = $this->formatAmount($data->amount);
+        if (($amount = $data->money()) !== null) {
+            $request['Total'] = $this->formatAmount($amount);
         }
 
         $response = $this->postXml($request);
@@ -327,13 +328,13 @@ class AssecoGateway extends AbstractBankGateway
     }
 
     /**
-     * NestPay tutarı sabit ondalık yerine PHP'nin doğal float gösterimiyle
-     * bekler (örn: 100 => "100", 1.99 => "1.99"). Hash gövdeye birebir aynı
-     * dizgiden hesaplandığı için bu formatın korunması kritiktir.
+     * NestPay tutarı sabit ondalık yerine doğal gösterimle bekler
+     * (100 => "100", 1.99 => "1.99"). Hash gövdeye birebir aynı dizgiden
+     * hesaplandığı için bu biçimin korunması kritiktir.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return (string) $amount;
+        return $money->toNaturalString();
     }
 
     /**

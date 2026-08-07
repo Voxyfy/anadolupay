@@ -13,6 +13,7 @@ use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
+use Voxyfy\AnadoluPay\Support\Money;
 
 /**
  * Yapı Kredi PosNet Sanal POS Driver'ı
@@ -64,7 +65,7 @@ class PosNetGateway extends AbstractBankGateway
                 'ccno' => $card->number,
                 'expDate' => $card->expiry('ym'),
                 'cvc' => $card->cvv,
-                'amount' => $this->formatAmount($data->amount),
+                'amount' => $this->formatAmount($data->money()),
                 'currencyCode' => Currency::numeric($data->currency),
                 'installment' => $this->formatInstallment($data->installments()),
                 'XID' => $this->formatOrderId($data->orderId),
@@ -231,7 +232,7 @@ class PosNetGateway extends AbstractBankGateway
             'sale' => [
                 'orderID' => $this->formatOrderId($data->orderId),
                 'installment' => $this->formatInstallment($data->installments()),
-                'amount' => $this->formatAmount($data->amount),
+                'amount' => $this->formatAmount($data->money()),
                 'currencyCode' => Currency::numeric($data->currency),
                 'ccno' => $card->number,
                 'expDate' => $card->expiry('ym'),
@@ -259,7 +260,7 @@ class PosNetGateway extends AbstractBankGateway
     public function refund(RefundPaymentData $data): RefundResponse
     {
         $transaction = [
-            'amount' => $this->formatAmount($data->amount ?? 0.0),
+            'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
             'currencyCode' => Currency::numeric($data->currency),
         ];
 
@@ -410,9 +411,9 @@ class PosNetGateway extends AbstractBankGateway
     /**
      * PosNet tutarları kuruş cinsinden tam sayı olarak bekler.
      */
-    protected function formatAmount(float $amount): string
+    protected function formatAmount(Money $money): string
     {
-        return $this->amountInMinorUnits($amount);
+        return $money->toMinorUnitsString();
     }
 
     /**

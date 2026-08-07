@@ -407,10 +407,12 @@ return [
         // Test ortamı için sandbox URL; canlı kullanımda prod host'u kullanın.
         'base_url' => env('IYZICO_BASE_URL', 'https://sandbox-api.iyzipay.com'),
         'callback_url' => env('IYZICO_CALLBACK_URL'),
-        // Canlı ortamda true kalsın; lokal testlerde false olabilir.
+        // Yanıt, callback ve webhook imzalarının doğrulanması.
+        // Kapatmayın: kapalıyken sahte callback'lere açık olursunuz.
         'validate_signature' => env('IYZICO_VALIDATE_SIGNATURE', true),
-        // Imza header ve parametre adlari saglayiciya gore degisebilir.
-        'signature_header' => env('IYZICO_SIGNATURE_HEADER', 'x-iyzi-signature'),
+        // Webhook imzasını taşıyan başlık (iyzico V3 imza şeması).
+        'webhook_signature_header' => env('IYZICO_WEBHOOK_SIGNATURE_HEADER', 'x-iyz-signature-v3'),
+        // Yanıt gövdesinde imzayı taşıyan alan.
         'signature_param' => env('IYZICO_SIGNATURE_PARAM', 'signature'),
     ],
 
