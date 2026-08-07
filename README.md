@@ -341,6 +341,81 @@ kendi rotanızı yazıp bunu döndürmeniz gerekir.
 `extractOrderId()`. Ardından `config/anadolupay.php` içindeki `banks` dizisine
 bir preset ekleyin. Akış, hata yönetimi ve HTTP katmanı temel sınıftan gelir.
 
+## Yol haritası
+
+Bilinen eksikler ve planlanan işler. Katkıya açıktır; bir maddeye başlamadan
+önce issue açmanız çakışmayı önler.
+
+### Öncelikli — bilinen riskler
+
+- [ ] **iyzico imza şemasını doğrula.** `IyzicoHttpClient` ve
+      `IyzicoSignatureValidator` içindeki imza algoritması iyzico'nun resmi
+      dokümantasyonuyla teyit edilmemiştir (kodda `TODO` olarak işaretli).
+      Yanlış algoritma ya geçerli bildirimleri reddeder ya da
+      `IYZICO_VALIDATE_SIGNATURE=false` kullanımında sahte bildirimlerin
+      kabul edilmesine yol açar. Banka driver'larının imzaları testle
+      kilitlidir, iyzico'nunki değildir.
+- [ ] **iyzico iadesi.** Şu an `UnsupportedOperationException` fırlatıyor.
+- [ ] **Tutarları kuruş cinsinden `int` olarak taşı.** `CreatePaymentData::$amount`
+      `float`; kuruşa çevirim `round($amount * 100)` ile yapılıyor. Para için
+      float prensipte risklidir. Geriye dönük uyumluluğu kıracağı için ayrı bir
+      major sürümde ele alınmalı.
+
+### İşlem kapsamı
+
+- [ ] **`cancel()` ve `status()`'ü sözleşmeye taşı.** İkisi de şu an driver'lara
+      özel metotlar; `PaymentGatewayInterface`'de olmadıkları için çağrı statik
+      olarak tip güvenli değil. Ayrı `SupportsCancellation` /
+      `SupportsStatusQuery` arayüzleri uygun olabilir.
+- [ ] **Eksik `cancel()`**: Kuveyt Türk, Param, PayTR.
+- [ ] **Eksik `status()`**: Asseco, PayFor ve PayTR dışındaki tüm driver'lar.
+- [ ] **Kuveyt Türk iade/iptal.** Ayrı bir SOAP servisinde (`query_api`) yürüyor
+      ve farklı kimlik doğrulama istiyor.
+- [ ] Ön provizyon / provizyon kapama (pre-auth / post-auth) — hiçbir driver'da yok.
+- [ ] İşlem geçmişi sorgulama (order / transaction history).
+- [ ] Taksit oranı sorgulama.
+- [ ] BIN sorgulama (kart bankası ve tipi tespiti).
+- [ ] Tekrarlayan ödeme (recurring).
+
+### Yeni bankalar
+
+Aşağıdakilerin çoğu hâlihazırda yazılmış olan NestPay driver'ını kullanır;
+yeni kod değil, yalnızca `config/anadolupay.php` içine preset ve doğrulanmış
+uç nokta eklemek gerekir.
+
+- [ ] ING Bank
+- [ ] Anadolubank
+- [ ] Alternatif Bank
+- [ ] Odeabank
+- [ ] Türkiye Finans
+- [ ] Fibabanka
+- [ ] Burgan Bank
+- [ ] Emlak Katılım — hangi altyapıyı kullandığı araştırılmalı
+
+### Yeni ödeme kuruluşları
+
+- [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
+      için bilinçli olarak eklenmedi.
+- [ ] Craftgate
+- [ ] Moka
+- [ ] Paratika / MSU
+- [ ] PayU Türkiye
+- [ ] Vallet
+- [ ] Paycell
+- [ ] Papara, Ozan, Hepsipay
+
+### Paket altyapısı
+
+- [ ] **Event'ler**: `PaymentInitiated`, `PaymentVerified`, `PaymentFailed`,
+      `RefundIssued`. Şu an tüketen uygulama her şeyi kendi izlemek zorunda.
+- [ ] **PSR-3 loglama.** Kart verisi maskelenmiş istek/yanıt logu; banka
+      entegrasyonlarında hata ayıklamanın pratikte tek yolu.
+- [ ] **Idempotency.** Aynı `orderId` ile ikinci kez `createPayment()`
+      çağrılmasına karşı koruma yok.
+- [ ] **Retry politikası.** Timeout var (30 sn), yeniden deneme yok.
+- [ ] **Hata sınıflandırması.** Ağ/HTTP hatası ile bankanın iş kuralı reddi
+      şu an ikisi de `PaymentFailedException`; ayrıştırılmalı.
+
 ## Testler
 
 ```bash
