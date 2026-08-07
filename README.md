@@ -24,6 +24,9 @@ return response($response->toHtmlForm());
 
 Bankayı değiştirmek için `'garanti'` yerine `'akbank'` yazmak yeterlidir.
 
+Çalışan bir örnek uygulama için:
+**[Voxyfy/anadolupay-laravel](https://github.com/Voxyfy/anadolupay-laravel)**
+
 **Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
 kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
 uygulamanızın işi.
@@ -49,6 +52,7 @@ uygulamanızın işi.
 
 **İçindekiler**
 [Kurulum](#kurulum) ·
+[Örnek proje](https://github.com/Voxyfy/anadolupay-laravel) ·
 [Desteklenen bankalar](#desteklenen-bankalar) ·
 [Nasıl çalışır](#nasıl-çalışır) ·
 [Yapılandırma](#yapılandırma) ·
@@ -74,6 +78,10 @@ php artisan vendor:publish --tag="anadolupay-config"
 ```
 
 PHP 8.2+, Laravel 12 veya 13. Auto-discovery açıktır, ek adım yoktur.
+
+Uçtan uca kurulmuş bir Laravel projesi görmek isterseniz
+[anadolupay-laravel](https://github.com/Voxyfy/anadolupay-laravel) deposu
+ödeme başlatma, 3D dönüşü ve iade akışlarını örnekliyor.
 
 ## Desteklenen bankalar
 
