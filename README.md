@@ -66,6 +66,7 @@ uygulamanızın işi.
 [Event'ler](#eventler) ·
 [Loglama](#loglama) ·
 [Test ortamı](#test-ortamı) ·
+[Test kartları](TEST-KARTLARI.md) ·
 [Güvenlik](#güvenlik) ·
 [Yeni banka eklemek](#yeni-banka-eklemek) ·
 [Yol haritası](#yol-haritası)
@@ -719,6 +720,11 @@ AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
 
 ## Test ortamı
 
+Test kartları için ayrı bir belge var:
+**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti ve PayTR'nin resmî
+listeleri (hata senaryosu kartları dahil), diğer bankalar için kartı nereden
+alacağınız.
+
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
 değiştirin ve `*_TEST_MODE=true` yapın.
@@ -773,6 +779,8 @@ isterseniz:
 ```php
 config(['anadolupay.fake.success_rate' => 0]);  // her zaman başarısız
 ```
+
+Gerçek kartlarla denemek isterseniz [TEST-KARTLARI.md](TEST-KARTLARI.md).
 
 ## Güvenlik
 
