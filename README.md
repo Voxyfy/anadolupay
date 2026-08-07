@@ -57,6 +57,8 @@ uygulamanızın işi.
 [Ödeme modelleri](#ödeme-modelleri) ·
 [Tutarlar](#tutarlar) ·
 [Bankaların tuhaflıkları](#bankaların-tuhaflıkları) ·
+[Hata yönetimi](#hata-yönetimi-ve-yeniden-deneme) ·
+[Event'ler](#eventler) ·
 [Loglama](#loglama) ·
 [Test ortamı](#test-ortamı) ·
 [Güvenlik](#güvenlik) ·
@@ -409,6 +411,111 @@ sıralanır, `hash`/`encoding`/`nationalidno` çıkarılır, sona secret key ekl
 `|` ve `\` karakterleri kaçırılır. Forma yeni bir alan eklerseniz hash'e de
 girer — banka bunu bilmiyorsa işlem reddedilir.
 
+## Hata yönetimi ve yeniden deneme
+
+Ödeme entegrasyonlarında en tehlikeli hata, **belirsiz** olandır. Banka
+"reddettim" derse ne yapacağınız bellidir; ama istek zaman aşımına uğradığında
+paranın çekilip çekilmediğini bilmezsiniz. Paket bu ikisini tip düzeyinde ayırır:
+
+```
+AnadoluPayException
+├── PaymentFailedException        kesin: banka isteği aldı ve reddetti
+├── InvalidSignatureException     imza tutmadı — sahte callback olabilir
+├── DuplicatePaymentException     aynı sipariş için ikinci deneme
+├── UnsupportedOperationException driver bu işlemi desteklemiyor
+├── DriverNotFoundException       yapılandırma hatası
+└── TransportException            BELİRSİZ: istek ulaştı mı, işlendi mi?
+    ├── GatewayUnreachableException   bağlantı kurulamadı / zaman aşımı
+    └── GatewayHttpException          2xx dışı yanıt veya çözümlenemeyen gövde
+```
+
+`TransportException` yakaladığınızda ödemeyi başarısız saymayın — durumu
+banka üzerinden sorgulayın veya müşteriye "işleminiz kontrol ediliyor" deyin.
+
+```php
+use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Exceptions\TransportException;
+
+try {
+    $result = AnadoluPay::driver('garanti')->verify($data);
+} catch (PaymentFailedException $e) {
+    // Kesin ret: siparişi iptal edebilirsiniz.
+} catch (TransportException $e) {
+    // Belirsiz: siparişi "beklemede" bırakın, durum sorgusuyla teyit edin.
+    $e->safeToRetry;  // yalnızca isteğin bankaya ulaşmadığı kesinse true
+}
+```
+
+### Yeniden deneme
+
+```env
+ANADOLUPAY_RETRY_TIMES=2
+ANADOLUPAY_RETRY_SLEEP_MS=250
+```
+
+Retry **yalnızca bankaya ulaşılamayan** durumlarda yapılır: bağlantı
+reddedildi, DNS çözülemedi, TLS kurulamadı. Bu hatalarda isteğin bankaya
+varmadığı bilinir.
+
+**Zaman aşımı ve HTTP hataları tekrar denenmez.** Her ikisinde de istek bankaya
+ulaşmış ve işlenmiş olabilir; körlemesine ikinci bir ödeme isteği göndermek
+çift çekim demektir. Bu davranış testle kilitlidir.
+
+Varsayılan `0`dır — yani retry kapalıdır. Açmadan önce sipariş durumunu kendi
+tarafınızda takip ettiğinizden emin olun.
+
+## Event'ler
+
+Ödeme akışının dört noktasında event yayınlanır. **Hiçbiri kart verisi
+taşımaz**, çünkü dinleyicilerin çoğu bu veriyi loglar veya kuyruğa yazar.
+
+| Event | Ne zaman | Taşıdığı |
+|---|---|---|
+| `PaymentInitiated` | müşteri bankaya yönlendirilmeden önce | driver, orderId, `Money`, model, taksit |
+| `PaymentVerified` | dönüş doğrulanıp provizyon tamamlanınca | driver, orderId, paymentId, success, status |
+| `PaymentFailed` | akış bir istisnayla kesilince | driver, orderId, reason, exception |
+| `RefundIssued` | iade isteği gönderilince | driver, paymentId, `Money`, refundId, success |
+
+```php
+Event::listen(PaymentVerified::class, function (PaymentVerified $event) {
+    if ($event->success) {
+        Order::where('code', $event->orderId)->update([
+            'status' => 'paid',
+            'payment_reference' => $event->paymentId,
+        ]);
+    }
+});
+```
+
+`PaymentVerified` `success: false` ile de gelebilir — bu, doğrulama akışının
+hatasız tamamlandığı ama ödemenin alınmadığı anlamına gelir. `PaymentFailed`
+ise akışın kesildiği durumdur; istisna yutulmaz, event'ten sonra yukarı çıkar.
+
+`ANADOLUPAY_EVENTS=false` ile kapatılabilir.
+
+## Mükerrer ödeme koruması
+
+```env
+ANADOLUPAY_IDEMPOTENCY=true
+ANADOLUPAY_IDEMPOTENCY_TTL=30
+```
+
+Aynı sipariş numarası için pencere içinde ikinci bir `createPayment()`
+çağrısı `DuplicatePaymentException` fırlatır. Asıl hedef kullanıcının "Öde"
+düğmesine iki kez basmasıdır.
+
+Pencere bilinçli olarak kısadır (varsayılan 30 sn): ödeme gerçekten başarısız
+olduğunda müşterinin aynı sipariş numarasıyla tekrar denemesi meşrudur.
+Başlatma isteği hata alırsa kilit hemen bırakılır.
+
+Kilit `Cache::add()` ile alınır — atomiktir, yani iki eşzamanlı istekten
+yalnızca biri geçer. Bunun çalışması için `array` dışında bir cache sürücüsü
+(redis, memcached, database) gerekir.
+
+> Bu bir kolaylıktır, kesin garanti değildir. Mükerrer çekime karşı asıl
+> savunma, siparişin durumunu kendi veritabanınızda tutmak ve ödemesi alınmış
+> siparişler için akışı hiç başlatmamaktır.
+
 ## Loglama
 
 Banka bir işlemi reddettiğinde size yalnızca bir kod döner
@@ -594,13 +701,11 @@ uç nokta gerekir.
 ### Altyapı
 
 - [x] ~~PSR-3 loglama (maskeli)~~ — bkz. [Loglama](#loglama)
-- [ ] Event'ler: `PaymentInitiated`, `PaymentVerified`, `PaymentFailed`,
-      `RefundIssued`.
-- [ ] Idempotency — aynı `orderId` ile ikinci `createPayment()` çağrısına karşı
-      koruma yok.
-- [ ] Retry politikası — timeout var (30 sn), yeniden deneme yok.
-- [ ] Hata sınıflandırması — ağ/HTTP hatası ile bankanın iş kuralı reddi şu an
-      ikisi de `PaymentFailedException`.
+- [x] ~~Event'ler~~ — bkz. [Event'ler](#eventler)
+- [x] ~~Idempotency~~ — bkz. [Mükerrer ödeme koruması](#mükerrer-ödeme-koruması)
+- [x] ~~Retry politikası~~ — bkz. [Hata yönetimi ve yeniden deneme](#hata-yönetimi-ve-yeniden-deneme)
+- [x] ~~Hata sınıflandırması~~ — `TransportException` ile `PaymentFailedException`
+      artık ayrı; aynı bölüme bakın.
 
 ## Katkı
 

@@ -252,7 +252,7 @@ class AkbankPosGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade (txnCode 1002).
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         return $this->mapReversal($this->postJson([
             'terminal' => [

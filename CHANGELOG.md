@@ -23,11 +23,31 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Eklendi
 
+* **Hata sınıflandırması.** `TransportException` (ve alt tipleri
+  `GatewayUnreachableException`, `GatewayHttpException`) bankanın kesin
+  reddi olan `PaymentFailedException`'dan ayrıldı. Taşıma hataları
+  `safeToRetry` bayrağı taşır; zaman aşımı ve HTTP hataları isteğin bankaya
+  ulaşmış olabileceği için tekrar denenemez olarak işaretlenir.
+* **Yeniden deneme** (`anadolupay.retry`). Yalnızca bankaya ulaşılamayan
+  durumlarda çalışır; zaman aşımı ve HTTP hataları çift çekim riski
+  taşıdığı için tekrar denenmez. Varsayılan kapalı.
+* **Event'ler** (`anadolupay.events`): `PaymentInitiated`, `PaymentVerified`,
+  `PaymentFailed`, `RefundIssued`. Kart verisi taşımazlar.
+* **Mükerrer ödeme koruması** (`anadolupay.idempotency`). Aynı sipariş
+  numarası için kısa bir pencerede ikinci ödeme başlatmayı engeller;
+  atomik cache kilidi kullanır. Varsayılan kapalı.
 * **`Money` value object.** Tutarlar artık paket içinde kuruş cinsinden tam
   sayı olarak taşınır; float aritmetiği ödeme yolundan çıkarıldı.
   `CreatePaymentData` ve `RefundPaymentData` hem `Money` hem `float` kabul
   eder, mevcut çağrılar değişmeden çalışır.
 * **iyzico iadesi** — `/v2/payment/refund` ile tam ve kısmi iade.
+
+### Değişti
+
+* `createPayment()`, `verify()` ve `refund()` artık `final`; bankaya özel
+  davranış `performCreatePayment()`, `performVerify()` ve `performRefund()`
+  metotlarında yaşıyor. Böylece idempotency, event yayını ve hata sarmalama
+  tek yerde duruyor ve driver override'ları bunları atlayamıyor.
 
 ### Düzeltildi — güvenlik
 
@@ -45,6 +65,9 @@ All notable changes to `voxyfy/anadolupay` will be documented in this file.
 
 ### Düzeltildi
 
+* `BankHttpClient` 2xx dışı bir yanıtın düz metin gövdesini query string
+  sanıp **başarılı sonuç gibi** döndürebiliyordu; durum kodu artık
+  çözümleme denemesinden önce kontrol ediliyor.
 * `IyzicoMapper` kart bilgisini yalnızca eski `customer['card']` dizisinden
   okuyordu; birinci sınıf `CardData` alanı yok sayılıyordu.
 

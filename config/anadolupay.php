@@ -60,6 +60,63 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Event'ler
+    |--------------------------------------------------------------------------
+    |
+    | PaymentInitiated, PaymentVerified, PaymentFailed ve RefundIssued
+    | event'leri yayınlanır. Kart verisi taşımazlar.
+    |
+    */
+
+    'events' => [
+        'enabled' => env('ANADOLUPAY_EVENTS', true),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Yeniden Deneme
+    |--------------------------------------------------------------------------
+    |
+    | Retry YALNIZCA bankaya ulaşılamayan durumlarda (bağlantı kurulamadı,
+    | DNS çözülemedi) yapılır. Zaman aşımı ve HTTP hataları tekrar
+    | DENENMEZ: bu durumlarda istek bankaya ulaşmış ve işlenmiş olabilir,
+    | körlemesine tekrar denemek çift çekim üretir.
+    |
+    | Varsayılan 0'dır. Açmadan önce sipariş durumunu kendi tarafınızda
+    | takip ettiğinizden emin olun.
+    |
+    */
+
+    'retry' => [
+        'times' => env('ANADOLUPAY_RETRY_TIMES', 0),
+        'sleep_ms' => env('ANADOLUPAY_RETRY_SLEEP_MS', 250),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mükerrer Ödeme Koruması
+    |--------------------------------------------------------------------------
+    |
+    | Aynı sipariş numarası için kısa bir pencere içinde ikinci bir ödeme
+    | başlatılmasını engeller; asıl hedef çift tıklamayı yakalamaktır.
+    |
+    | Pencere bilinçli olarak kısadır: ödeme gerçekten başarısız olduğunda
+    | müşterinin aynı sipariş numarasıyla tekrar denemesi meşrudur.
+    |
+    | Atomik kilit için `array` dışında bir cache sürücüsü gerekir.
+    |
+    */
+
+    'idempotency' => [
+        'enabled' => env('ANADOLUPAY_IDEMPOTENCY', false),
+        'ttl' => env('ANADOLUPAY_IDEMPOTENCY_TTL', 30),
+        // Boş bırakılırsa uygulamanın varsayılan cache sürücüsü kullanılır.
+        'store' => env('ANADOLUPAY_IDEMPOTENCY_STORE'),
+        'prefix' => 'anadolupay:payment:',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Banka Sanal POS Preset'leri
     |--------------------------------------------------------------------------
     |

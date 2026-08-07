@@ -223,7 +223,7 @@ class AssecoGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade. Tutar verilmezse banka tam iade uygular.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $request = $this->accountData() + [
             'Type' => 'Credit',

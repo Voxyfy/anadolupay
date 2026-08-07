@@ -282,7 +282,7 @@ class PosNetV1Gateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         return $this->mapReversal($this->postJson('Return', $this->reversalRequest($data, 'Sale')));
     }

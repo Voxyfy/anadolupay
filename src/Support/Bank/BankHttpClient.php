@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Support\Bank;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Psr\Log\LoggerInterface;
+use Voxyfy\AnadoluPay\Exceptions\GatewayHttpException;
+use Voxyfy\AnadoluPay\Exceptions\GatewayUnreachableException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 
 /**
@@ -31,6 +34,11 @@ class BankHttpClient
      * @param  bool  $verifySsl  TLS sertifikası doğrulansın mı (canlıda daima true olmalı)
      * @param  LoggerInterface|null  $logger  Verilirse istek/yanıt loglanır
      * @param  string  $bank  Log kayıtlarında görünen banka anahtarı
+     * @param  int  $retryTimes  Yalnızca bankaya **ulaşılamayan** durumlarda
+     *                           yapılacak deneme sayısı. Zaman aşımı ve HTTP
+     *                           hataları tekrar denenmez; istek bankaya ulaşmış
+     *                           olabileceği için çift çekim riski taşırlar.
+     * @param  int  $retrySleepMs  Denemeler arası bekleme (ms)
      */
     public function __construct(
         private readonly int $timeout = 30,
@@ -38,6 +46,8 @@ class BankHttpClient
         private readonly ?LoggerInterface $logger = null,
         private readonly string $bank = 'unknown',
         ?SensitiveDataScrubber $scrubber = null,
+        private readonly int $retryTimes = 0,
+        private readonly int $retrySleepMs = 250,
     ) {
         $this->scrubber = $scrubber ?? new SensitiveDataScrubber;
     }
@@ -119,10 +129,11 @@ class BankHttpClient
     {
         $this->logRequest($url, http_build_query($this->scrubber->scrubArray($fields)), scrubbed: true);
 
-        $startedAt = microtime(true);
-        $response = $this->request($headers)->asForm()->post($url, $fields);
-
-        $this->logResponse($url, $response, $startedAt);
+        $response = $this->dispatch(
+            $url,
+            fn (PendingRequest $request) => $request->asForm()->post($url, $fields),
+            $headers,
+        );
 
         return $this->decode($response, $url);
     }
@@ -151,10 +162,12 @@ class BankHttpClient
     {
         $this->logRequest($url, $body);
 
-        $startedAt = microtime(true);
-        $response = $this->request($headers)->withBody($body, $headers['Content-Type'] ?? 'text/plain')->post($url);
-
-        $this->logResponse($url, $response, $startedAt);
+        $contentType = $headers['Content-Type'] ?? 'text/plain';
+        $response = $this->dispatch(
+            $url,
+            fn (PendingRequest $request) => $request->withBody($body, $contentType)->post($url),
+            $headers,
+        );
 
         return $this->decode($response, $url);
     }
@@ -179,14 +192,14 @@ class BankHttpClient
 
         $this->logRequest($url, $body);
 
-        $startedAt = microtime(true);
-        $response = $this->request($headers + [
-            'Content-Type' => 'application/xml; charset='.strtolower($encoding),
-        ])->withBody($body, 'application/xml')->post($url);
-
-        // Yanıt bir HTML sayfası; gövdesini loglamak hem gereksiz hem çok
-        // hacimli olacağı için yalnızca boyutunu kaydediyoruz.
-        $this->logResponse($url, $response, $startedAt, logBody: false);
+        $response = $this->dispatch(
+            $url,
+            fn (PendingRequest $request) => $request->withBody($body, 'application/xml')->post($url),
+            $headers + ['Content-Type' => 'application/xml; charset='.strtolower($encoding)],
+            // Yanıt bir HTML sayfası; gövdesini loglamak hem gereksiz hem çok
+            // hacimli olacağı için yalnızca boyutunu kaydediyoruz.
+            logBody: false,
+        );
 
         return $response->body();
     }
@@ -233,6 +246,74 @@ class BankHttpClient
     }
 
     /**
+     * İsteği gönderir, bağlantı hatalarını sınıflandırır ve yanıtı loglar.
+     *
+     * Retry yalnızca bankaya **ulaşılamayan** durumlarda yapılır. Zaman
+     * aşımında istek bankaya varmış ve işlenmiş olabileceği için tekrar
+     * denemek çift çekim üretir; bu yüzden zaman aşımı tekrar denenmez.
+     *
+     * @param  callable(PendingRequest): Response  $send
+     * @param  array<string, string>  $headers
+     *
+     * @throws GatewayUnreachableException
+     */
+    private function dispatch(string $url, callable $send, array $headers = [], bool $logBody = true): Response
+    {
+        $attempt = 0;
+
+        while (true) {
+            $attempt++;
+            $startedAt = microtime(true);
+
+            try {
+                $response = $send($this->request($headers));
+            } catch (ConnectionException $exception) {
+                $timedOut = $this->isTimeout($exception);
+
+                if (! $timedOut && $attempt <= $this->retryTimes) {
+                    $this->logger?->warning('AnadoluPay banka bağlantısı başarısız, yeniden denenecek', [
+                        'bank' => $this->bank,
+                        'url' => $url,
+                        'attempt' => $attempt,
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    usleep($this->retrySleepMs * 1000);
+
+                    continue;
+                }
+
+                throw $timedOut
+                    ? GatewayUnreachableException::timedOut($this->bank, $url, $this->timeout, previous: $exception)
+                    : GatewayUnreachableException::connectionFailed($this->bank, $url, previous: $exception);
+            }
+
+            $this->logResponse($url, $response, $startedAt, $logBody);
+
+            return $response;
+        }
+    }
+
+    /**
+     * Bağlantı hatasının zaman aşımı kaynaklı olup olmadığını belirler.
+     *
+     * Guzzle zaman aşımını ayrı bir istisna tipiyle değil, mesaj içinde
+     * bildirir; bu yüzden mesaja bakmak zorundayız.
+     */
+    private function isTimeout(ConnectionException $exception): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        foreach (['timed out', 'timeout', 'operation too slow'] as $needle) {
+            if (str_contains($message, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param  array<string, string>  $headers
      */
     private function request(array $headers): PendingRequest
@@ -253,10 +334,7 @@ class BankHttpClient
 
         if ($body === '') {
             if (! $response->successful()) {
-                throw new PaymentFailedException(
-                    message: 'Banka isteği başarısız oldu.',
-                    context: ['status' => $response->status(), 'url' => $url],
-                );
+                throw GatewayHttpException::unexpectedStatus($this->bank, $url, $response->status());
             }
 
             return [];
@@ -274,18 +352,24 @@ class BankHttpClient
             return Xml::decode($body);
         }
 
+        // Gövde bankanın kendi protokolünde (JSON/XML) geldiyse yukarıda
+        // çözümlendi ve hata kodu driver tarafından eşlenecek. Buraya
+        // düşen bir gövde çözümlenememiş demektir; durum kodu 2xx değilse
+        // bunu query string sanıp başarılı bir yanıt gibi döndürmemeliyiz.
+        if (! $response->successful()) {
+            throw GatewayHttpException::unexpectedStatus(
+                $this->bank,
+                $url,
+                $response->status(),
+                $this->scrubber->scrubBody($body),
+            );
+        }
+
         // Bazı bankalar (örn. PayTR bin sorgusu) düz metin/query string döner.
         parse_str($body, $parsed);
 
         if ($parsed !== [] && ! isset($parsed[$body])) {
             return $parsed;
-        }
-
-        if (! $response->successful()) {
-            throw new PaymentFailedException(
-                message: 'Banka isteği başarısız oldu.',
-                context: ['status' => $response->status(), 'url' => $url, 'body' => mb_substr($body, 0, 2000)],
-            );
         }
 
         return ['raw_body' => $body];

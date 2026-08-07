@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Support;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Psr\Log\LoggerInterface;
+use Voxyfy\AnadoluPay\Exceptions\GatewayHttpException;
+use Voxyfy\AnadoluPay\Exceptions\GatewayUnreachableException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Support\Bank\SensitiveDataScrubber;
 
@@ -60,16 +63,22 @@ class IyzicoHttpClient
 
         $startedAt = microtime(true);
 
-        $response = Http::baseUrl($this->baseUrl)
-            ->timeout($this->timeout)
-            ->withHeaders([
-                'Authorization' => $this->authorizationHeader($path, $body, $randomKey),
-                'x-iyzi-rnd' => $randomKey,
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json',
-            ])
-            ->withBody($body, 'application/json')
-            ->post($path);
+        try {
+            $response = Http::baseUrl($this->baseUrl)
+                ->timeout($this->timeout)
+                ->withHeaders([
+                    'Authorization' => $this->authorizationHeader($path, $body, $randomKey),
+                    'x-iyzi-rnd' => $randomKey,
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ])
+                ->withBody($body, 'application/json')
+                ->post($path);
+        } catch (ConnectionException $exception) {
+            throw str_contains(strtolower($exception->getMessage()), 'time')
+                ? GatewayUnreachableException::timedOut('iyzico', $path, $this->timeout, previous: $exception)
+                : GatewayUnreachableException::connectionFailed('iyzico', $path, previous: $exception);
+        }
 
         $this->logger?->debug('AnadoluPay iyzico yanıtı', [
             'path' => $path,
@@ -79,26 +88,21 @@ class IyzicoHttpClient
         ]);
 
         if (! $response->successful()) {
-            throw new PaymentFailedException(
-                message: 'iyzico API isteği başarısız oldu.',
-                context: [
-                    'status' => $response->status(),
-                    'path' => $path,
-                    'body' => $this->scrubber->scrubBody($response->body()),
-                ],
+            throw GatewayHttpException::unexpectedStatus(
+                'iyzico',
+                $path,
+                $response->status(),
+                $this->scrubber->scrubBody($response->body()),
             );
         }
 
         $decoded = $response->json();
 
         if (! is_array($decoded)) {
-            throw new PaymentFailedException(
-                message: 'iyzico API geçersiz JSON döndü.',
-                context: [
-                    'status' => $response->status(),
-                    'path' => $path,
-                    'body' => $this->scrubber->scrubBody($response->body()),
-                ],
+            throw GatewayHttpException::unreadableBody(
+                'iyzico',
+                $path,
+                $this->scrubber->scrubBody($response->body()),
             );
         }
 

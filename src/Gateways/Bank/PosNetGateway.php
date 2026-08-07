@@ -101,7 +101,7 @@ class PosNetGateway extends AbstractBankGateway
      * ile çözülmesi, ardından `mac` kontrolünden sonra `oosTranData` ile
      * provizyonun tamamlanması gerekir.
      */
-    public function verify(VerifyPaymentData $data): VerificationResponse
+    protected function performVerify(VerifyPaymentData $data): VerificationResponse
     {
         $payload = $data->payload;
 
@@ -257,7 +257,7 @@ class PosNetGateway extends AbstractBankGateway
      * PosNet iadeyi tercihen `hostLogKey` ile eşler; verilmezse sipariş
      * numarası kullanılır (3D siparişlerde 'TDSC' ön ekiyle).
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $transaction = [
             'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),

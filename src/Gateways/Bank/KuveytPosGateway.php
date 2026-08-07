@@ -55,7 +55,7 @@ class KuveytPosGateway extends AbstractBankGateway
     /**
      * 3D adımında banka hazır HTML döndürür.
      */
-    public function createPayment(CreatePaymentData $data): PaymentResponse
+    protected function performCreatePayment(CreatePaymentData $data): PaymentResponse
     {
         if ($data->paymentModel === CreatePaymentData::MODEL_NON_SECURE) {
             return $this->nonSecurePayment($data);
@@ -137,7 +137,7 @@ class KuveytPosGateway extends AbstractBankGateway
     /**
      * Banka dönüşünü çözer ve provizyonu tamamlar.
      */
-    public function verify(VerifyPaymentData $data): VerificationResponse
+    protected function performVerify(VerifyPaymentData $data): VerificationResponse
     {
         $encoded = $this->pick($data->payload, ['AuthenticationResponse']);
 

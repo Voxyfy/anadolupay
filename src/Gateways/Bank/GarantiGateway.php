@@ -255,7 +255,7 @@ class GarantiGateway extends AbstractBankGateway
      *
      *     new RefundPaymentData('ORDER-1', 19.90, metadata: ['ref_ret_num' => '...'])
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         return $this->reversal($data, 'refund');
     }

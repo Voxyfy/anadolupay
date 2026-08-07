@@ -49,7 +49,7 @@ class PayFlexGateway extends AbstractBankGateway
     /**
      * 3D formu MPI'dan alınan ACS bilgileriyle üretilir.
      */
-    public function createPayment(CreatePaymentData $data): PaymentResponse
+    protected function performCreatePayment(CreatePaymentData $data): PaymentResponse
     {
         if ($data->paymentModel === CreatePaymentData::MODEL_NON_SECURE) {
             return $this->nonSecurePayment($data);
@@ -149,7 +149,7 @@ class PayFlexGateway extends AbstractBankGateway
      *         'card' => ['number' => '...', 'expire_month' => '01', ...],
      *     ]);
      */
-    public function verify(VerifyPaymentData $data): VerificationResponse
+    protected function performVerify(VerifyPaymentData $data): VerificationResponse
     {
         $payload = $data->payload;
 
@@ -238,7 +238,7 @@ class PayFlexGateway extends AbstractBankGateway
      * PayFlex iadeyi orijinal işlemin `TransactionId` değeriyle eşler;
      * bu değeri `metadata['transaction_id']` ile geçin.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $request = [
             'MerchantId' => $this->config->merchantId,

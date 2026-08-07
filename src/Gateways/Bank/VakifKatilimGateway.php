@@ -35,7 +35,7 @@ class VakifKatilimGateway extends AbstractBankGateway
     /**
      * 3D formunu bankadan alır; Vakıf Katılım da hazır HTML döner.
      */
-    public function createPayment(CreatePaymentData $data): PaymentResponse
+    protected function performCreatePayment(CreatePaymentData $data): PaymentResponse
     {
         if ($data->paymentModel === CreatePaymentData::MODEL_NON_SECURE) {
             return $this->nonSecurePayment($data);
@@ -219,7 +219,7 @@ class VakifKatilimGateway extends AbstractBankGateway
      *
      * Bankanın işlem numarasını `metadata['remote_order_id']` ile geçin.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $operation = $data->money() !== null ? 'PartialDrawBack' : 'DrawBack';
 

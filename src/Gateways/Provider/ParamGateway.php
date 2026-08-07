@@ -37,7 +37,7 @@ class ParamGateway extends AbstractBankGateway
     /**
      * Param 3D Secure adımında hazır HTML döner.
      */
-    public function createPayment(CreatePaymentData $data): PaymentResponse
+    protected function performCreatePayment(CreatePaymentData $data): PaymentResponse
     {
         if ($data->paymentModel === CreatePaymentData::MODEL_NON_SECURE) {
             return $this->nonSecurePayment($data);
@@ -251,7 +251,7 @@ class ParamGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade. Param iptal ve iadeyi aynı serviste yürütür.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $request = $this->accountData() + [
             '@xmlns' => self::NAMESPACE,

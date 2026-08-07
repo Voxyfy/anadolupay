@@ -34,7 +34,7 @@ class ToslaGateway extends AbstractBankGateway
     /**
      * Tosla'da form alanları, önce alınan 3D oturumundan üretilir.
      */
-    public function createPayment(CreatePaymentData $data): PaymentResponse
+    protected function performCreatePayment(CreatePaymentData $data): PaymentResponse
     {
         if ($data->paymentModel === CreatePaymentData::MODEL_NON_SECURE) {
             return $this->nonSecurePayment($data);
@@ -243,7 +243,7 @@ class ToslaGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $request = $this->accountData() + [
             'orderId' => $data->paymentId,

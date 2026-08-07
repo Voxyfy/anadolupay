@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways;
 
+use Illuminate\Support\Facades\Event;
+use Throwable;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\PaymentResponse;
@@ -11,7 +13,12 @@ use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
+use Voxyfy\AnadoluPay\Events\PaymentFailed;
+use Voxyfy\AnadoluPay\Events\PaymentInitiated;
+use Voxyfy\AnadoluPay\Events\PaymentVerified;
+use Voxyfy\AnadoluPay\Events\RefundIssued;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
+use Voxyfy\AnadoluPay\Support\IdempotencyGuard;
 use Voxyfy\AnadoluPay\Support\IyzicoHttpClient;
 use Voxyfy\AnadoluPay\Support\IyzicoMapper;
 use Voxyfy\AnadoluPay\Support\IyzicoSignatureValidator;
@@ -38,6 +45,7 @@ class IyzicoGateway implements PaymentGatewayInterface
         private readonly IyzicoHttpClient $client,
         private readonly IyzicoMapper $mapper,
         private readonly IyzicoSignatureValidator $validator,
+        private readonly ?IdempotencyGuard $idempotency = null,
     ) {}
 
     public static function fromConfig(): self
@@ -60,7 +68,7 @@ class IyzicoGateway implements PaymentGatewayInterface
             signatureParam: (string) ($config['signature_param'] ?? 'signature'),
         );
 
-        return new self($client, new IyzicoMapper, $validator);
+        return new self($client, new IyzicoMapper, $validator, IdempotencyGuard::fromConfig());
     }
 
     /**
@@ -70,6 +78,27 @@ class IyzicoGateway implements PaymentGatewayInterface
      * bunu sizin için yapar.
      */
     public function createPayment(CreatePaymentData $data): PaymentResponse
+    {
+        $this->idempotency?->acquire('iyzico', $data->orderId);
+
+        try {
+            $response = $this->initialize($data);
+        } catch (Throwable $exception) {
+            $this->idempotency?->release('iyzico', $data->orderId);
+            $this->dispatch(PaymentFailed::from('iyzico', $data->orderId, $exception));
+
+            throw $exception;
+        }
+
+        $this->dispatch(PaymentInitiated::from('iyzico', $data, $response));
+
+        return $response;
+    }
+
+    /**
+     * 3DS başlatma isteğini gönderir ve HTML içeriğini çözer.
+     */
+    protected function initialize(CreatePaymentData $data): PaymentResponse
     {
         $callbackUrl = (string) config('anadolupay.iyzico.callback_url');
         $payload = $this->mapper->to3dsInitializePayload($data, $callbackUrl);
@@ -106,11 +135,27 @@ class IyzicoGateway implements PaymentGatewayInterface
     {
         $payload = $data->payload;
 
-        if ($this->isWebhook($payload)) {
-            return $this->verifyWebhook($payload, $data->headers);
+        try {
+            $response = $this->isWebhook($payload)
+                ? $this->verifyWebhook($payload, $data->headers)
+                : $this->verifyCallback($payload);
+        } catch (Throwable $exception) {
+            $this->dispatch(PaymentFailed::from(
+                'iyzico',
+                isset($payload['conversationId']) ? (string) $payload['conversationId'] : null,
+                $exception,
+            ));
+
+            throw $exception;
         }
 
-        return $this->verifyCallback($payload);
+        $this->dispatch(PaymentVerified::from(
+            'iyzico',
+            $response,
+            isset($payload['conversationId']) ? (string) $payload['conversationId'] : null,
+        ));
+
+        return $response;
     }
 
     /**
@@ -188,6 +233,24 @@ class IyzicoGateway implements PaymentGatewayInterface
      */
     public function refund(RefundPaymentData $data): RefundResponse
     {
+        try {
+            $response = $this->performRefund($data);
+        } catch (Throwable $exception) {
+            $this->dispatch(PaymentFailed::from('iyzico', $data->paymentId, $exception));
+
+            throw $exception;
+        }
+
+        $this->dispatch(RefundIssued::from('iyzico', $data, $response));
+
+        return $response;
+    }
+
+    /**
+     * İade isteğini gönderir ve yanıt imzasını doğrular.
+     */
+    protected function performRefund(RefundPaymentData $data): RefundResponse
+    {
         $payload = array_filter([
             'locale' => (string) ($data->meta('locale') ?? 'tr'),
             'conversationId' => (string) ($data->meta('conversation_id') ?? $data->paymentId),
@@ -216,6 +279,16 @@ class IyzicoGateway implements PaymentGatewayInterface
             refundId: isset($response['paymentId']) ? (string) $response['paymentId'] : null,
             raw: $response,
         );
+    }
+
+    /**
+     * Event yayınlar. Yapılandırmadan kapatılabilir.
+     */
+    protected function dispatch(object $event): void
+    {
+        if ((bool) config('anadolupay.events.enabled', true)) {
+            Event::dispatch($event);
+        }
     }
 
     /**

@@ -54,7 +54,7 @@ class PayTrGateway extends AbstractBankGateway
      * düz metin `OK` bekler. Webhook rotanızın bunu döndürdüğünden
      * emin olun.
      */
-    public function verify(VerifyPaymentData $data): VerificationResponse
+    protected function performVerify(VerifyPaymentData $data): VerificationResponse
     {
         $payload = $data->payload;
 
@@ -176,7 +176,7 @@ class PayTrGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $fields = [
             'merchant_id' => $this->config->merchantId,

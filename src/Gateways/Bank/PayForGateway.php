@@ -209,7 +209,7 @@ class PayForGateway extends AbstractBankGateway
     /**
      * Tam veya kısmi iade.
      */
-    public function refund(RefundPaymentData $data): RefundResponse
+    protected function performRefund(RefundPaymentData $data): RefundResponse
     {
         $request = $this->accountData() + [
             'SecureType' => 'NonSecure',
