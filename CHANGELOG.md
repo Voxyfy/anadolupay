@@ -2,6 +2,10 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.0.8 - 2026-08-08
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.7...v1.0.8
+
 ## v1.0.7 - 2026-08-08
 
 ### What's Changed
