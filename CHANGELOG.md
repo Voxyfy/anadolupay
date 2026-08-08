@@ -4,6 +4,34 @@
 
 ## Yayımlanmamış
 
+### Eklendi — Paratika (Payten)
+
+* **Paratika driver'ı** (`paratika`). Dört ödeme modeli de destekleniyor:
+  3D Pay (`sale3d`), klasik 3D (`auth3d` + ayrı satış), 3D Host (ortak ödeme
+  sayfası) ve non-secure. Ayrıca ön provizyon/kapama, iptal, tam ve kısmi
+  iade, durum sorgusu, işlem dökümü, BIN sorgusu ve taksit sorgulama.
+* Akış her modelde oturum anahtarıyla (`SESSIONTOKEN`) başlar; paket bunu
+  kendisi alır.
+* `TEST-KARTLARI.md` dosyasına Paratika'nın resmî test kartları eklendi.
+
+**Dikkat edilmesi gereken iki davranış:**
+
+* **Dönüş imzasında iki alan gelir.** `SD_SHA512` dokümanda "Deprecated /
+  Legacy — Do not use!" işaretlidir ama örnek yanıtlarda önce göründüğü için
+  yaygın biçimde yanlışlıkla kullanılıyor. Driver güncel olan `sdSha512`
+  alanını doğrular; eskisi doğru olsa bile yenisi tutmuyorsa dönüş
+  reddedilir.
+* **Durum sorgusu tek bir kayıt değil, işlem listesi döndürür.** İade
+  edilmiş bir satışın kendi kaydı hâlâ `AP` (onaylı) görünür; yalnızca ona
+  bakan bir eşleme iade edilmiş siparişi "ödendi" sanır. Driver listenin
+  tamamını yorumluyor: tam iade `refunded`, kısmi iade `paid` +
+  `refundedAmount`, iptal `cancelled`, kapatılmamış ön provizyon
+  `pre_authorized`.
+
+Paratika istek imzası kullanmaz; kimlik doğrulama her isteğe eklenen
+`MERCHANT` / `MERCHANTUSER` / `MERCHANTPASSWORD` alanlarıdır. `secret_key`
+yalnızca 3D dönüşünü doğrulamak için gerekir.
+
 ### Eklendi — Moka United
 
 * **Moka United driver'ı** (`moka`). 3D Secure ve non-secure ödeme, ön

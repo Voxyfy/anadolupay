@@ -15,6 +15,7 @@ use Voxyfy\AnadoluPay\Gateways\Provider\AkbankPosGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\CraftgateGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\MokaGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
+use Voxyfy\AnadoluPay\Gateways\Provider\ParatikaGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\PayTrGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
 
@@ -473,6 +474,28 @@ return [
                 'payment_api' => env('TOSLA_PAYMENT_API', 'https://entegrasyon.tosla.com/api/Payment'),
                 'gateway_3d' => env('TOSLA_GATEWAY_3D', 'https://entegrasyon.tosla.com/api/Payment/ProcessCardForm'),
                 'gateway_3d_host' => env('TOSLA_GATEWAY_3D_HOST', 'https://entegrasyon.tosla.com/api/Payment/threeDSecure'),
+            ],
+        ],
+
+        'paratika' => [
+            'gateway' => ParatikaGateway::class,
+            // Paratika terminolojisi: merchant_id => MERCHANT,
+            // username => Merchant Api User e-postası, password => şifresi.
+            // secret_key yalnızca 3D dönüş imzasını doğrulamak için kullanılır.
+            'merchant_id' => env('PARATIKA_MERCHANT'),
+            'username' => env('PARATIKA_MERCHANT_USER'),
+            'password' => env('PARATIKA_MERCHANT_PASSWORD'),
+            'secret_key' => env('PARATIKA_SECRET_KEY'),
+            'test_mode' => env('PARATIKA_TEST_MODE', false),
+            'endpoints' => [
+                // Test ortamı: https://entegrasyon.paratika.com.tr
+                'payment_api' => env('PARATIKA_PAYMENT_API', 'https://vpos.paratika.com.tr/paratika/api/v2'),
+                // 3D Pay: doğrulama ve satış tek adımda.
+                'gateway_3d' => env('PARATIKA_GATEWAY_3D', 'https://vpos.paratika.com.tr/paratika/api/v2/post/sale3d'),
+                // Klasik 3D: yalnızca kimlik doğrulama, satış dönüşte yapılır.
+                'gateway_3d_auth' => env('PARATIKA_GATEWAY_3D_AUTH', 'https://vpos.paratika.com.tr/paratika/api/v2/post/auth3d'),
+                // Ortak ödeme sayfası.
+                'gateway_3d_host' => env('PARATIKA_GATEWAY_3D_HOST', 'https://vpos.paratika.com.tr/payment'),
             ],
         ],
 

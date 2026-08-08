@@ -155,6 +155,64 @@ işyeri paketine bakın.
 
 ---
 
+## Paratika (Payten)
+
+**Kaynak:** [docs.paratika.com.tr/test-kartlari](https://docs.paratika.com.tr/test-kartlari) — resmî, giriş gerektirmez
+
+| Banka | Kart numarası | SKT | CVV |
+|---|---|---|---|
+| Ziraat | `4546711234567894` | 12/2026 | 000 |
+| Ziraat | `5401341234567891` | 12/2026 | 000 |
+| Akbank | `4355084355084358` | 12/2030 | 000 |
+| Akbank | `5571135571135575` | 12/2030 | 000 |
+| Akbank (Troy) | `9792072000017956` | 12/2027 | 000 |
+| TEB | `4402934402934406` | 12/2030 | 000 |
+| TEB | `5101385101385104` | 12/2030 | 000 |
+| Halkbank | `4920244920244921` | 12/2030 | 001 |
+| Halkbank | `5404355404355405` | 12/2030 | 001 |
+| QNB Finansbank | `4022774022774026` | 12/2030 | 000 |
+| QNB Finansbank | `5456165456165454` | 12/2030 | 000 |
+| QNB Finansbank (Troy) | `9792350046201275` | 07/2027 | 993 |
+| İş Bankası | `4508034508034509` | 12/2030 | 000 |
+| İş Bankası | `5406675406675403` | 12/2030 | 000 |
+| Anadolubank | `4258464258464253` | 12/2030 | 000 |
+| Anadolubank | `5222405222405229` | 12/2030 | 000 |
+| ING | `4555714555714556` | 12/2030 | 000 |
+| ING | `5400245400245409` | 12/2030 | 000 |
+| Garanti | `4824892919057014` | 12/2025 | 067 |
+| Garanti | `5378297758742014` | 05/2025 | 467 |
+| Garanti (Troy) | `9792052565200010` | 01/2027 | 327 |
+| Yapı Kredi | `4506344103118942` | 12/2025 | 000 |
+| Yapı Kredi | `5400617004770430` | 12/2025 | 000 |
+| Yapı Kredi (Troy) | `6501617060023449` | 12/2026 | 000 |
+| VakıfBank | `4938460158754205` | 01/2024 | 715 |
+| VakıfBank | `4119790155203496` | 04/2024 | 579 |
+| Kuveyt Türk | `5188961939192544` | 06/2025 | 929 |
+| Türkiye Finans (Troy) | `9792182023832743` | 10/2028 | 878 |
+| Şekerbank (Troy) | `6501750104751517` | 12/2027 | 516 |
+| Alternatif Bank (Troy) | `36577312700094` | 12/2027 | 000 |
+| HSBC | `5100051016005572` | 01/2020 | 742 |
+
+Portaldaki tabloda Yapı Kredi için dört ayrı Visa, üç ayrı Master ve üç ayrı
+Troy kartı daha var; taksit ve puan senaryolarını denemek isterseniz tam
+listeye bakın. Bazı kartların son kullanma tarihi geçmiş (HSBC `01/2020`,
+VakıfBank `01/2024`) — bunlar tabloda öylece duruyor, çalışmayan kartla
+uğraşmayın.
+
+```env
+PARATIKA_PAYMENT_API=https://entegrasyon.paratika.com.tr/paratika/api/v2
+PARATIKA_GATEWAY_3D=https://entegrasyon.paratika.com.tr/paratika/api/v2/post/sale3d
+PARATIKA_GATEWAY_3D_AUTH=https://entegrasyon.paratika.com.tr/paratika/api/v2/post/auth3d
+PARATIKA_GATEWAY_3D_HOST=https://entegrasyon.paratika.com.tr/payment
+PARATIKA_TEST_MODE=true
+```
+
+> Test kimlik bilgileri açık değildir: Paratika panelinde hesap açıp
+> **Merchant Api User** oluşturmanız gerekir. `PARATIKA_SECRET_KEY` ayrı bir
+> değerdir ve yalnızca 3D dönüş imzasını doğrulamakta kullanılır.
+
+---
+
 ## Moka United
 
 **Kaynak:** [developer.mokaunited.com/home.php?page=test-kartlari](https://developer.mokaunited.com/home.php?page=test-kartlari) — resmî, giriş gerektirmez

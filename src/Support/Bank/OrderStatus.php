@@ -121,6 +121,21 @@ final class OrderStatus
     ];
 
     /**
+     * Paratika işlem durumları.
+     *
+     * `MR` (manuel inceleme) kasıtlı olarak `pending`dir: işlem henüz
+     * sonuçlanmamıştır, başarılı da başarısız da sayılamaz.
+     */
+    public const PARATIKA = [
+        'AP' => StatusResponse::STATUS_PAID,
+        'FA' => StatusResponse::STATUS_FAILED,
+        'VD' => StatusResponse::STATUS_CANCELLED,
+        'CA' => StatusResponse::STATUS_CANCELLED,
+        'IP' => StatusResponse::STATUS_PENDING,
+        'MR' => StatusResponse::STATUS_PENDING,
+    ];
+
+    /**
      * Banka kodunu normalleştirilmiş duruma çevirir.
      *
      * PHP sayısal dizgi anahtarlarını tam sayıya çevirdiği için sözlükler

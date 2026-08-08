@@ -123,6 +123,7 @@ ve kimlik bilgisidir.
 | `tosla` | Tosla (AkÖde) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `craftgate` | Craftgate | ✅ | — | — | ✅ | ✅ | — |
 | `moka` | Moka United | ✅ | — | — | ✅ | ✅ | ✅ |
+| `paratika` | Paratika (Payten) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `iyzico` | iyzico | ✅ | — | — | — | — | — |
 | `fake` | geliştirme için sahte driver | — | — | — | ✅ | ✅ | — |
 
@@ -151,7 +152,7 @@ CardData ──────────┘            │
                                  │  banka-özel eşleme
           ┌──────────────────────┼──────────────────────┐
           ▼                      ▼                      ▼
-   AssecoGateway          GarantiGateway         PosNetGateway   … (15 driver)
+   AssecoGateway          GarantiGateway         PosNetGateway   … (16 driver)
    sha512 + '|'           sha512 UPPER           sha256 + ';'
    CC5Request XML         GVPSRequest XML        posnetRequest XML
           │                      │                      │
@@ -396,6 +397,7 @@ if ($gateway instanceof SupportsStatusQuery) {
 | `tosla` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | `craftgate` | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
 | `moka` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| `paratika` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | `iyzico` | ✅ | — | — | — | ✅ | ✅ | — |
 
 Arayüzler: `SupportsStatusQuery`, `SupportsCancellation`,
@@ -541,6 +543,12 @@ düzelttiyse `ZIRAAT_KATILIM_VERIFY_HASH=true` yapın.
 
 **PayTR ve Moka bildirimi `OK` yanıtı bekler.** Webhook'unuz gövdede düz metin
 `OK` döndürmezse bildirim tekrar tekrar gönderilir (Moka iki kez daha dener).
+
+**Paratika iki hash alanı döndürür ve biri kullanımdan kalkmıştır.**
+`SD_SHA512` örnek yanıtlarda önce görünür ama dokümanda "Do not use!"
+işaretlidir; doğrusu `sdSha512`dir. Ayrıca durum sorgusu bir sipariş için
+**tüm** işlemleri döndürür; sadece satış kaydına bakarsanız iade edilmiş
+sipariş "ödendi" görünür.
 
 **Moka başarıyı ayrı bir alanda söylemez.** 3D dönüşündeki `resultCode`
 başarılı işlemlerde boş gelir; sonuç `hashValue` içindedir. Ödeme başlatılırken
@@ -737,6 +745,56 @@ AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
 ));
 ```
 
+## Paratika
+
+Paratika, NestPay driver'larının arkasındaki **Payten/Asseco**'nun kendi ödeme
+kuruluşudur. İstek imzası kullanmaz; kimlik doğrulama her isteğe eklenen üç
+alandır. İmza yalnızca 3D dönüşünde vardır.
+
+Akış her modelde bir **oturum anahtarıyla** başlar. Paket bunu sizin yerinize
+yapar; dört ödeme modeli dört farklı uca karşılık gelir:
+
+| Model | Ne olur |
+|---|---|
+| `3d_pay` | Tarayıcı `post/sale3d/{token}`a POST eder; Paratika hem 3D doğrulamayı hem satışı yapar |
+| `3d` | Tarayıcı `post/auth3d/{token}`a POST eder; yalnızca doğrulama yapılır, satış dönüşte tamamlanır |
+| `3d_host` | Müşteri Paratika'nın ödeme sayfasına yönlendirilir |
+| `regular` | Kart bilgisiyle doğrudan `SALE` |
+
+**Dönüş imzasında iki alan gelir ve biri tuzaktır.** Örnek yanıtlarda `SD_SHA512`
+önce görünür ama dokümanda "Deprecated / Legacy — Do not use!" diye
+işaretlidir. Paket güncel olanı doğrular:
+
+```
+sdSha512 = sha512_hex( merchantPaymentId|customerId|sessionToken|responseCode|random|secretKey )
+```
+
+`PARATIKA_SECRET_KEY`, API şifresinden farklı bir değerdir.
+
+**Durum sorgusu bir liste döndürür.** Paratika bir sipariş numarasına ait
+*tüm* işlemleri verir: satış, iade, iptal. İade edilmiş bir satışın kendi
+kaydı hâlâ `AP` (onaylı) görünür — tek kayda bakan entegrasyon iade edilmiş
+siparişi "ödendi" sanır. Paket listenin tamamını yorumlar: tam iade
+`refunded`, kısmi iade `paid` + `refundedAmount`, iptal `cancelled`.
+
+```php
+$status = AnadoluPay::driver('paratika')->status('SIPARIS-123');
+
+$status->isPaid();               // kısmi iadeden sonra da true
+$status->refundedAmount;         // Money|null
+```
+
+İade tutarı verilirse Paratika bunu kendi tarafında `PTREFUND` olarak
+kaydeder; ayrı bir aksiyon göndermeniz gerekmez.
+
+```env
+PARATIKA_MERCHANT=xxx
+PARATIKA_MERCHANT_USER=api@shop.test
+PARATIKA_MERCHANT_PASSWORD=xxx
+PARATIKA_SECRET_KEY=xxx
+PARATIKA_PAYMENT_API=https://entegrasyon.paratika.com.tr/paratika/api/v2
+```
+
 ## Moka United
 
 Moka'nın kimlik doğrulaması bir istek imzası değil, sabit bir paroladır:
@@ -854,9 +912,9 @@ olarak geçer.
 ## Test ortamı
 
 Test kartları için ayrı bir belge var:
-**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR, Craftgate
-ve Moka'nın resmî listeleri (hata senaryosu kartları dahil), diğer bankalar
-için kartı nereden alacağınız.
+**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR, Craftgate,
+Moka ve Paratika'nın resmî listeleri (hata senaryosu kartları dahil), diğer
+bankalar için kartı nereden alacağınız.
 
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
@@ -889,6 +947,7 @@ PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
 CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
 MOKA_PAYMENT_API=https://service.refmokaunited.com
+PARATIKA_PAYMENT_API=https://entegrasyon.paratika.com.tr/paratika/api/v2
 ```
 
 ### Sahte driver
@@ -1002,12 +1061,19 @@ uç nokta gerekir.
       Craftgate'in resmi istemci depolarındaki test vektörleriyle doğrulandı.
 - [x] ~~Moka United.~~ Dokümantasyonu tamamen açık; dönüş hash'i oradaki
       test vektörüyle kilitlendi.
+- [x] ~~Paratika (Payten).~~ Dokümantasyonu ve resmî örnek kodu açık.
+      Test vektörü yayınlanmadığı için imza formülü dokümana göre
+      uygulandı, ölçülmedi.
+- [ ] **Paycell** — protokol iki bağımsız açık kaynak uygulamadan
+      çıkarılabiliyor ama resmî doküman yok. Paycell test kimlik
+      bilgilerini herkese açık yayınladığı için sandbox'a karşı
+      doğrulanabilir; önce o deneme yapılmalı.
 - [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
       için bilinçli olarak eklenmedi.
 - [ ] ~~**PayU Türkiye**~~ — **eklenmeyecek.** PayU'nun Türkiye'deki ödeme
       ucu (`secure.payu.com.tr`) artık DNS'te yok; PayU Türkiye'de iyzico
       markasıyla çalışıyor. İhtiyacınız olan driver `iyzico`.
-- [ ] Paratika/MSU · Vallet · Paycell
+- [ ] Vallet
 
 ### Altyapı
 
