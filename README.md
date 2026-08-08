@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="art/anadolupay.svg" alt="AnadoluPay" width="640">
+</p>
+
 # AnadoluPay
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/voxyfy/anadolupay.svg?style=flat-square)](https://packagist.org/packages/voxyfy/anadolupay)
@@ -102,6 +106,9 @@ ve kimlik bilgisidir.
 | `qnb` | QNB Finansbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `teb` | TEB | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `sekerbank` | Şekerbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ing` | ING | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `alternatifbank` | Alternatif Bank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `garanti` | Garanti BBVA | GVPS | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ✅ | — | ✅ | ✅ | ✅ | ✅ |
@@ -383,7 +390,7 @@ if ($gateway instanceof SupportsStatusQuery) {
 
 | Driver | Durum | İptal | Ön prov. | Geçmiş | BIN | Taksit | Tekrar |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank`, `isbank`, `ziraat`, `halkbank`, `qnb`, `teb`, `sekerbank` | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
+| `akbank`, `isbank`, `ziraat`, `halkbank`, `qnb`, `teb`, `sekerbank`, `ing`, `alternatifbank`, `turkiyefinans` | ✅ | ✅ | ✅ | ✅ | — | — | ✅ |
 | `garanti` | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ |
 | `yapikredi`, `albaraka` | ✅ | ✅ | ✅ | — | — | — | — |
 | `vakifbank`, `ziraat-payflex` | ✅ | ✅ | ✅ | — | — | — | ✅ |
@@ -1051,9 +1058,17 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 Çoğu mevcut NestPay driver'ını kullanır; yeni kod değil, preset ve doğrulanmış
 uç nokta gerekir.
 
-- [ ] ING Bank · Anadolubank · Alternatif Bank · Odeabank · Türkiye Finans ·
-      Fibabanka · Burgan Bank
-- [ ] Emlak Katılım — hangi altyapıyı kullandığı araştırılmalı
+- [x] ~~ING · Alternatif Bank · Türkiye Finans.~~ Üçü de NestPay kullanıyor;
+      uç noktaları doğrulandı (aşağıya bakın).
+- [ ] Anadolubank · Odeabank · Fibabanka · Burgan Bank · Emlak Katılım —
+      sanal POS uç noktaları herkese açık bir kaynaktan **doğrulanamadı**.
+      Tahmin edilen alan adları ya DNS'te yok ya da NestPay/PayFor/BOA
+      imzası vermiyor. Bu bankalardan biriyle çalışıyorsanız entegrasyon
+      dokümanınızdaki adresi issue olarak paylaşın, preset'i ekleyelim.
+
+Preset eklenmemiş olması o bankayla çalışamayacağınız anlamına gelmez:
+altyapısı bilinen bir bankanın uç noktalarını `config/anadolupay.php`
+içinde kendiniz tanımlayabilirsiniz — bkz. [Yeni banka eklemek](#yeni-banka-eklemek).
 
 ### Yeni ödeme kuruluşları
 

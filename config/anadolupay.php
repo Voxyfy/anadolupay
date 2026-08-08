@@ -256,6 +256,46 @@ return [
             ],
         ],
 
+        'ing' => [
+            'gateway' => AssecoGateway::class,
+            'merchant_id' => env('ING_MERCHANT_ID'),
+            'username' => env('ING_USERNAME'),
+            'password' => env('ING_PASSWORD'),
+            'secret_key' => env('ING_SECRET_KEY'),
+            'test_mode' => env('ING_TEST_MODE', false),
+            'endpoints' => [
+                // sanalpos.ingbank.com.tr adresi de aynı NestPay kurulumuna çıkar.
+                'payment_api' => env('ING_PAYMENT_API', 'https://sanalpos.ing.com.tr/fim/api'),
+                'gateway_3d' => env('ING_GATEWAY_3D', 'https://sanalpos.ing.com.tr/fim/est3Dgate'),
+            ],
+        ],
+
+        'alternatifbank' => [
+            'gateway' => AssecoGateway::class,
+            'merchant_id' => env('ALTERNATIFBANK_MERCHANT_ID'),
+            'username' => env('ALTERNATIFBANK_USERNAME'),
+            'password' => env('ALTERNATIFBANK_PASSWORD'),
+            'secret_key' => env('ALTERNATIFBANK_SECRET_KEY'),
+            'test_mode' => env('ALTERNATIFBANK_TEST_MODE', false),
+            'endpoints' => [
+                'payment_api' => env('ALTERNATIFBANK_PAYMENT_API', 'https://sanalpos.alternatifbank.com.tr/fim/api'),
+                'gateway_3d' => env('ALTERNATIFBANK_GATEWAY_3D', 'https://sanalpos.alternatifbank.com.tr/fim/est3Dgate'),
+            ],
+        ],
+
+        'turkiyefinans' => [
+            'gateway' => AssecoGateway::class,
+            'merchant_id' => env('TURKIYEFINANS_MERCHANT_ID'),
+            'username' => env('TURKIYEFINANS_USERNAME'),
+            'password' => env('TURKIYEFINANS_PASSWORD'),
+            'secret_key' => env('TURKIYEFINANS_SECRET_KEY'),
+            'test_mode' => env('TURKIYEFINANS_TEST_MODE', false),
+            'endpoints' => [
+                'payment_api' => env('TURKIYEFINANS_PAYMENT_API', 'https://sanalpos.turkiyefinans.com.tr/fim/api'),
+                'gateway_3d' => env('TURKIYEFINANS_GATEWAY_3D', 'https://sanalpos.turkiyefinans.com.tr/fim/est3Dgate'),
+            ],
+        ],
+
         /*
         |----------------------------------------------------------------------
         | Kendi altyapısını kullanan bankalar

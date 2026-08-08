@@ -214,3 +214,17 @@ it('ad alanlı XML’i çözümler', function () {
 
     expect($decoded)->toBe(['Body' => ['Sonuc' => '1']]);
 });
+
+it('NestPay preset’leri aynı driver’a ve doğrulanmış uçlara bağlanır', function (string $bank, string $host) {
+    // Bu üç banka için uç noktalar tahmin edilmedi; `/fim/est3Dgate` ve
+    // `/fim/api` yollarının NestPay imzası döndürdüğü teyit edildi.
+    $gateway = app(AnadoluPay::class)->driver($bank);
+
+    expect($gateway)->toBeInstanceOf(AssecoGateway::class)
+        ->and($gateway->config()->endpoint('gateway_3d'))->toBe("https://{$host}/fim/est3Dgate")
+        ->and($gateway->config()->endpoint('payment_api'))->toBe("https://{$host}/fim/api");
+})->with([
+    ['ing', 'sanalpos.ing.com.tr'],
+    ['alternatifbank', 'sanalpos.alternatifbank.com.tr'],
+    ['turkiyefinans', 'sanalpos.turkiyefinans.com.tr'],
+]);

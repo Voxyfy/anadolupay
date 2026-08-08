@@ -12,6 +12,21 @@
 
 ## Yayımlanmamış
 
+### Eklendi — üç yeni banka preset'i
+
+* `ing`, `alternatifbank`, `turkiyefinans`. Üçü de mevcut `AssecoGateway`
+  (NestPay) driver'ını kullanır; yeni kod yazılmadı.
+* Uç noktalar tahmin edilmedi, **doğrulandı**: her adayın `/fim/est3Dgate`
+  ve `/fim/api` yolları NestPay'in kendi imzasını ("3D Gate requires HTTP
+  POST", "VPos Api Server") döndürüyor. Aynı sunucularda NestPay'e ait
+  olmayan yollar WAF hata sayfası veriyor; yani imza yola özgü.
+
+**Eklenmeyenler:** Anadolubank, Odeabank, Fibabanka, Burgan Bank ve Emlak
+Katılım için sanal POS uç noktası herkese açık bir kaynaktan doğrulanamadı.
+Denenen alan adları ya DNS'te yok ya da NestPay/PayFor/BOA imzası vermiyor.
+Çalışmayan bir adresle preset koymak, preset'in hiç olmamasından kötüdür —
+çalışıyormuş gibi görünür. Yol haritasında açık madde olarak duruyorlar.
+
 ### Eklendi — Paratika (Payten)
 
 * **Paratika driver'ı** (`paratika`). Dört ödeme modeli de destekleniyor:
