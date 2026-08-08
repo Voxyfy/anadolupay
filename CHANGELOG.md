@@ -2,6 +2,14 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.0.7 - 2026-08-08
+
+### What's Changed
+
+* Bump actions/checkout from 6 to 7 by @dependabot[bot] in https://github.com/Voxyfy/anadolupay/pull/5
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.6...v1.0.7
+
 ## Yayımlanmamış
 
 ### Eklendi — Paratika (Payten)
