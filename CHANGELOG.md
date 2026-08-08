@@ -4,6 +4,29 @@
 
 ## Yayımlanmamış
 
+### Eklendi — Moka United
+
+* **Moka United driver'ı** (`moka`). 3D Secure ve non-secure ödeme, ön
+  provizyon ve kapama (`DoCapture`), iptal (`DoVoid`), tam ve kısmi iade
+  (`DoCreateRefundRequest`), durum sorgusu, işlem dökümü, BIN sorgusu ve
+  düz metin `OK` webhook onayı.
+* Moka'nın dönüş hash'i (`sha256(CodeForHash + "T"|"F")`) dokümantasyondaki
+  test vektörüyle kilitlendi.
+* `TEST-KARTLARI.md` dosyasına Moka'nın 36 kartlık resmî test tablosu eklendi.
+
+**Dikkat edilmesi gereken davranış:** Moka 3D dönüşünde ödemenin başarılı olup
+olmadığını ayrı bir alanda bildirmez — `resultCode` başarılı işlemlerde boş
+gelir ve sonuç yalnızca `hashValue` içinde taşınır. Bu yüzden `verify()`
+çağrısı `order['code_for_hash']` ister; verilmezse paket sonucu tahmin etmek
+yerine hata verir. Hash ne başarı ne başarısızlık varyantıyla eşleşiyorsa
+`InvalidSignatureException` atılır.
+
+### Eklenmeyecek — PayU Türkiye
+
+PayU Türkiye için driver yazılmadı: ödeme ucu `secure.payu.com.tr` artık
+DNS'te çözülmüyor (NXDOMAIN) ve PayU'nun Türkiye'deki ödeme hizmeti iyzico
+markası altında sürüyor. Aynı işlevi mevcut `iyzico` driver'ı görüyor.
+
 ### Eklendi — Craftgate
 
 * **Craftgate driver'ı** (`craftgate`). Craftgate bir bankanın sanal POS'u

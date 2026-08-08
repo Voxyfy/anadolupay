@@ -155,6 +155,74 @@ işyeri paketine bakın.
 
 ---
 
+## Moka United
+
+**Kaynak:** [developer.mokaunited.com/home.php?page=test-kartlari](https://developer.mokaunited.com/home.php?page=test-kartlari) — resmî, giriş gerektirmez
+
+Bu kartlarla yapılan ödemeler **bankaya gönderilmez**; yanıtı Moka'nın kendi
+sistemi üretir. Hepsinin son kullanma tarihi `12/2030`, CVC'si `000`.
+
+| Kart numarası | Banka | Tip |
+|---|---|---|
+| `5127541122223332` | Akbank | Master |
+| `4531441122223338` | Aktif Bank | Visa |
+| `4230021122223332` | Albaraka | Visa |
+| `5126181122223338` | Alternatif Bank | Master |
+| `4258461122223337` | Anadolu Bank | Visa |
+| `5482021122223334` | Burgan Bank | Master |
+| `4715091122223339` | Citi Bank | Visa |
+| `5120171122223335` | Deniz Bank | Master |
+| `4234951122223336` | Fibabanka | Visa |
+| `4022771122223334` | Finansbank | Visa |
+| `5269111122223332` | Finansbank | Master |
+| `5269551122223339` | Garanti Bankası | Master |
+| `4155141122223339` | Halkbank | Visa |
+| `5100051122223333` | HSBC | Master |
+| `4137291122223335` | ICBC | Visa |
+| `5101511122223335` | ING | Master |
+| `4397481122223337` | ININAL | Visa |
+| `5406681122223338` | İş Bankası | Master |
+| `4183441122223339` | İş Bankası | Visa |
+| `5125951122223335` | Kuveyt Türk | Master |
+| `4691801122223339` | Odeabank | Visa |
+| `5313891122223335` | Papara | Master |
+| `4349131122223337` | PTT Bank | Visa |
+| `5100101122223336` | Şekerbank | Master |
+| `4024591122223334` | TEB | Visa |
+| `4347271122223333` | Turkcell | Visa |
+| `5185991122223338` | Turkishbank | Master |
+| `4007421122223335` | Türkiye Finans | Visa |
+| `5313251122223332` | Türkpara | Master |
+| `4029401122223331` | Vakıfbank | Visa |
+| `5353551122223336` | Vakıf Katılım | Master |
+| `4462121122223339` | Yapı Kredi | Visa |
+| `5136621122223331` | Ziraat Bankası | Master |
+| `4162831122223336` | Ziraat Katılım | Visa |
+| `9792061122223337` | Ziraat Bankası | Troy |
+| `6549971122223339` | İş Bankası | Troy |
+
+Portalda ikinci bir tablo daha var: o kartlarla yapılan işlemler **gerçekten
+bankaya gider** ve yanıt bankadan döner. Uçtan uca 3D akışını denemek
+istiyorsanız onları kullanın; günlük hayatta yukarıdaki liste yeterlidir.
+
+Sandbox ayrı bir adres kullanır:
+
+```env
+MOKA_PAYMENT_API=https://service.refmokaunited.com
+MOKA_DEALER_CODE=xxx
+MOKA_USERNAME=xxx
+MOKA_PASSWORD=xxx
+MOKA_TEST_MODE=true
+```
+
+> Moka'da 3D dönüşünün başarılı olup olmadığı `resultCode` alanından
+> **anlaşılmaz** — o alan başarılı işlemlerde boş gelir. Sonuç yalnızca
+> `hashValue` içinde taşınır, o da ödeme başlatılırken dönen `CodeForHash`
+> değerinden üretilir. Bu değeri saklamayı unutursanız test ortamında da
+> canlıda da ödemenin sonucunu okuyamazsınız.
+
+---
+
 ## Craftgate
 
 **Kaynak:** [craftgate/craftgate-php-client](https://github.com/craftgate/craftgate-php-client/tree/master/samples),

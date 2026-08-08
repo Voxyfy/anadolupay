@@ -122,6 +122,7 @@ ve kimlik bilgisidir.
 | `param` | Param | ✅ | ✅ | — | ✅ | ✅ | — |
 | `tosla` | Tosla (AkÖde) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `craftgate` | Craftgate | ✅ | — | — | ✅ | ✅ | — |
+| `moka` | Moka United | ✅ | — | — | ✅ | ✅ | ✅ |
 | `iyzico` | iyzico | ✅ | — | — | — | — | — |
 | `fake` | geliştirme için sahte driver | — | — | — | ✅ | ✅ | — |
 
@@ -150,7 +151,7 @@ CardData ──────────┘            │
                                  │  banka-özel eşleme
           ┌──────────────────────┼──────────────────────┐
           ▼                      ▼                      ▼
-   AssecoGateway          GarantiGateway         PosNetGateway   … (14 driver)
+   AssecoGateway          GarantiGateway         PosNetGateway   … (15 driver)
    sha512 + '|'           sha512 UPPER           sha256 + ';'
    CC5Request XML         GVPSRequest XML        posnetRequest XML
           │                      │                      │
@@ -394,6 +395,7 @@ if ($gateway instanceof SupportsStatusQuery) {
 | `param` | ✅ | ✅ | ✅ | — | — | — | — |
 | `tosla` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | `craftgate` | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
+| `moka` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | `iyzico` | ✅ | — | — | — | ✅ | ✅ | — |
 
 Arayüzler: `SupportsStatusQuery`, `SupportsCancellation`,
@@ -537,8 +539,12 @@ alır.
 yüzden o preset'te `verify_hash` varsayılan olarak kapalıdır. Bankanız
 düzelttiyse `ZIRAAT_KATILIM_VERIFY_HASH=true` yapın.
 
-**PayTR bildirimi `OK` yanıtı bekler.** Webhook'unuz gövdede düz metin `OK`
-döndürmezse PayTR bildirimi tekrar tekrar gönderir.
+**PayTR ve Moka bildirimi `OK` yanıtı bekler.** Webhook'unuz gövdede düz metin
+`OK` döndürmezse bildirim tekrar tekrar gönderilir (Moka iki kez daha dener).
+
+**Moka başarıyı ayrı bir alanda söylemez.** 3D dönüşündeki `resultCode`
+başarılı işlemlerde boş gelir; sonuç `hashValue` içindedir. Ödeme başlatılırken
+dönen `CodeForHash` saklanmazsa dönüş yorumlanamaz.
 
 **Craftgate iki ayrı anahtar kullanır.** API istekleri Secret Key ile,
 3D dönüşü panelde ayrıca üretilen **3D Secure Callback Key** ile imzalanır.
@@ -731,6 +737,67 @@ AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
 ));
 ```
 
+## Moka United
+
+Moka'nın kimlik doğrulaması bir istek imzası değil, sabit bir paroladır:
+
+```
+CheckKey = sha256( DealerCode + "MK" + Username + "PD" + Password )
+```
+
+Her istekte aynı değer gider — yani gövdeyi korumaz. Bu paketin diğer
+driver'larındaki hash'lerden farkı budur.
+
+**Asıl dikkat edilmesi gereken yer 3D dönüşü.** Moka ödemenin başarılı olup
+olmadığını ayrı bir alanda söylemez; dönüşteki `resultCode` başarılı
+işlemlerde **boş gelir**. Sonuç yalnızca `hashValue` içinde taşınır:
+
+```
+hashValue = sha256( CodeForHash + "T" )   → başarılı
+hashValue = sha256( CodeForHash + "F" )   → başarısız
+```
+
+`CodeForHash` ödeme başlatılırken bir kez döner. Saklamazsanız dönüşü
+yorumlayamazsınız — bu yüzden paket sonucu tahmin etmeye çalışmaz, hata verir:
+
+```php
+$response = AnadoluPay::driver('moka')->createPayment($data);
+
+// Bu değeri siparişle birlikte saklayın.
+$codeForHash = $response->raw['code_for_hash'];
+
+return redirect()->away($response->redirectUrl);
+```
+
+Dönüşte:
+
+```php
+$result = AnadoluPay::driver('moka')->verify(new VerifyPaymentData(
+    $request->all(),
+    order: ['code_for_hash' => $codeForHash],
+));
+```
+
+Hash ne `T` ne `F` varyantıyla eşleşiyorsa `InvalidSignatureException` atılır.
+
+**İptal ve iade ayrı uçlardır.** Aynı gün saat 22.00'ye kadar `cancel()`
+(`DoVoid`), sonrasında `refund()` (`DoCreateRefundRequest`). İade tutarı
+verilmezse kalan tutarın tamamı iade edilir.
+
+Referans olarak hem Moka'nın numarası hem sizinki kullanılabilir; paket
+`ORDER-` ile başlayan değerleri Moka'nın numarası (`VirtualPosOrderId`),
+diğerlerini kendi sipariş numaranız (`OtherTrxCode`) sayar.
+
+```env
+MOKA_DEALER_CODE=xxx
+MOKA_USERNAME=xxx
+MOKA_PASSWORD=xxx
+MOKA_PAYMENT_API=https://service.refmokaunited.com
+```
+
+Moka da PayTR gibi bildirimlere düz metin `OK` yanıtı bekler; paketin webhook
+rotası bunu kendisi döndürür.
+
 ## Craftgate
 
 Craftgate tek bir bankanın sanal POS'u değil, birden çok POS'u tek API
@@ -787,8 +854,8 @@ olarak geçer.
 ## Test ortamı
 
 Test kartları için ayrı bir belge var:
-**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR ve
-Craftgate'in resmî listeleri (hata senaryosu kartları dahil), diğer bankalar
+**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR, Craftgate
+ve Moka'nın resmî listeleri (hata senaryosu kartları dahil), diğer bankalar
 için kartı nereden alacağınız.
 
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
@@ -821,6 +888,7 @@ TOSLA_PAYMENT_API=https://prepentegrasyon.tosla.com/api/Payment
 PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
 CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
+MOKA_PAYMENT_API=https://service.refmokaunited.com
 ```
 
 ### Sahte driver
@@ -932,9 +1000,14 @@ uç nokta gerekir.
 
 - [x] ~~Craftgate.~~ API imzası, 3D dönüş imzası ve webhook imzası
       Craftgate'in resmi istemci depolarındaki test vektörleriyle doğrulandı.
+- [x] ~~Moka United.~~ Dokümantasyonu tamamen açık; dönüş hash'i oradaki
+      test vektörüyle kilitlendi.
 - [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
       için bilinçli olarak eklenmedi.
-- [ ] Moka · Paratika/MSU · PayU Türkiye · Vallet · Paycell
+- [ ] ~~**PayU Türkiye**~~ — **eklenmeyecek.** PayU'nun Türkiye'deki ödeme
+      ucu (`secure.payu.com.tr`) artık DNS'te yok; PayU Türkiye'de iyzico
+      markasıyla çalışıyor. İhtiyacınız olan driver `iyzico`.
+- [ ] Paratika/MSU · Vallet · Paycell
 
 ### Altyapı
 

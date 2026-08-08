@@ -13,6 +13,7 @@ use Voxyfy\AnadoluPay\Gateways\FakeGateway;
 use Voxyfy\AnadoluPay\Gateways\IyzicoGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\AkbankPosGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\CraftgateGateway;
+use Voxyfy\AnadoluPay\Gateways\Provider\MokaGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\PayTrGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
@@ -472,6 +473,27 @@ return [
                 'payment_api' => env('TOSLA_PAYMENT_API', 'https://entegrasyon.tosla.com/api/Payment'),
                 'gateway_3d' => env('TOSLA_GATEWAY_3D', 'https://entegrasyon.tosla.com/api/Payment/ProcessCardForm'),
                 'gateway_3d_host' => env('TOSLA_GATEWAY_3D_HOST', 'https://entegrasyon.tosla.com/api/Payment/threeDSecure'),
+            ],
+        ],
+
+        'moka' => [
+            'gateway' => MokaGateway::class,
+            // Moka terminolojisi: merchant_id => DealerCode.
+            // CheckKey bu üç değerden türetilir; ayrı bir gizli anahtar yoktur.
+            'merchant_id' => env('MOKA_DEALER_CODE'),
+            'username' => env('MOKA_USERNAME'),
+            'password' => env('MOKA_PASSWORD'),
+            'test_mode' => env('MOKA_TEST_MODE', false),
+            'extra' => [
+                // Havuz ödemesi: para çekilir ama onaylanana kadar bekletilir.
+                'pool_payment' => env('MOKA_POOL_PAYMENT', false),
+                // 3D sonucu IFrame içine dönecekse 1 yapın.
+                'redirect_type' => env('MOKA_REDIRECT_TYPE', 0),
+                'software' => env('MOKA_SOFTWARE', 'anadolupay'),
+            ],
+            'endpoints' => [
+                // Test: https://service.refmokaunited.com
+                'payment_api' => env('MOKA_PAYMENT_API', 'https://service.mokaunited.com'),
             ],
         ],
 

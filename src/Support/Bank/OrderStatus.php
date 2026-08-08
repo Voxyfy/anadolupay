@@ -107,6 +107,20 @@ final class OrderStatus
     ];
 
     /**
+     * Moka `PaymentStatus` kodları.
+     *
+     * Bu kod tek başına yeterli değildir: işlemin başarılı olup olmadığını
+     * `TrxStatus` söyler. Driver önce onu kontrol eder.
+     */
+    public const MOKA = [
+        '0' => StatusResponse::STATUS_PENDING,
+        '1' => StatusResponse::STATUS_PRE_AUTHORIZED,
+        '2' => StatusResponse::STATUS_PAID,
+        '3' => StatusResponse::STATUS_CANCELLED,
+        '4' => StatusResponse::STATUS_REFUNDED,
+    ];
+
+    /**
      * Banka kodunu normalleştirilmiş duruma çevirir.
      *
      * PHP sayısal dizgi anahtarlarını tam sayıya çevirdiği için sözlükler
