@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="art/anadolupay.svg" alt="AnadoluPay" width="640">
+  <img src="art/anadolupay.png" alt="AnadoluPay" width="640">
 </p>
 
 # AnadoluPay
