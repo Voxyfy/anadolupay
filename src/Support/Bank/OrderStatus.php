@@ -93,6 +93,20 @@ final class OrderStatus
     ];
 
     /**
+     * Craftgate ödeme durumları.
+     *
+     * Craftgate iadeyi ödemenin durumunda değil ayrı bir iade kaydında
+     * tutar; bu yüzden sözlükte `refunded` karşılığı yoktur.
+     */
+    public const CRAFTGATE = [
+        'SUCCESS' => StatusResponse::STATUS_PAID,
+        'FAILURE' => StatusResponse::STATUS_FAILED,
+        'INIT_THREEDS' => StatusResponse::STATUS_PENDING,
+        'CALLBACK_THREEDS' => StatusResponse::STATUS_PENDING,
+        'WAITING' => StatusResponse::STATUS_PENDING,
+    ];
+
+    /**
      * Banka kodunu normalleştirilmiş duruma çevirir.
      *
      * PHP sayısal dizgi anahtarlarını tam sayıya çevirdiği için sözlükler

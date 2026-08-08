@@ -121,6 +121,7 @@ ve kimlik bilgisidir.
 | `paytr` | PayTR | — | ✅ | ✅ | ✅ | ✅ | — |
 | `param` | Param | ✅ | ✅ | — | ✅ | ✅ | — |
 | `tosla` | Tosla (AkÖde) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `craftgate` | Craftgate | ✅ | — | — | ✅ | ✅ | — |
 | `iyzico` | iyzico | ✅ | — | — | — | — | — |
 | `fake` | geliştirme için sahte driver | — | — | — | ✅ | ✅ | — |
 
@@ -149,7 +150,7 @@ CardData ──────────┘            │
                                  │  banka-özel eşleme
           ┌──────────────────────┼──────────────────────┐
           ▼                      ▼                      ▼
-   AssecoGateway          GarantiGateway         PosNetGateway   … (13 driver)
+   AssecoGateway          GarantiGateway         PosNetGateway   … (14 driver)
    sha512 + '|'           sha512 UPPER           sha256 + ';'
    CC5Request XML         GVPSRequest XML        posnetRequest XML
           │                      │                      │
@@ -392,6 +393,7 @@ if ($gateway instanceof SupportsStatusQuery) {
 | `paytr` | ✅ | — | — | — | ✅ | ✅ | — |
 | `param` | ✅ | ✅ | ✅ | — | — | — | — |
 | `tosla` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
+| `craftgate` | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
 | `iyzico` | ✅ | — | — | — | ✅ | ✅ | — |
 
 Arayüzler: `SupportsStatusQuery`, `SupportsCancellation`,
@@ -537,6 +539,17 @@ düzelttiyse `ZIRAAT_KATILIM_VERIFY_HASH=true` yapın.
 
 **PayTR bildirimi `OK` yanıtı bekler.** Webhook'unuz gövdede düz metin `OK`
 döndürmezse PayTR bildirimi tekrar tekrar gönderir.
+
+**Craftgate iki ayrı anahtar kullanır.** API istekleri Secret Key ile,
+3D dönüşü panelde ayrıca üretilen **3D Secure Callback Key** ile imzalanır.
+İkisini karıştırmak "imza geçersiz" hatası verir. Webhook'ların üçüncü bir
+anahtarı vardır (Merchant Hook Key).
+
+**Craftgate'te ödeme formu POST edilmez.** `3ds-init` ucu hazır bir HTML
+sayfası döner; `PaymentResponse::$htmlContent` içinde gelir ve doğrudan
+tarayıcıya basılır. Ayrıca kısmi iade ödeme değil **işlem** bazındadır:
+`metadata['payment_transaction_id']` vermezseniz paket sessizce tam iade
+yapmak yerine hata verir.
 
 **NestPay hash'i alanları sıralar.** Alanlar doğal sırada (harf duyarsız)
 sıralanır, `hash`/`encoding`/`nationalidno` çıkarılır, sona secret key eklenir,
@@ -718,12 +731,65 @@ AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
 ));
 ```
 
+## Craftgate
+
+Craftgate tek bir bankanın sanal POS'u değil, birden çok POS'u tek API
+arkasında toplayan bir orkestrasyon platformudur. Akış bu yüzden banka
+driver'larından ayrılır: müşteri bir banka geçidine form POST edilmez,
+`3ds-init` ucu hazır bir HTML sayfası döner.
+
+```php
+$response = AnadoluPay::driver('craftgate')->createPayment($data);
+
+return response($response->htmlContent);   // 3D sayfası
+```
+
+**Üç ayrı anahtar** kullanılır; hangisinin nerede kullanıldığını karıştırmak
+en sık yapılan hatadır:
+
+| Anahtar | Nerede | İmzalanan |
+|---|---|---|
+| Secret Key | `x-signature` istek başlığı | `baseUrl + path + apiKey + secretKey + rndKey + gövde` → `base64(sha256(…))` |
+| 3D Secure Callback Key | 3D dönüşündeki `hash` alanı | `key###status###completeStatus###paymentId###conversationData###conversationId###callbackStatus` → `sha256` (onaltılık) |
+| Merchant Hook Key | webhook imzası | `eventType + eventTimestamp + status + payloadId` → `base64(hmac-sha256(…))` |
+
+```env
+CRAFTGATE_API_KEY=xxx
+CRAFTGATE_SECRET_KEY=xxx
+CRAFTGATE_CALLBACK_KEY=xxx
+CRAFTGATE_HOOK_KEY=xxx
+CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
+```
+
+Webhook imzasını driver doğrular:
+
+```php
+$gateway->verifyWebhookSignature($request->header('X-Signature'), $request->all());
+```
+
+**Kısmi iade işlem bazındadır.** Craftgate bir ödemeyi birden çok satıcı
+işlemine bölebildiği için hangi işlemin iade edileceğini paket kendi başına
+seçemez:
+
+```php
+AnadoluPay::driver('craftgate')->refund(new RefundPaymentData(
+    paymentId: '12345',
+    amount: 20.00,
+    metadata: ['payment_transaction_id' => 555],
+));
+```
+
+`payment_transaction_id` vermezseniz paket sessizce tam iade yapmaz, hata
+verir. Tam iade için tutarı hiç göndermeyin. Gün içi iptal ayrı bir uç
+değildir; Craftgate mutabakata girmemiş işlemi iade isteğinde kendisi void
+olarak geçer.
+
 ## Test ortamı
 
 Test kartları için ayrı bir belge var:
-**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti ve PayTR'nin resmî
-listeleri (hata senaryosu kartları dahil), diğer bankalar için kartı nereden
-alacağınız.
+**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR ve
+Craftgate'in resmî listeleri (hata senaryosu kartları dahil), diğer bankalar
+için kartı nereden alacağınız.
 
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
@@ -754,6 +820,7 @@ ALBARAKA_PAYMENT_API=https://epostest.albarakaturk.com.tr/ALBMerchantService/Mer
 TOSLA_PAYMENT_API=https://prepentegrasyon.tosla.com/api/Payment
 PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
+CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
 ```
 
 ### Sahte driver
@@ -846,6 +913,12 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 - [x] ~~İşlem geçmişi, taksit oranı ve BIN sorgulama.~~
 - [x] ~~Tekrarlayan ödeme.~~ Asseco, Garanti, PayFlex, Akbank POS.
 
+### Doğrulama
+
+- [ ] **Gerçek banka testi.** Hiçbir driver gerçek bir banka test terminaline
+      karşı çalıştırılmadı — bkz. yukarıdaki uyarı. Kapsamı yatay büyütmek
+      (yeni banka, yeni kuruluş) bu doğrulama yapılmadan riski azaltmıyor.
+
 ### Yeni bankalar
 
 Çoğu mevcut NestPay driver'ını kullanır; yeni kod değil, preset ve doğrulanmış
@@ -857,9 +930,11 @@ uç nokta gerekir.
 
 ### Yeni ödeme kuruluşları
 
+- [x] ~~Craftgate.~~ API imzası, 3D dönüş imzası ve webhook imzası
+      Craftgate'in resmi istemci depolarındaki test vektörleriyle doğrulandı.
 - [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
       için bilinçli olarak eklenmedi.
-- [ ] Craftgate · Moka · Paratika/MSU · PayU Türkiye · Vallet · Paycell
+- [ ] Moka · Paratika/MSU · PayU Türkiye · Vallet · Paycell
 
 ### Altyapı
 

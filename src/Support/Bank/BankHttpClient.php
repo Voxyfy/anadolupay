@@ -119,6 +119,29 @@ class BankHttpClient
     }
 
     /**
+     * GET isteği gönderir.
+     *
+     * Sanal POS'ların çoğu her şeyi POST ile yapar; sorgu uçlarını GET
+     * olarak sunan sağlayıcılar (örn. Craftgate'in BIN, taksit ve
+     * raporlama uçları) için gereklidir.
+     *
+     * @param  array<string, string>  $headers
+     * @return array<string, mixed>
+     */
+    public function get(string $url, array $headers = []): array
+    {
+        $this->logRequest($url, '', scrubbed: true);
+
+        $response = $this->dispatch(
+            $url,
+            fn (PendingRequest $request) => $request->get($url),
+            $headers + ['Accept' => 'application/json'],
+        );
+
+        return $this->decode($response, $url);
+    }
+
+    /**
      * application/x-www-form-urlencoded POST isteği gönderir.
      *
      * @param  array<string, scalar>  $fields

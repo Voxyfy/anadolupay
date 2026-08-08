@@ -12,6 +12,7 @@ use Voxyfy\AnadoluPay\Gateways\Bank\VakifKatilimGateway;
 use Voxyfy\AnadoluPay\Gateways\FakeGateway;
 use Voxyfy\AnadoluPay\Gateways\IyzicoGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\AkbankPosGateway;
+use Voxyfy\AnadoluPay\Gateways\Provider\CraftgateGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\PayTrGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
@@ -471,6 +472,28 @@ return [
                 'payment_api' => env('TOSLA_PAYMENT_API', 'https://entegrasyon.tosla.com/api/Payment'),
                 'gateway_3d' => env('TOSLA_GATEWAY_3D', 'https://entegrasyon.tosla.com/api/Payment/ProcessCardForm'),
                 'gateway_3d_host' => env('TOSLA_GATEWAY_3D_HOST', 'https://entegrasyon.tosla.com/api/Payment/threeDSecure'),
+            ],
+        ],
+
+        'craftgate' => [
+            'gateway' => CraftgateGateway::class,
+            // Craftgate terminolojisi: username => API Key,
+            // secret_key => Secret Key, password => 3D Secure Callback Key.
+            // Son ikisi farklı anahtarlardır: ilki API isteklerini,
+            // ikincisi 3D dönüşünü imzalar.
+            'username' => env('CRAFTGATE_API_KEY'),
+            'secret_key' => env('CRAFTGATE_SECRET_KEY'),
+            'password' => env('CRAFTGATE_CALLBACK_KEY'),
+            'test_mode' => env('CRAFTGATE_TEST_MODE', false),
+            'extra' => [
+                // Webhook imzası için panelden alınan Merchant Hook Key.
+                'merchant_hook_key' => env('CRAFTGATE_HOOK_KEY'),
+                // PRODUCT veya LISTING_OR_SUBSCRIPTION.
+                'payment_group' => env('CRAFTGATE_PAYMENT_GROUP', 'PRODUCT'),
+            ],
+            'endpoints' => [
+                // Sandbox: https://sandbox-api.craftgate.io
+                'payment_api' => env('CRAFTGATE_PAYMENT_API', 'https://api.craftgate.io'),
             ],
         ],
 

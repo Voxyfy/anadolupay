@@ -155,6 +155,46 @@ işyeri paketine bakın.
 
 ---
 
+## Craftgate
+
+**Kaynak:** [craftgate/craftgate-php-client](https://github.com/craftgate/craftgate-php-client/tree/master/samples),
+[craftgate-java-client](https://github.com/craftgate/craftgate-java-client) ve
+[craftgate-go-client](https://github.com/craftgate/craftgate-go-client) —
+Craftgate'in kendi resmî istemci depolarındaki örnek ve test dosyaları
+
+Craftgate'in kart tablosunun tamamı geliştirici portalında yayınlanıyor ancak
+portal giriş istiyor: [developer.craftgate.io/en/test-cards](https://developer.craftgate.io/en/test-cards/).
+Aşağıdaki kartlar portala girmeden doğrulanabilen tek kaynaktan — Craftgate'in
+herkese açık istemci depolarından — alınmıştır.
+
+| Kart numarası | SKT | CVV | Not |
+|---|---|---|---|
+| `5258640000000001` | 07/2044 | 000 | Craftgate'in tüm örneklerinde kullandığı varsayılan kart |
+| `4256690000000001` | 11/2035 | 123 | Go istemcisinin ödeme testlerinde kullandığı kart |
+| `5400010000000004` | 07/2044 | 000 | Java ve .NET örneklerinde kullanılan kart |
+| `4043080000000003` | 07/2044 | 000 | Ödül/puan (loyalty) sorgusu için |
+
+> Sandbox'ta **yalnızca** Craftgate'in tanımladığı test kartlarıyla ödeme
+> yapılabilir; rastgele bir kart numarası reddedilir. Bankaya özel senaryolar
+> (belirli hata kodları, taksit tabloları, ödül puanları) için portaldaki tam
+> listeye ihtiyacınız olacak.
+
+Sandbox ortamı ayrı bir uç nokta ve ayrı anahtar kullanır:
+
+```env
+CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
+CRAFTGATE_API_KEY=sandbox-api-key
+CRAFTGATE_SECRET_KEY=sandbox-secret-key
+CRAFTGATE_CALLBACK_KEY=merchantThreeDsCallbackKeySndbox
+CRAFTGATE_TEST_MODE=true
+```
+
+`CRAFTGATE_CALLBACK_KEY`, API anahtarından **farklı** bir değerdir (panelde
+"3D Secure Callback Key"). Boş bırakırsanız 3D dönüşü imza doğrulamasında
+reddedilir.
+
+---
+
 ## Diğer bankalar
 
 Aşağıdaki sağlayıcılar test kartlarını herkese açık yayınlamaz; kartlar test
