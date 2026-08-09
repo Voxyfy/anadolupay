@@ -1226,11 +1226,16 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 - [x] ~~İlk banka terminali.~~ Ziraat NestPay test terminalinde 3D hash'i ve
       API kimlik doğrulaması kabul edildi; durum sorgusunda bulunan bir kusur
       düzeltildi.
-- [ ] **NestPay'de 3D akışını tamamla.** Form kabul ediliyor ama tarayıcıdan
-      3D onayı geçilip provizyon ve iade denenmedi.
-- [ ] **Diğer altyapılar için gerçek terminal testi** — Garanti, PosNet,
-      PayFlex, PayFor, InterPos, BOA. Kapsamı yatay büyütmek bu doğrulama
-      yapılmadan riski azaltmıyor.
+- [x] ~~NestPay'de 3D akışını tamamla.~~ 2026-08-09, Ziraat test terminali:
+      tarayıcıdan 3D onayı, provizyon, durum sorgusu, iade ve iptal. Üç kusur
+      çıktı (hash'te `null` işlenmesi, bileşik `ORDERSTATUS`, kuruş tutar).
+- [x] ~~PayFlex için gerçek terminal testi.~~ 2026-08-10, VakıfBank'ın açık
+      sandbox'ı: 3D Secure satış, non-3D satış, durum, iade, iptal, ön
+      provizyon ve kapama. Dört kusur çıktı — bkz. CHANGELOG.
+- [ ] **Kalan altyapılar için gerçek terminal testi** — Garanti, PosNet,
+      PayFor, InterPos. BOA'da yalnızca ödeme doğrulandı (Kuveyt Türk);
+      sorgu/iade servisi SOAP olduğu için ölçülemedi. Kapsamı yatay büyütmek
+      bu doğrulama yapılmadan riski azaltmıyor.
 - [x] ~~iyzico'nun işlem kapsamı.~~ İade, durum, BIN ve taksit sorgusu
       sandbox'ta doğrulandı; iade tutarsız çağrıda hiç çalışmıyordu, düzeltildi.
       İptal ayrı bir işlem değil — iyzico tam iadeyi iptal olarak işliyor.
