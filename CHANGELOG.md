@@ -16,6 +16,59 @@
 
 ## Yayımlanmamış
 
+### Düzeltildi — Param'ın belgelenen test adresi kapanmış
+
+README'de test ortamı olarak gösterilen `test-dmz.param.com.tr` artık `404`
+dönüyor; güncel adres `testposws.param.com.tr`. Ayrıca Param hem test hem
+canlı sunucularında **IP kısıtı** uyguluyor: whitelist dışındaki bir adresten
+gelen istek WAF seviyesinde `403` ile reddediliyor, kimlik bilgileri doğru
+olsa bile. İkisi de belgelendi.
+
+### Düzeltildi — iyzico'da tutarsız iade hiç çalışmıyordu
+
+`refund()` çağrısında tutar verilmediğinde paket `price` alanını hiç
+göndermiyordu ve istek **her seferinde** `5004 price gönderilmesi zorunludur`
+ile reddediliyordu. Paketin diğer driver'larında tutarı boş bırakmak
+"tamamını iade et" demektir; iyzico'da böyle bir uç yok — hem
+`/v2/payment/refund` hem `/payment/refund` tutarı zorunlu tutar.
+
+Sözleşme bozulmasın diye tutar verilmediğinde ödemenin tahsil edilen tutarı
+`/payment/detail` ucundan okunup gönderiliyor. Tutar okunamazsa istek
+gönderilmiyor, açıklayıcı bir hata veriliyor.
+
+Kısmi iade yapılmış bir ödemede bu tutar kalan bakiyeden büyük olur ve iyzico
+işlemi reddeder — bilinçli tercih: fazla iade etmektense hata vermek doğrudur.
+Öyle bir ödemede tutarı açıkça verin.
+
+Bu kusur sandbox testinde ortaya çıktı; birim testleri paketin kendi
+varsayımını doğruladığı için görünmüyordu.
+
+Düzeltmeden sonra iade sandbox'ta başarıyla çalıştı ve **iade yanıt imzası**
+(`paymentId:price:currency:conversationId`) da gerçek trafikle doğrulanmış
+oldu. iyzico işlemi `transactionType: CANCEL` olarak kaydetti — aynı gün
+yapılan tam iadeyi iptal olarak işliyor. Bu yüzden driver'ın ayrı bir
+`SupportsCancellation` uygulaması yoktur ve olmasına gerek de yoktur;
+belgelendi.
+
+### Doğrulandı — iyzico uçtan uca
+
+2026-08-09'da iyzico sandbox'ında, örnek proje üzerinden tarayıcıyla tamamlanan
+bir 3D Secure satış (100,00 TL, tek çekim, resmî test kartı) `iyzico`
+driver'ının **dört imza şemasını da** gerçek trafikle doğruladı:
+
+* `Authorization` başlığı (IYZWSv2) — istek kabul edildi, `paymentId` alındı
+* Initialize yanıt imzası
+* 3DS dönüş imzası — `conversationData:conversationId:mdStatus:paymentId:status`
+* Provizyon (`/payment/3dsecure/auth`) yanıt imzası
+
+Bu, paketin ilk uçtan uca doğrulanan driver'ı. README'ye sürüm bazında değil
+**driver bazında** bir [Doğrulama durumu](README.md#doğrulama-durumu) tablosu
+eklendi: "test var" ile "gerçekten çalışıyor" aynı şey olmadığı için her
+driver'ın hangi seviyede ölçüldüğü ayrı ayrı yazıyor.
+
+Doğrulanmayanlar aynı tabloda: iyzico'nun iade/iptal/sorgu işlemleri, diğer
+sağlayıcılar ve canlı ortam.
+
 ### Eklendi — üç yeni banka preset'i
 
 * `ing`, `alternatifbank`, `turkiyefinans`. Üçü de mevcut `AssecoGateway`

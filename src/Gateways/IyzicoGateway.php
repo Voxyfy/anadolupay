@@ -267,14 +267,26 @@ class IyzicoGateway implements PaymentGatewayInterface, SupportsBinQuery, Suppor
 
     /**
      * İade isteğini gönderir ve yanıt imzasını doğrular.
+     *
+     * **iyzico'da tutar her zaman zorunludur.** Paketin diğer driver'larında
+     * tutarı boş bırakmak "tamamını iade et" demektir; iyzico'da böyle bir uç
+     * yoktur — `price` gönderilmezse istek `5004 price gönderilmesi
+     * zorunludur` ile reddedilir. Sözleşmeyi bozmamak için tutar verilmediğinde
+     * ödemenin tahsil edilen tutarı sorgulanıp o gönderilir.
+     *
+     * Kısmi iade yapılmış bir ödemede bu tutar kalan bakiyeden büyük olur ve
+     * iyzico işlemi reddeder. Bu bilinçli bir tercih: fazla iade etmektense
+     * hata vermek doğrudur. Böyle bir ödemede tutarı açıkça verin.
      */
     protected function performRefund(RefundPaymentData $data): RefundResponse
     {
+        $price = $data->money()?->toDecimalString() ?? $this->paidPriceOf($data->paymentId);
+
         $payload = array_filter([
             'locale' => (string) ($data->meta('locale') ?? 'tr'),
             'conversationId' => (string) ($data->meta('conversation_id') ?? $data->paymentId),
             'paymentId' => $data->paymentId,
-            'price' => $data->money()?->toDecimalString(),
+            'price' => $price,
             'currency' => strtoupper($data->currency),
             'ip' => (string) ($data->meta('ip') ?? '127.0.0.1'),
             'reason' => $data->reason,
@@ -298,6 +310,32 @@ class IyzicoGateway implements PaymentGatewayInterface, SupportsBinQuery, Suppor
             refundId: isset($response['paymentId']) ? (string) $response['paymentId'] : null,
             raw: $response,
         );
+    }
+
+    /**
+     * Ödemenin tahsil edilen tutarını `/payment/detail` ucundan okur.
+     *
+     * @throws PaymentFailedException Tutar okunamazsa
+     */
+    protected function paidPriceOf(string $paymentId): string
+    {
+        $response = $this->client->post('/payment/detail', [
+            'locale' => 'tr',
+            'conversationId' => $paymentId,
+            'paymentId' => $paymentId,
+        ]);
+
+        $paid = $response['paidPrice'] ?? $response['price'] ?? null;
+
+        if ($this->statusOf($response) !== self::STATUS_SUCCESS || ! is_numeric($paid)) {
+            throw new PaymentFailedException(
+                message: 'iyzico iadesi tutar ister ve ödemenin tutarı okunamadı; '
+                    ."RefundPaymentData'ya tutarı açıkça verin.",
+                context: ['driver' => 'iyzico', 'payment_id' => $paymentId, 'response' => $response],
+            );
+        }
+
+        return Money::fromDecimal((string) $paid)->toDecimalString();
     }
 
     /**

@@ -49,13 +49,68 @@ uygulamanızın işi.
 > ve bir iade** çalıştırın. Hash hesabında bankalar zaman zaman kuruluma özel
 > farklılıklar tanımlıyor.
 >
-> Bu uyarı banka driver'ları içindir. `iyzico` driver'ının imza şeması resmi
-> dokümantasyondan doğrulanmış ve testle kilitlenmiştir.
+> Bu uyarı banka driver'ları içindir. **`iyzico` driver'ı bunun dışındadır:**
+> sandbox ortamında uçtan uca çalıştırılıp doğrulanmıştır — bkz.
+> [Doğrulama durumu](#doğrulama-durumu).
+
+---
+
+## Doğrulama durumu
+
+Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kadar
+ölçüldüğünü gösterir; "test var" ile "gerçekten çalışıyor" aynı şey değildir.
+
+| Seviye | Ne anlama gelir |
+|---|---|
+| **Uçtan uca** | Sağlayıcının sandbox'ında gerçek bir ödeme tamamlandı |
+| **Test vektörü** | İmza, sağlayıcının kendi yayınladığı vektörle birebir eşleşiyor |
+| **Dokümana göre** | Protokol dokümandan uygulandı, sağlayıcıya karşı ölçülmedi |
+
+| Driver | Seviye | Dayanak |
+|---|---|---|
+| `iyzico` | **Uçtan uca** | 2026-08-09, sandbox 3D Secure satış |
+| `craftgate` | Test vektörü | Resmî istemci depolarındaki üç vektör |
+| `moka` | Test vektörü | Dokümantasyondaki dönüş hash'i vektörü |
+| `paratika` | Dokümana göre | Vektör yayınlanmıyor |
+| Banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
+
+### iyzico'da tam olarak ne doğrulandı
+
+2026-08-09'da iyzico sandbox'ında, örnek projeden, tarayıcıyla tamamlanan bir
+3D Secure satış (100,00 TL, tek çekim, resmî test kartı) şunları kanıtladı:
+
+- **`Authorization` başlığı** (IYZWSv2) — iyzico isteği kabul etti, `paymentId` verdi
+- **Initialize yanıt imzası** — doğrulama açıkken geçti
+- **3DS dönüş imzası** — gerçek dönüş, `conversationData:conversationId:mdStatus:paymentId:status`
+  sırasıyla birebir eşleşti
+- **Provizyon (auth) yanıt imzası** — `/payment/3dsecure/auth` yanıtı doğrulandı,
+  `authCode` alındı
+
+Aynı oturumda şu işlemler de sandbox'a karşı çalıştırıldı:
+
+| İşlem | Sonuç |
+|---|---|
+| Durum sorgusu | `paid`, 100,00 TL, maskeli kart — sipariş numarasıyla |
+| Durum sorgusu (bulunamayan kayıt) | `found: false` / `unknown` — sessizce "ödendi" demiyor |
+| BIN sorgusu | Akbank · `master_card` · `debit` |
+| Taksit sorgusu | Debit kartta tek seçenek, kredi kartta 1/2/3/6/9/12 — taksit kart tipine ve işyeri anlaşmasına bağlı |
+| İade (tutarsız) | **Kusur bulundu ve düzeltildi**: `price` gönderilmiyordu, iyzico `5004` ile reddediyordu |
+| İade (düzeltme sonrası) | Başarılı — iade yanıt imzası da doğrulandı; iyzico işlemi `transactionType: CANCEL` olarak kaydetti |
+
+Bunlar **doğrulanmadı**: diğer ödeme modelleri (`3d_pay`, `3d_host`,
+`regular`) ve canlı ortam. Sandbox'ta çalışan bir akış canlıda da çalışır diye
+bir garanti yoktur; üye işyeri tanımınız farklı olabilir.
+
+**iyzico'nun ayrı bir iptal işlemi yoktur** — bu yüzden driver
+`SupportsCancellation` arayüzünü uygulamaz. Aynı gün yapılan tam iadeyi iyzico
+kendisi iptal olarak işler; yukarıdaki testte yanıt `transactionType: CANCEL`
+döndü. Yani iptal etmek için `refund()` çağırmanız yeterli.
 
 ---
 
 **İçindekiler**
 [Kurulum](#kurulum) ·
+[Doğrulama durumu](#doğrulama-durumu) ·
 [Örnek proje](https://github.com/Voxyfy/anadolupay-laravel) ·
 [Desteklenen bankalar](#desteklenen-bankalar) ·
 [Nasıl çalışır](#nasıl-çalışır) ·
@@ -561,6 +616,13 @@ sipariş "ödendi" görünür.
 başarılı işlemlerde boş gelir; sonuç `hashValue` içindedir. Ödeme başlatılırken
 dönen `CodeForHash` saklanmazsa dönüş yorumlanamaz.
 
+**Param IP kısıtı uygular ve eski test adresi kapandı.** `posws` ve
+`testposws` sunucuları whitelist dışındaki adreslerden gelen isteği WAF
+seviyesinde `403` ile reddeder — yani kimlik bilgileriniz doğru olsa bile
+sunucunuzun IP'si Param'a bildirilmeden hiçbir çağrı geçmez. Ayrıca çok
+sayıda kaynakta geçen `test-dmz.param.com.tr` adresi artık `404` dönüyor;
+güncel test adresi `testposws.param.com.tr`'dir.
+
 **Craftgate iki ayrı anahtar kullanır.** API istekleri Secret Key ile,
 3D dönüşü panelde ayrıca üretilen **3D Secure Callback Key** ile imzalanır.
 İkisini karıştırmak "imza geçersiz" hatası verir. Webhook'ların üçüncü bir
@@ -751,6 +813,20 @@ AnadoluPay::driver('iyzico')->refund(new RefundPaymentData(
     metadata: ['conversation_id' => 'SIPARIS-123'],
 ));
 ```
+
+**iyzico'da tutar zorunludur.** Diğer driver'larda tutarı boş bırakmak
+"tamamını iade et" demektir; iyzico'da böyle bir uç yoktur ve tutarsız istek
+`5004 price gönderilmesi zorunludur` ile reddedilir. Paket bu durumda ödemenin
+tutarını `/payment/detail` ucundan okuyup gönderir — yani tutarsız çağrı da
+çalışır, ama arka planda fazladan bir sorgu yapar.
+
+Kısmi iade yapılmış bir ödemede okunan tutar kalan bakiyeden büyük olur ve
+iyzico işlemi reddeder. Bu bilinçli bir tercihtir: fazla iade etmektense hata
+vermek doğrudur. Öyle bir ödemede tutarı açıkça verin.
+
+**Ayrı bir iptal işlemi yoktur.** Driver `SupportsCancellation` uygulamaz;
+çünkü iyzico aynı gün yapılan tam iadeyi kendisi iptal olarak işler — yanıtta
+`transactionType: CANCEL` döner. Gün içi iptal için `refund()` çağırın.
 
 ## Paratika
 
@@ -950,7 +1026,7 @@ QNB_PAYFOR_GATEWAY_3D=https://vpostest.qnb.com.tr/Gateway/Default.aspx
 KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services/Home
 ALBARAKA_PAYMENT_API=https://epostest.albarakaturk.com.tr/ALBMerchantService/MerchantJSONAPI.svc
 TOSLA_PAYMENT_API=https://prepentegrasyon.tosla.com/api/Payment
-PARAM_PAYMENT_API=https://test-dmz.param.com.tr/turkpos.ws/service_turkpos_test.asmx
+PARAM_PAYMENT_API=https://testposws.param.com.tr/turkpos.ws/service_turkpos_test.asmx
 AKBANK_POS_PAYMENT_API=https://apipre.akbank.com/api/v1/payment/virtualpos
 CRAFTGATE_PAYMENT_API=https://sandbox-api.craftgate.io
 MOKA_PAYMENT_API=https://service.refmokaunited.com
@@ -1049,9 +1125,17 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 
 ### Doğrulama
 
-- [ ] **Gerçek banka testi.** Hiçbir driver gerçek bir banka test terminaline
-      karşı çalıştırılmadı — bkz. yukarıdaki uyarı. Kapsamı yatay büyütmek
-      (yeni banka, yeni kuruluş) bu doğrulama yapılmadan riski azaltmıyor.
+- [x] ~~iyzico uçtan uca doğrulaması.~~ 2026-08-09, sandbox 3D Secure satış:
+      dört imza şeması da gerçek trafikle doğrulandı. Bkz.
+      [Doğrulama durumu](#doğrulama-durumu).
+- [ ] **Gerçek banka testi.** Hiçbir banka driver'ı gerçek bir test
+      terminaline karşı çalıştırılmadı. Kapsamı yatay büyütmek (yeni banka,
+      yeni kuruluş) bu doğrulama yapılmadan riski azaltmıyor.
+- [x] ~~iyzico'nun işlem kapsamı.~~ İade, durum, BIN ve taksit sorgusu
+      sandbox'ta doğrulandı; iade tutarsız çağrıda hiç çalışmıyordu, düzeltildi.
+      İptal ayrı bir işlem değil — iyzico tam iadeyi iptal olarak işliyor.
+- [ ] iyzico'nun diğer ödeme modelleri (`3d_pay`, `3d_host`, `regular`)
+      sandbox'ta çalıştırılmadı.
 
 ### Yeni bankalar
 

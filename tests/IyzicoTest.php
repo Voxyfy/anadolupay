@@ -8,6 +8,7 @@ use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
+use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\IyzicoGateway;
 use Voxyfy\AnadoluPay\Support\IyzicoHttpClient;
 use Voxyfy\AnadoluPay\Support\IyzicoSignatureValidator;
@@ -349,5 +350,61 @@ describe('iyzico ödeme akışı', function () {
 
         expect($result->success)->toBeFalse()
             ->and($result->errorMessage)->toBe('İade edilebilir tutar aşıldı');
+    });
+    /*
+     * iyzico'da `price` her zaman zorunludur — "tutarı boş bırak, tamamını
+     * iade et" diye bir uç yoktur. Bu davranış sandbox'ta `5004 price
+     * gönderilmesi zorunludur` hatasıyla ortaya çıktı.
+     */
+    it('tutar verilmezse ödemenin tutarını sorgulayıp gönderir', function () {
+        Http::fake([
+            '*/payment/detail' => Http::response([
+                'status' => 'success',
+                'paymentId' => '12345',
+                'paidPrice' => 100,
+                'price' => 100,
+            ]),
+            '*/v2/payment/refund' => Http::response([
+                'status' => 'success',
+                'paymentId' => '12345',
+                'price' => '100.00',
+                'currency' => 'TRY',
+                'conversationId' => '12345',
+                // İmza sondaki sıfırlar atılmış tutar üzerinden hesaplanır.
+                'signature' => iyzicoSign('12345', '100.0', 'TRY', '12345'),
+            ]),
+        ]);
+
+        $result = IyzicoGateway::fromConfig()->refund(new RefundPaymentData('12345'));
+
+        expect($result->success)->toBeTrue();
+
+        Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/v2/payment/refund')
+            && str_contains($request->body(), '"price":"100.00"'));
+    });
+
+    it('tutar okunamazsa iadeyi tutarsız göndermek yerine hata verir', function () {
+        Http::fake([
+            '*/payment/detail' => Http::response(['status' => 'failure', 'errorCode' => '5087']),
+        ]);
+
+        IyzicoGateway::fromConfig()->refund(new RefundPaymentData('YOK'));
+    })->throws(PaymentFailedException::class, 'tutar ister');
+
+    it('tutar verildiğinde fazladan sorgu yapmaz', function () {
+        Http::fake([
+            '*/v2/payment/refund' => Http::response([
+                'status' => 'success',
+                'paymentId' => '12345',
+                'price' => '1.99',
+                'currency' => 'TRY',
+                'conversationId' => '12345',
+                'signature' => iyzicoSign('12345', '1.99', 'TRY', '12345'),
+            ]),
+        ]);
+
+        IyzicoGateway::fromConfig()->refund(new RefundPaymentData('12345', 1.99));
+
+        Http::assertNotSent(fn ($request) => str_contains((string) $request->url(), '/payment/detail'));
     });
 });
