@@ -2,6 +2,10 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.0.9 - 2026-08-09
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.8...v1.0.9
+
 ## v1.0.8 - 2026-08-08
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.7...v1.0.8
@@ -67,25 +71,28 @@ alınan sonuç kimlik bilgilerinin doğruluğunu kanıtlamaz.
 ### Düzeltildi — VakıfBank (PayFlex) canlı sandbox'a karşı
 
 VakıfBank, sanal POS sandbox'ını test üye işyeri ve kartlarıyla birlikte
-herkese açık yayınlıyor ([sanalpossandbox-test.vakifbank.com.tr]). Driver bu
+herkese açık yayınlıyor ([sanalpossandbox-test.vakifbank.com.tr](https://sanalpossandbox-test.vakifbank.com.tr/)). Driver bu
 ortama karşı çalıştırıldığında üç gerçek kusur çıktı:
 
 - **Enrollment isteği yanlış kodlanıyordu.** Servis düz form alanı beklerken
   `prmstr` içinde XML gönderiliyordu; banka alanları hiç okumadan yanıltıcı
   bir `2030 Invalid expire date` döndürüyordu. Artık düz form gönderiliyor.
+  
 - **`MerchantType` varsayılan olarak `0` gönderiliyordu**; banka yalnızca `1`
   (ana bayi) ve `2` (alt bayi) tanır. Alan artık yalnızca alt bayi
   yapılandırıldığında, `SubMerchantId` ile birlikte gönderiliyor.
+  
 - **Durum sorgusu her zaman `unknown` döndürüyordu.** Yanıtta `TransactionStatus`
   diye bir alan yok; durum `IsCanceled`, `IsReversed`, `IsRefunded`,
   `TotalRefundAmount` ve `IsCaptured` bayraklarından türetiliyor. Maskeli kart
   da okunmuyordu (`PanMasked`).
-
+  
 - **3D provizyonu kart bilgisi istiyordu.** Banka işlemi `MpiTransactionId`
   üzerinden bulur; kart zorunlu değil, hatta bazı kurulumlar gönderilmesini
   `1127` ile reddeder. `order['card']` artık isteğe bağlı — verilmezse kart
   alanları hiç gönderilmiyor. Böylece kart numarasını 3D dönüşü için istekler
   arasında saklama zorunluluğu kalktı. Tutar da aynı şekilde isteğe bağlı oldu.
+  
 
 Ayrıca 3D akışı için: bankanın BKM "GO Güvenli Öde" kurulumunda `PaReq`, klasik
 bir 3DS bloğu değil, kendi kendini gönderen bir HTML sayfasının base64'üdür.
@@ -102,8 +109,6 @@ yalnızca 3D akışında geçiyor (non-secure provizyonda CVV'den bağımsız ol
 `0312` ile reddediliyor) ve eski `4443` portlu uçlar bu üye işyerini tanımayıp
 her isteğe — tutar alanı hiç yokken bile — `1008 Invalid money amount`
 döndürüyor.
-
-[sanalpossandbox-test.vakifbank.com.tr]: https://sanalpossandbox-test.vakifbank.com.tr/
 
 ### Doğrulandı — Moka uçtan uca
 
@@ -278,8 +283,8 @@ alandır**:
 
 ```
 ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A AUTH_DTTM:… AUTH_CODE:…
-```
 
+```
 Driver bu dizginin tamamını durum kodu sanıyordu. Sonuç: var olan bir sipariş
 `unknown` görünüyor, **var olmayan bir sipariş ise `found: true` dönüyordu** —
 çünkü boş şablon (`ORD_ID: CHARGE_TYPE_CD: …`) dolu bir değer sayılıyordu.
@@ -351,7 +356,7 @@ driver'ının **dört imza şemasını da** gerçek trafikle doğruladı:
 * Provizyon (`/payment/3dsecure/auth`) yanıt imzası
 
 Bu, paketin ilk uçtan uca doğrulanan driver'ı. README'ye sürüm bazında değil
-**driver bazında** bir [Doğrulama durumu](README.md#doğrulama-durumu) tablosu
+**driver bazında** bir [Doğrulama durumu](README.md#do%C4%9Frulama-durumu) tablosu
 eklendi: "test var" ile "gerçekten çalışıyor" aynı şey olmadığı için her
 driver'ın hangi seviyede ölçüldüğü ayrı ayrı yazıyor.
 
