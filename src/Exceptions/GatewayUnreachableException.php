@@ -34,6 +34,8 @@ class GatewayUnreachableException extends TransportException
             safeToRetry: true,
             context: $context + ['bank' => $bank, 'url' => $url, 'reason' => 'connection_failed'],
             previous: $previous,
+            // Bağlantı hiç kurulamadı: istek bankaya ulaşmadı, sonuç kesin.
+            outcomeUncertain: false,
         );
     }
 

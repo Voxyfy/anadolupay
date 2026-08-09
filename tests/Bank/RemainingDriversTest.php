@@ -365,11 +365,12 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
     });
 
     it('MPI kaydından ACS bilgilerini alıp forma çevirir', function () {
+        // Gerçek yanıt zarfı: kök eleman IPaySecure.
         Http::fake(['bank.test/*' => Http::response(
-            '<VposEnrollmentResponse><Message><VERes><Status>Y</Status>'
+            '<IPaySecure><Message><VERes><Status>Y</Status>'
             .'<PaReq>PAREQ-1</PaReq><ACSUrl>https://acs.test/auth</ACSUrl>'
             .'<TermUrl>https://shop.test/ok</TermUrl><MD>MD-1</MD>'
-            .'</VERes></Message></VposEnrollmentResponse>'
+            .'</VERes></Message><MessageErrorCode>200</MessageErrorCode></IPaySecure>'
         )]);
 
         $response = $this->gateway->createPayment(BankTestConfig::order(amount: 199.90));
@@ -379,8 +380,64 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
             ->and($response->formFields['PaReq'])->toBe('PAREQ-1')
             ->and($response->formFields['MD'])->toBe('MD-1');
 
-        Http::assertSent(fn ($request) => str_contains($request->body(), 'PurchaseAmount')
-            && str_contains(urldecode($request->body()), '<PurchaseAmount>199.90</PurchaseAmount>'));
+        // Enrollment servisi `prmstr` içinde XML değil düz form alanı bekler;
+        // XML gönderildiğinde alanları hiç okumadan "2030 Invalid expire date"
+        // döner. VakıfBank sandbox'ında canlı istekle doğrulanmıştır.
+        Http::assertSent(function ($request) {
+            $body = urldecode($request->body());
+
+            return ! str_contains($body, 'prmstr=')
+                && str_contains($body, 'PurchaseAmount=199.90')
+                && str_contains($body, 'ExpiryDate=3012');
+        });
+    });
+
+    /**
+     * VakıfBank'ın BKM "GO Güvenli Öde" kurulumunda PaReq, klasik bir 3DS
+     * bloğu değil; kendi kendini gönderen bir HTML sayfasının base64'üdür.
+     * Doğrulama sayfası ACSUrl'de değil, o sayfanın form hedefindedir —
+     * ACSUrl'e POST edildiğinde banka "400 Hatalı İstek" sayfası döndürür.
+     */
+    it('PaReq bir HTML yönlendirme sayfasıysa içindeki formu kullanır', function () {
+        $inner = "<html><body><form id='initThreeDFlow' action='https://go.test/troy/approve' method='post'>"
+            ."<input type='hidden' name='goreq' value='GOREQ-1'/></form></body></html>";
+
+        Http::fake(['bank.test/*' => Http::response(
+            '<IPaySecure><Message><VERes><Status>Y</Status>'
+            .'<PaReq>'.base64_encode($inner).'</PaReq>'
+            .'<ACSUrl>https://acs.test/startThreeDFlow</ACSUrl><MD>MD-1</MD>'
+            .'</VERes></Message></IPaySecure>'
+        )]);
+
+        $response = $this->gateway->createPayment(BankTestConfig::order());
+
+        expect($response->formAction)->toBe('https://go.test/troy/approve')
+            ->and($response->formFields)->toBe(['goreq' => 'GOREQ-1']);
+    });
+
+    it('PaReq klasik bir blokken ACSUrl kullanılmaya devam eder', function () {
+        Http::fake(['bank.test/*' => Http::response(
+            '<IPaySecure><Message><VERes><Status>Y</Status><PaReq>eJxVUttuwjAM</PaReq>'
+            .'<ACSUrl>https://acs.test/auth</ACSUrl><TermUrl>https://shop.test/ok</TermUrl><MD>MD-1</MD>'
+            .'</VERes></Message></IPaySecure>'
+        )]);
+
+        $response = $this->gateway->createPayment(BankTestConfig::order());
+
+        expect($response->formAction)->toBe('https://acs.test/auth')
+            ->and(array_keys($response->formFields))->toBe(['PaReq', 'TermUrl', 'MD']);
+    });
+
+    it('alt bayi tanımlı değilse MerchantType alanını hiç göndermez', function () {
+        Http::fake(['bank.test/*' => Http::response(
+            '<IPaySecure><Message><VERes><Status>Y</Status><ACSUrl>https://acs.test/a</ACSUrl>'
+            .'</VERes></Message></IPaySecure>'
+        )]);
+
+        $this->gateway->createPayment(BankTestConfig::order());
+
+        // Banka yalnızca 1 ve 2 değerlerini tanır; eski varsayılan "0" geçersizdi.
+        Http::assertSent(fn ($request) => ! str_contains(urldecode($request->body()), 'MerchantType'));
     });
 
     it('kart 3D programına dahil değilse açık hata verir', function () {
@@ -417,6 +474,33 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
             && str_contains(urldecode($request->body()), '<CAVV>CAVV-1</CAVV>'));
     });
 
+    /**
+     * 3D provizyonunda banka işlemi `MpiTransactionId` üzerinden bulur; kart
+     * zorunlu değildir ve bazı kurulumlar gönderilmesini `1127` ile reddeder.
+     * Kart istenmemesi, PAN'ı istekler arasında saklama zorunluluğunu kaldırır.
+     */
+    it('kart verilmemişse provizyonu kartsız gönderir', function () {
+        Http::fake(['bank.test/*' => Http::response(
+            '<VposResponse><ResultCode>0000</ResultCode><TransactionId>TX-1</TransactionId></VposResponse>'
+        )]);
+
+        $result = $this->gateway->verify(new VerifyPaymentData(
+            payload: ['Status' => 'Y', 'Cavv' => 'CAVV-1', 'Eci' => '05', 'VerifyEnrollmentRequestId' => 'VER-1'],
+            order: ['id' => 'ORDER-1'],
+        ));
+
+        expect($result->success)->toBeTrue();
+
+        Http::assertSent(function ($request) {
+            $body = urldecode($request->body());
+
+            return str_contains($body, '<MpiTransactionId>VER-1</MpiTransactionId>')
+                && ! str_contains($body, '<Pan>')
+                && ! str_contains($body, '<Cvv>')
+                && ! str_contains($body, '<CurrencyAmount>');
+        });
+    });
+
     it('3D doğrulaması başarısızsa provizyon istemez', function () {
         Http::fake();
 
@@ -430,11 +514,55 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
         $this->gateway->capture(new CapturePaymentData('ORDER-1', 99.90));
     })->throws(PaymentFailedException::class);
 
+    /**
+     * Search yanıtında tek bir durum alanı yoktur; durum bayraklardan
+     * türetilir. Gövde, VakıfBank sandbox'ından alınan gerçek yanıttır.
+     */
+    it('durumu Search bayraklarından türetir', function (array $fields, string $expected) {
+        $rows = '';
+
+        foreach ([...[
+            'PaymentTransactionId' => '10000611422',
+            'TransactionType' => 'Sale',
+            'Amount' => '10.50',
+            'OrderId' => 'ORDER-1',
+            'TransactionId' => 'TX-1',
+            'PanMasked' => '43550840****0001',
+            'HostDate' => '20260809234631',
+            'ResultCode' => '0000',
+        ], ...$fields] as $key => $value) {
+            $rows .= "<{$key}>{$value}</{$key}>";
+        }
+
+        Http::fake(['bank.test/*' => Http::response(
+            '<SearchResponse><ResponseInfo><ResponseCode>0000</ResponseCode></ResponseInfo>'
+            ."<TransactionSearchResultInfo><TransactionSearchResultInfo>{$rows}"
+            .'</TransactionSearchResultInfo></TransactionSearchResultInfo></SearchResponse>'
+        )]);
+
+        $status = $this->gateway->status('ORDER-1');
+
+        expect($status->found)->toBeTrue()
+            ->and($status->status)->toBe($expected)
+            ->and($status->amount?->toDecimalString())->toBe('10.50')
+            // Maskeli kart `PanMasked` alanında döner.
+            ->and($status->maskedCardNumber)->toBe('43550840****0001');
+    })->with([
+        'satış' => [['IsCanceled' => 'false', 'IsRefunded' => 'false'], StatusResponse::STATUS_PAID],
+        'iptal' => [['IsCanceled' => 'true'], StatusResponse::STATUS_CANCELLED],
+        'teknik iptal' => [['IsReversed' => 'true'], StatusResponse::STATUS_CANCELLED],
+        'tam iade' => [['IsRefunded' => 'true', 'TotalRefundAmount' => '10.50'], StatusResponse::STATUS_REFUNDED],
+        // Kısmî iade sonrası işlem hâlâ tahsil edilmiş sayılır.
+        'kısmî iade' => [['IsRefunded' => 'true', 'TotalRefundAmount' => '4.00'], StatusResponse::STATUS_PAID],
+        'kapanmamış ön provizyon' => [['TransactionType' => 'Auth', 'IsCaptured' => 'false'], StatusResponse::STATUS_PRE_AUTHORIZED],
+        'kapanmış ön provizyon' => [['TransactionType' => 'Auth', 'IsCaptured' => 'true'], StatusResponse::STATUS_PAID],
+    ]);
+
     it('durum sorgusunu ayrı sorgu ucuna gönderir', function () {
         Http::fake(['bank.test/query' => Http::response(
             '<SearchResponse><TransactionSearchResultInfo><TransactionSearchResultInfo>'
-            .'<TransactionStatus>Successful</TransactionStatus><TransactionId>TX-1</TransactionId>'
-            .'<CurrencyAmount>199.90</CurrencyAmount>'
+            .'<ResultCode>0000</ResultCode><TransactionId>TX-1</TransactionId>'
+            .'<Amount>199.90</Amount>'
             .'</TransactionSearchResultInfo></TransactionSearchResultInfo></SearchResponse>'
         )]);
 

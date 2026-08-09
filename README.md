@@ -70,11 +70,13 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | Driver | Seviye | Dayanak |
 |---|---|---|
 | `iyzico` | **Uçtan uca** | 2026-08-09, sandbox 3D Secure satış |
+| `kuveytturk` | **Uçtan uca (ödeme)** | 2026-08-09 — 3D doğrulama ve provizyon (`OTORİZASYON VERİLDİ`); sorgu/iade doğrulanmadı |
 | `craftgate` | Test vektörü | Resmî istemci depolarındaki üç vektör |
 | `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
 | `tosla` | **Uçtan uca** | 2026-08-09 — 3D satış, durum, taksit, iade ve iptal doğrulandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
 | NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal |
+| `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
@@ -592,6 +594,27 @@ PayFor ve Kuveyt Türk `'0'`, Param `'1'` bekler. PayFlex alanı hiç göndermez
 **Para birimi kodu her yerde ISO 4217 sayısal değil.** Kuveyt Türk dört haneli
 kullanır (`0949`), PosNet V1 harf kısaltması (`TL`, `US`, `EU`).
 
+**PayFlex'te enrollment adımı diğer uçlardan ayrışır.** Provizyon ve sorgu
+istekleri `prmstr` alanında URL-kodlanmış XML ister; enrollment ise **düz form
+alanı** bekler. XML gönderilirse banka alanları hiç okumadan yanıltıcı bir
+`2030 Invalid expire date` döndürür. Son kullanma tarihi de iki biçimdedir:
+enrollment `YYMM`, provizyon `YYYYMM`.
+
+**PayFlex 3D'de `PaReq` her zaman klasik bir 3DS bloğu değildir.** BKM "GO
+Güvenli Öde" kurulumunda base64'ü, kendi kendini gönderen bir HTML sayfasıdır ve
+doğrulama sayfası `ACSUrl`'de değil o sayfanın form hedefindedir; `ACSUrl`'e
+POST edilirse banka "400 Hatalı İstek" sayfası verir. Driver bunu ayırt eder.
+
+**PayFlex 3D provizyonu kart bilgisi istemez.** Banka işlemi `MpiTransactionId`
+üzerinden bulur; bazı kurulumlar kart gönderilmesini `1127` ile reddeder. Bu
+yüzden `verify()` çağrısında `order['card']` isteğe bağlıdır — vermezseniz kart
+alanları hiç gönderilmez ve PAN'ı istekler arasında saklamanız gerekmez.
+
+**PayFlex durum sorgusu tek bir durum alanı döndürmez.** `IsCanceled`,
+`IsReversed`, `IsRefunded`, `TotalRefundAmount` ve `IsCaptured` bayraklarından
+türetilir. Kısmî iade edilmiş bir işlem `paid` kalır; `refunded` yalnızca tamamı
+iade edildiğinde döner.
+
 **Garanti iade için ayrı kullanıcı ister.** `refund` ve `void` işlemlerinde
 `securityData` normal şifreyle değil iade şifresiyle hesaplanır. İki ayrı
 kullanıcı tanımlamazsanız iadeler reddedilir.
@@ -670,6 +693,19 @@ sayfası döner; `PaymentResponse::$htmlContent` içinde gelir ve doğrudan
 tarayıcıya basılır. Ayrıca kısmi iade ödeme değil **işlem** bazındadır:
 `metadata['payment_transaction_id']` vermezseniz paket sessizce tam iade
 yapmak yerine hata verir.
+
+**Taşıma hatalarında iki ayrı soru vardır.** `safeToRetry` isteğin bankaya
+ulaşmadığından emin miyiz, `outcomeUncertain` ise işlemin gerçekleşmiş olma
+ihtimali var mı demektir. Banka isteği okumadan reddettiyse (4xx) sonuç
+kesindir — hiçbir şey olmamıştır; zaman aşımı ve 5xx'te ise durum sorgusuyla
+teyit gerekir.
+
+**Kuveyt Türk'te sorgu ve iade ayrı bir SOAP servisindedir.** Ödeme ve
+provizyon XML uçlarına giderken durum sorgusu, iade ve iptal
+`VirtualPosService.svc/Basic` adresine gider. Bu uç JSON gövdeyi `415` ile
+reddeder ve paketin bu bölümü **henüz doğrulanmamıştır**. Ayrıca `query_api`
+tanımlanmazsa varsayılan canlı adrestir — test terminaliyle çalışırken mutlaka
+test adresini verin.
 
 **NestPay sorgu yanıtında tutarlar kuruş cinsindendir.** Birleşik
 `ORDERSTATUS` alanındaki `ORIG_TRANS_AMT` ve `CAPTURE_AMT` kuruştur; ondalık

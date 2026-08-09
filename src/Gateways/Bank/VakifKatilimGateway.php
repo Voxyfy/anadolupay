@@ -327,7 +327,10 @@ class VakifKatilimGateway extends AbstractBankGateway implements SupportsCancell
 
     protected function operationUrl(string $operation): string
     {
-        return rtrim($this->config->endpoint('payment_api'), '/').'/'.$operation;
+        $base = rtrim($this->config->endpoint('payment_api'), '/');
+
+        // Yapılandırmadaki adres zaten işlem adıyla bitiyorsa tekrar ekleme.
+        return str_ends_with($base, $operation) ? $base : $base.'/'.$operation;
     }
 
     /**

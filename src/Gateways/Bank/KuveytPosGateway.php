@@ -68,7 +68,7 @@ class KuveytPosGateway extends AbstractBankGateway implements SupportsCancellati
         }
 
         $html = $this->client->postXmlForRawBody(
-            url: $this->config->endpoint('payment_api'),
+            url: $this->operationUrl('ThreeDModelPayGate'),
             data: $this->build3dFormFields($data),
             root: self::XML_ROOT,
             encoding: 'ISO-8859-1',
@@ -393,13 +393,28 @@ class KuveytPosGateway extends AbstractBankGateway implements SupportsCancellati
     }
 
     /**
+     * BOA işlemleri ayrı uçlara gider; taban adrese işlem adı eklenir.
+     *
+     * Yapılandırmadaki adres zaten işlem adıyla bitiyorsa (eski
+     * kurulumlarla uyum için) olduğu gibi kullanılır. Taban adrese POST
+     * etmek bankadan `AssemblyNotFound` yanıtı aldırır — istek işlenir ama
+     * çağrılan metot bulunamaz.
+     */
+    protected function operationUrl(string $operation): string
+    {
+        $base = rtrim($this->config->endpoint('payment_api'), '/');
+
+        return str_ends_with($base, $operation) ? $base : $base.'/'.$operation;
+    }
+
+    /**
      * @param  array<string, mixed>  $request
      * @return array<string, mixed>
      */
-    protected function postXml(array $request): array
+    protected function postXml(array $request, string $operation = 'ThreeDModelProvisionGate'): array
     {
         return $this->client->postXml(
-            url: $this->config->endpoint('payment_api'),
+            url: $this->operationUrl($operation),
             data: $request,
             root: self::XML_ROOT,
             encoding: 'ISO-8859-1',
@@ -579,7 +594,20 @@ class KuveytPosGateway extends AbstractBankGateway implements SupportsCancellati
     }
 
     /**
-     * BOA sorgu servisine JSON isteği gönderir.
+     * BOA sorgu servisine istek gönderir.
+     *
+     * **Bilinen sınır:** bu uç (`VirtualPosService.svc/Basic`) bir WCF
+     * `basicHttpBinding` servisidir ve JSON gövdeyi `415 Unsupported Media
+     * Type` ile reddeder. Gerçek test terminalinde doğrulandı. Servisin
+     * metadata yayını kapalı olduğu için SOAP sözleşmesi uzaktan
+     * çıkarılamadı; doğru zarfı bankanın entegrasyon dokümanından alıp
+     * uygulamak gerekir.
+     *
+     * Ödeme ve provizyon akışı bundan etkilenmez; yalnızca durum sorgusu,
+     * iade ve iptal bu servisi kullanır.
+     *
+     * Ayrıca `query_api` tanımlanmazsa varsayılan **canlı** adrestir; test
+     * terminaliyle çalışırken mutlaka test adresini verin.
      *
      * @param  array<string, mixed>  $request
      * @return array<string, mixed>

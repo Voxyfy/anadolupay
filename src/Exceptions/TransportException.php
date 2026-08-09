@@ -29,6 +29,14 @@ class TransportException extends AnadoluPayException
      * @param  string  $message  Hata mesajı
      * @param  bool  $safeToRetry  İsteğin bankaya ulaşmadığı kesin mi
      * @param  array<string, mixed>  $context  Hata ayıklama verisi
+     * @param  bool  $outcomeUncertain  İşlemin gerçekleşmiş olma ihtimali var mı.
+     *                                  Bu, `$safeToRetry`den farklı bir sorudur:
+     *                                  banka isteği okumadan reddettiyse (4xx)
+     *                                  sonuç **kesindir** — hiçbir şey olmadı —
+     *                                  ama istek aynı şekilde tekrarlanırsa yine
+     *                                  reddedilir. Kullanıcıya "sonuç belirsiz,
+     *                                  mutabakat yapın" demek yalnızca bu bayrak
+     *                                  true iken doğrudur.
      */
     public function __construct(
         string $message,
@@ -36,6 +44,7 @@ class TransportException extends AnadoluPayException
         array $context = [],
         int $code = 0,
         ?Throwable $previous = null,
+        public readonly bool $outcomeUncertain = true,
     ) {
         parent::__construct($message, $context, $code, $previous);
     }

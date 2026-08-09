@@ -146,12 +146,50 @@ PAYTR_TEST_MODE=true
 
 ## VakıfBank (PayFlex)
 
-**Kaynak:** [VakıfBank Sanal POS Entegrasyon Kılavuzu (PDF)](https://vbassets.vakifbank.com.tr/ticari/pos-uye-is-yeri-hizmetleri/vakifbank-sanal-pos-entegrasyon-dokumani-2.4-versiyon.pdf) — resmî
+**Kaynak:** [sanalpossandbox-test.vakifbank.com.tr](https://sanalpossandbox-test.vakifbank.com.tr/) —
+resmî, giriş gerektirmez. Banka test üye işyerini ve kartlarını sayfada açıkça
+yayınlıyor; başvuru gerekmiyor.
 
-Entegrasyon kılavuzunda örnek 3D Secure test kartı olarak
-`4289450189088488`, statik 3D şifresi `12ABCDEF` verilmiştir. Kılavuzdaki son
-kullanma tarihi geçmiştir; güncel kart ve tarih için bankadan gelen test üye
-işyeri paketine bakın.
+| Marka | Numara | CVV | SKT |
+|---|---|---|---|
+| VISA | `4355084000000001` | `000` | 12/29 |
+| MasterCard | `5521010140829928` | `961` | 12/29 |
+
+Test üye işyeri bilgileri:
+
+```
+MerchantId : 000000000007955
+Password   : 123Ab456
+TerminalNo : VP000123
+```
+
+Uçlar (test ortamı — *bu paketin varsayılanları canlı ortamı gösterir, test için
+`.env` üzerinden ezin*):
+
+```
+Enrollment : https://inbound.apigatewaytest.vakifbank.com.tr:8443/threeDGateway/Enrollment
+Provizyon  : https://apiportalprep.vakifbank.com.tr:8443/virtualPos/Vposreq
+Sorgu      : https://apiportalprep.vakifbank.com.tr:8443/virtualPos/Search
+```
+
+**Bu ortamda gözlemlediğimiz tuhaflıklar** (hepsi canlı istekle doğrulandı):
+
+- **MasterCard kartı yalnızca 3D akışında kullanılabilir.** Non-secure
+  provizyonda CVV ne gönderilirse gönderilsin `0312` ("Kartın Cvv2 değeri
+  hatalı", `ResultDetail` ise "RED-GEÇERSİZ KART") ile reddediliyor. Non-3D
+  testleri VISA kartıyla yapın.
+- **CVV bu ortamda doğrulanmıyor.** VISA kartı `000` ile de `961` ile de aynı
+  şekilde `0000` döndürüyor. Yani `0312` hatası gerçekten CVV'yi işaret
+  etmiyor — kart bazlı bir kısıt.
+- **Son kullanma tarihi iki farklı biçimde gönderilir:** Enrollment `YYMM`
+  (`2912`), provizyon `YYYYMM` (`202912`). Paket bunu zaten ayırıyor.
+- Eski `4443` portlu uçlar (`3dsecuretest…/MPIAPI/MPI_Enrollment.aspx`) bu üye
+  işyerini tanımıyor; **her isteğe**, hatta tutar alanı hiç yokken bile,
+  `1008 Invalid money amount` döndürüyorlar. Kod ayırt edici değil, hata
+  ayıklarken yanıltmasın.
+
+Kılavuzun eski sürümünde geçen `4289450189088488` / statik 3D şifresi
+`12ABCDEF` kartının son kullanma tarihi geçmiştir; yukarıdaki kartları kullanın.
 
 ---
 
@@ -402,12 +440,17 @@ açıldığı doğrulanmıştır.
 [Paratika'nın resmî tablosu](https://docs.paratika.com.tr/test-kartlari) —
 aynı numara iki kaynakta da geçiyor.
 
-| Kart numarası | SKT | CVV |
-|---|---|---|
-| `5188961939192544` | 06/2025 | 929 |
+| Kart numarası | SKT | CVV | 3D doğrulama kodu |
+|---|---|---|---|
+| `5188961939192544` | 06/2029 | 588 | **`123456`** |
 
-> **Son kullanma tarihi geçmiştir** (06/2025). Test ortamları tarihi
-> doğrulamayabilir ama reddedilirse bankadan güncel kartı isteyin.
+3D sayfasında istenen "Doğrulama Kodu" test ortamında sabittir: `123456`.
+
+> **Dolaşımdaki `06/2025 · CVV 929` bilgisi eskimiştir.** Paratika'nın
+> tablosunda öyle geçiyor ama o kartla 3D adımı sorunsuz geçilip
+> **provizyon adımında** `ResponseCode: 54 Vade Sonu Geçmiş Kart` alınıyor —
+> yani hata ancak akışın ikinci adımında görünüyor. Yukarıdaki `06/2029 · 588`
+> değerleri mewebstudio/pos örneğinden alınmıştır.
 
 Dokümanlarda dolaşan test üye işyeri bilgileri:
 
@@ -419,11 +462,10 @@ KUVEYTTURK_CUSTOMER_ID=400235
 KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services/Home
 ```
 
-> 2026-08-09'da denendi: istek kabul edilip imzalı bir yanıt üretildi, ancak
-> banka `ResponseCode: AssemblyNotFound` döndürdü — "Call couldn't find the
-> method in the orchestration assembly". Bu **bankanın test sunucusundaki**
-> bir sorundur, istemci tarafından düzeltilemez. Kendi test terminaliniz
-> varsa onu kullanın.
+> 2026-08-09'da bu bilgilerle bankanın gerçek 3D sayfası alındı. İlk
+> denemede `AssemblyNotFound` hatası gelmişti; sebep bankanın sunucusu değil,
+> isteğin taban adrese gönderilmesiydi — BOA işlemleri `ThreeDModelPayGate`
+> gibi ayrı uçlara gider. Paket bunu artık kendisi ekler.
 
 ---
 

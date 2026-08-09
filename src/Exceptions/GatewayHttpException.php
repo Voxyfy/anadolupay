@@ -39,6 +39,9 @@ class GatewayHttpException extends TransportException
                 'reason' => 'unexpected_status',
             ],
             code: $status,
+            // 4xx: banka isteği işlemeden reddetti, sonuç kesin — hiçbir şey
+            // olmadı. 5xx: istek işlenmiş olabilir, sonuç belirsizdir.
+            outcomeUncertain: $status >= 500,
         );
     }
 

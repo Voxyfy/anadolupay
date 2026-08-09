@@ -231,3 +231,32 @@ describe('Kuveyt Türk iptal', function () {
             ->and($status->status)->toBe(StatusResponse::STATUS_UNKNOWN);
     });
 });
+
+describe('Kuveyt Türk uç noktaları', function () {
+    /*
+     * BOA işlemleri ayrı uçlara gider. Taban adrese POST edilirse banka
+     * isteği işler ama `ResponseCode: AssemblyNotFound` döndürür —
+     * "Call couldn't find the method in the orchestration assembly".
+     * Gerçek test terminalinde bu şekilde ortaya çıktı.
+     */
+    it('3D isteğini ThreeDModelPayGate ucuna gönderir', function () {
+        Http::fake(['bank.test/*' => Http::response('<html>3D Secure Processing</html>')]);
+
+        BankTestConfig::make(KuveytPosGateway::class, [
+            'extra' => ['customer_id' => '400235'],
+        ])->createPayment(BankTestConfig::order());
+
+        Http::assertSent(fn ($request) => str_ends_with((string) $request->url(), '/ThreeDModelPayGate'));
+    });
+
+    it('yapılandırmada işlem adı zaten varsa tekrar eklemez', function () {
+        Http::fake(['bank.test/*' => Http::response('<html>3D Secure Processing</html>')]);
+
+        BankTestConfig::make(KuveytPosGateway::class, [
+            'extra' => ['customer_id' => '400235'],
+            'endpoints' => ['payment_api' => 'https://bank.test/api/ThreeDModelPayGate'],
+        ])->createPayment(BankTestConfig::order());
+
+        Http::assertSent(fn ($request) => (string) $request->url() === 'https://bank.test/api/ThreeDModelPayGate');
+    });
+});

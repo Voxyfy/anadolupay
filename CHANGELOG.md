@@ -16,6 +16,47 @@
 
 ## Yayımlanmamış
 
+### Düzeltildi — VakıfBank (PayFlex) canlı sandbox'a karşı
+
+VakıfBank, sanal POS sandbox'ını test üye işyeri ve kartlarıyla birlikte
+herkese açık yayınlıyor ([sanalpossandbox-test.vakifbank.com.tr]). Driver bu
+ortama karşı çalıştırıldığında üç gerçek kusur çıktı:
+
+- **Enrollment isteği yanlış kodlanıyordu.** Servis düz form alanı beklerken
+  `prmstr` içinde XML gönderiliyordu; banka alanları hiç okumadan yanıltıcı
+  bir `2030 Invalid expire date` döndürüyordu. Artık düz form gönderiliyor.
+- **`MerchantType` varsayılan olarak `0` gönderiliyordu**; banka yalnızca `1`
+  (ana bayi) ve `2` (alt bayi) tanır. Alan artık yalnızca alt bayi
+  yapılandırıldığında, `SubMerchantId` ile birlikte gönderiliyor.
+- **Durum sorgusu her zaman `unknown` döndürüyordu.** Yanıtta `TransactionStatus`
+  diye bir alan yok; durum `IsCanceled`, `IsReversed`, `IsRefunded`,
+  `TotalRefundAmount` ve `IsCaptured` bayraklarından türetiliyor. Maskeli kart
+  da okunmuyordu (`PanMasked`).
+
+- **3D provizyonu kart bilgisi istiyordu.** Banka işlemi `MpiTransactionId`
+  üzerinden bulur; kart zorunlu değil, hatta bazı kurulumlar gönderilmesini
+  `1127` ile reddeder. `order['card']` artık isteğe bağlı — verilmezse kart
+  alanları hiç gönderilmiyor. Böylece kart numarasını 3D dönüşü için istekler
+  arasında saklama zorunluluğu kalktı. Tutar da aynı şekilde isteğe bağlı oldu.
+
+Ayrıca 3D akışı için: bankanın BKM "GO Güvenli Öde" kurulumunda `PaReq`, klasik
+bir 3DS bloğu değil, kendi kendini gönderen bir HTML sayfasının base64'üdür.
+Doğrulama sayfası `ACSUrl`'de değil o sayfanın form hedefindedir; `ACSUrl`'e
+POST edildiğinde banka "400 Hatalı İstek" sayfası döndürür. Driver artık bunu
+ayırt edip doğru formu üretiyor — klasik `PaReq` gelen kurulumlarda davranış
+değişmedi.
+
+Doğrulanan işlemler: **tarayıcıyla tamamlanan 3D Secure satış** (2026-08-10),
+non-3D satış, durum sorgusu, iade (kısmî ve tam), iptal, ön provizyon ve kapama.
+
+Ortama dair iki not `TEST-KARTLARI.md`'ye eklendi: yayınlanan MasterCard
+yalnızca 3D akışında geçiyor (non-secure provizyonda CVV'den bağımsız olarak
+`0312` ile reddediliyor) ve eski `4443` portlu uçlar bu üye işyerini tanımayıp
+her isteğe — tutar alanı hiç yokken bile — `1008 Invalid money amount`
+döndürüyor.
+
+[sanalpossandbox-test.vakifbank.com.tr]: https://sanalpossandbox-test.vakifbank.com.tr/
+
 ### Doğrulandı — Moka uçtan uca
 
 Moka test servisinde tarayıcıyla tamamlanan bir 3D Secure satış driver'ı
@@ -98,6 +139,53 @@ Gerçek Moka test servisinde ortaya çıktı: servislerin çoğu istek gövdesin
 `post()` artık sarmalayıcı adını parametre alıyor; yalnızca BIN sorgusu
 farklı olanı kullanıyor. Düzeltmeden sonra gerçek serviste doğrulandı:
 `41834411 → İŞ BANKASI / VISA / credit`.
+
+### Düzeltildi — belirsiz sonuç ile kesin ret ayrılmadı
+
+`TransportException` her taşıma hatasını "sonuç belirsiz" gibi sunuyordu.
+Kuveyt Türk'ün sorgu servisi JSON gövdeyi `415` ile reddedince paket
+"sağlayıcıya ulaşılamadı — sonuç belirsiz" diyordu; oysa banka isteği
+**okumadan** reddetmişti, yani hiçbir şey olmamıştı.
+
+`outcomeUncertain` alanı eklendi ve `safeToRetry`den ayrıldı; bunlar farklı
+sorulardır:
+
+| Durum | safeToRetry | outcomeUncertain |
+|---|---|---|
+| Bağlantı kurulamadı | ✔ | ✘ — istek ulaşmadı |
+| Zaman aşımı | ✘ | ✔ — işlenmiş olabilir |
+| HTTP 4xx | ✘ | ✘ — okunmadan reddedildi |
+| HTTP 5xx | ✘ | ✔ — işlenmiş olabilir |
+
+Yanlış tarafa düşmek pahalıdır: kesin bir reddi "belirsiz" diye raporlamak
+gereksiz mutabakat çalışması doğurur, tersi ise çift çekimi gözden kaçırır.
+
+### Doğrulandı — Kuveyt Türk 3D akışı
+
+Uç nokta düzeltmesinden sonra gerçek test terminalinde 3D doğrulaması
+tamamlandı (`ResponseCode: 00`, `MDStatusCode: 1 AUTHENTICATION_SUCCESSFUL`)
+ve **provizyon isteği doğru uca gidip bankadan gerçek bir karar aldı**.
+
+Güncel kart bilgisiyle akış tamamlandı: provizyon `ResponseCode: 00`
+`OTORİZASYON VERİLDİ` döndürdü ve `ProvisionNumber` alındı.
+
+İlk denemede karar `54 Vade Sonu Geçmiş Kart` olmuştu: dolaşımdaki test kartı
+bilgisi (`06/2025`) eskimişti. 3D adımı son kullanma tarihini kontrol
+etmediği için hata ancak ikinci adımda görünüyor — `TEST-KARTLARI.md`
+güncel değerlerle (`06/2029`, CVV `588`) düzeltildi.
+
+### Düzeltildi — Kuveyt Türk ödeme isteği yanlış uca gidiyordu
+
+BOA işlemleri ayrı uçlara gider (`ThreeDModelPayGate`,
+`ThreeDModelProvisionGate`); driver hepsini yapılandırmadaki taban adrese
+POST ediyordu. Banka isteği işliyor ama
+`ResponseCode: AssemblyNotFound` — "Call couldn't find the method in the
+orchestration assembly" — döndürüyordu, yani **ödeme hiç başlamıyordu**.
+
+İşlem adı artık taban adrese ekleniyor; adres zaten işlem adıyla bitiyorsa
+tekrar eklenmiyor (mevcut kurulumlar bozulmasın diye). Gerçek Kuveyt Türk
+test terminalinde doğrulandı: istek artık bankanın gerçek "3D Secure
+Processing" sayfasını döndürüyor.
 
 ### Düzeltildi — NestPay durum sorgusu tutarı 100 kat büyük raporluyordu
 

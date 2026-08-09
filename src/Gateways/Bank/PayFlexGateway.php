@@ -33,12 +33,14 @@ use Voxyfy\AnadoluPay\Support\Money;
  *      3D programına dâhil olup olmadığını (`VERes.Status`) ve doğrudan
  *      kartın ACS adresini (`ACSUrl`) döner. 3D formu bankaya değil, kartı
  *      çıkaran bankanın ACS adresine POST edilir.
- *   2. Doğrulama sonrası provizyon isteği kart bilgisini tekrar ister.
- *      Bu yüzden `verify()` çağrılırken kart, `order['card']` içinde
- *      yeniden verilmelidir.
+ *   2. Doğrulama sonrası provizyon isteği işlemi `MpiTransactionId` üzerinden
+ *      bulur; kart bilgisi zorunlu değildir. `verify()` çağrılırken kart
+ *      `order['card']` içinde verilebilir ama gerekmez — bazı kurulumlar
+ *      kart gönderilmesini `1127` ile reddeder.
  *
- * İstekler `VposRequest` kök elemanlı XML'in `prmstr` form alanı içinde
- * gönderilir. Hash kullanılmaz; kimlik doğrulama MerchantId + Password iledir.
+ * Provizyon ve sorgu istekleri `VposRequest` kök elemanlı XML'in `prmstr` form
+ * alanı içinde gönderilir; **enrollment ise düz form alanı bekler**. Hash
+ * kullanılmaz; kimlik doğrulama MerchantId + Password iledir.
  */
 class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation, SupportsPreAuthorization, SupportsRecurringPayments, SupportsStatusQuery
 {
@@ -94,7 +96,6 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
         $request = [
             'MerchantId' => $this->config->merchantId,
             'MerchantPassword' => $this->config->password,
-            'MerchantType' => (string) ($this->config->extra('merchant_type') ?? '0'),
             'PurchaseAmount' => $this->formatAmount($data->money()),
             'VerifyEnrollmentRequestId' => $this->randomString(),
             'Currency' => Currency::numeric($data->currency),
@@ -110,11 +111,24 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
             $request['InstallmentCount'] = (string) $data->installments();
         }
 
+        // Alt bayi (sub-merchant) senaryosu; tanımlı değilse alan hiç gönderilmez.
+        // Banka yalnızca 1 (ana bayi) ve 2 (alt bayi) değerlerini tanır.
+        if (($merchantType = $this->config->extra('merchant_type')) !== null) {
+            $request['MerchantType'] = (string) $merchantType;
+
+            if (($subMerchantId = $this->config->extra('sub_merchant_id')) !== null) {
+                $request['SubMerchantId'] = (string) $subMerchantId;
+            }
+        }
+
         $request = array_merge($request, $this->recurringRequest($data));
 
+        // Enrollment servisi, diğer PayFlex uçlarının aksine `prmstr` içinde XML
+        // değil düz form alanları bekler. XML gönderildiğinde alanları hiç
+        // okumaz ve yanıltıcı bir "2030 Invalid expire date" döner.
         $response = $this->client->postForm(
             url: $this->config->endpoint('gateway_3d'),
-            fields: ['prmstr' => $this->encodeXml($request, 'VposEnrollmentRequest')],
+            fields: $request,
         );
 
         $veres = $response['Message']['VERes'] ?? null;
@@ -143,15 +157,58 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
             );
         }
 
+        $paReq = (string) ($veres['PaReq'] ?? '');
+
+        // Bazı kurulumlarda (BKM "GO Güvenli Öde") PaReq, klasik bir 3DS bloğu
+        // değil; kendi kendini gönderen bir HTML sayfasının base64'üdür. Bu
+        // durumda doğrulama sayfası ACSUrl'de değil, o sayfanın içindeki form
+        // hedefindedir — ACSUrl'e POST edildiğinde banka 400 sayfası döner.
+        if (($embedded = $this->embeddedAcsForm($paReq)) !== null) {
+            return ['acs_url' => $embedded['action'], 'inputs' => $embedded['inputs'], 'raw' => $response];
+        }
+
         return [
             'acs_url' => (string) ($veres['ACSUrl'] ?? ''),
             'inputs' => [
-                'PaReq' => (string) ($veres['PaReq'] ?? ''),
+                'PaReq' => $paReq,
                 'TermUrl' => (string) ($veres['TermUrl'] ?? ''),
                 'MD' => (string) ($veres['MD'] ?? ''),
             ],
             'raw' => $response,
         ];
+    }
+
+    /**
+     * PaReq bir HTML yönlendirme sayfası ise içindeki formu çıkarır.
+     *
+     * @return array{action: string, inputs: array<string, string>}|null
+     */
+    protected function embeddedAcsForm(string $paReq): ?array
+    {
+        $html = base64_decode($paReq, true);
+
+        if ($html === false || ! str_contains($html, '<form')) {
+            return null;
+        }
+
+        if (preg_match('/<form[^>]*\baction=["\']([^"\']+)["\']/i', $html, $form) !== 1) {
+            return null;
+        }
+
+        preg_match_all(
+            '/<input[^>]*\bname=["\']([^"\']+)["\'][^>]*\bvalue=["\']([^"\']*)["\']/i',
+            $html,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        $inputs = [];
+
+        foreach ($matches as $match) {
+            $inputs[html_entity_decode($match[1])] = html_entity_decode($match[2]);
+        }
+
+        return $inputs === [] ? null : ['action' => html_entity_decode($form[1]), 'inputs' => $inputs];
     }
 
     /**
@@ -183,9 +240,9 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
         $amount = $data->order('amount');
         $currency = (string) ($data->order('currency') ?? 'TRY');
 
-        if ($orderId === '' || ! is_numeric($amount)) {
+        if ($orderId === '') {
             throw new PaymentFailedException(
-                message: "PayFlex provizyonu için sipariş bağlamı (order['id'], order['amount']) zorunludur.",
+                message: "PayFlex provizyonu için sipariş bağlamı (order['id']) zorunludur.",
                 context: ['bank' => $this->config->bank],
             );
         }
@@ -193,19 +250,28 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
         $request = $this->accountData() + [
             'TransactionType' => 'Sale',
             'TransactionId' => $orderId,
-            'CurrencyAmount' => $this->formatAmount(Money::of($amount, $currency)),
-            'CurrencyCode' => Currency::numeric($currency),
             'ECI' => $this->pick($payload, ['Eci'], '') ?? '',
             'CAVV' => $this->pick($payload, ['Cavv'], '') ?? '',
             'MpiTransactionId' => $this->pick($payload, ['VerifyEnrollmentRequestId'], '') ?? '',
             'OrderId' => $orderId,
             'ClientIp' => (string) ($data->order('ip') ?? '127.0.0.1'),
             'TransactionDeviceSource' => '0',
-            'CardHoldersName' => $card->holderName ?? '',
-            'Cvv' => $card->cvv,
-            'Pan' => $card->number,
-            'Expiry' => $card->expiry('Ym'),
         ];
+
+        // Tutar da MPI kaydından gelir; yalnızca çağıran verdiyse iletilir.
+        if (is_numeric($amount)) {
+            $request['CurrencyAmount'] = $this->formatAmount(Money::of($amount, $currency));
+            $request['CurrencyCode'] = Currency::numeric($currency);
+        }
+
+        if ($card !== null) {
+            $request += [
+                'CardHoldersName' => $card->holderName ?? '',
+                'Cvv' => $card->cvv,
+                'Pan' => $card->number,
+                'Expiry' => $card->expiry('Ym'),
+            ];
+        }
 
         $installment = (int) ($data->order('installment') ?? 1);
 
@@ -388,7 +454,15 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
         return $data->paymentId;
     }
 
-    protected function cardFromOrder(VerifyPaymentData $data): CardData
+    /**
+     * Sipariş bağlamındaki kart; verilmemişse null.
+     *
+     * 3D provizyonunda kart zorunlu değildir: banka işlemi `MpiTransactionId`
+     * üzerinden bulur. Bazı kurulumlar kart gönderilmesini açıkça reddeder
+     * (`1127`). Kart yalnızca çağıran verdiyse iletilir; böylece kart
+     * numarasını istekler arasında saklama zorunluluğu doğmaz.
+     */
+    protected function cardFromOrder(VerifyPaymentData $data): ?CardData
     {
         $card = $data->order('card');
 
@@ -396,14 +470,7 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
             return $card;
         }
 
-        if (is_array($card)) {
-            return CardData::fromArray($card);
-        }
-
-        throw new PaymentFailedException(
-            message: "PayFlex provizyonu kart bilgisi gerektirir; order['card'] sağlanmalıdır.",
-            context: ['bank' => $this->config->bank],
-        );
+        return is_array($card) ? CardData::fromArray($card) : null;
     }
 
     /**
@@ -465,6 +532,45 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
      * PayFlex sorguyu ayrı bir uçtan (`query_api`) yürütür ve kimlik
      * bilgilerini `MerchantCriteria` bloğunda ister.
      */
+    /**
+     * Search yanıtındaki işlem durumu.
+     *
+     * Servis tek bir durum alanı döndürmez; durum `IsCanceled`, `IsRefunded`
+     * gibi bayraklardan türetilir. Kısmî iade edilmiş bir işlem hâlâ tahsil
+     * edilmiş sayılır; yalnızca tamamı iade edildiğinde `refunded` olur.
+     *
+     * @param  array<string, mixed>  $transaction
+     */
+    protected function searchStatus(array $transaction, ?string $amount): string
+    {
+        $flag = fn (string $key): bool => filter_var(
+            $this->pick($transaction, [$key]) ?? 'false',
+            FILTER_VALIDATE_BOOL,
+        );
+
+        if ($flag('IsCanceled') || $flag('IsReversed')) {
+            return StatusResponse::STATUS_CANCELLED;
+        }
+
+        $refunded = $this->pick($transaction, ['TotalRefundAmount']);
+
+        if ($flag('IsRefunded') && $amount !== null && $refunded !== null
+            && bccomp($refunded, $amount, 2) >= 0) {
+            return StatusResponse::STATUS_REFUNDED;
+        }
+
+        if ((string) ($this->pick($transaction, ['ResultCode']) ?? '') !== self::SUCCESS_CODE) {
+            return StatusResponse::STATUS_FAILED;
+        }
+
+        // Kapatılmamış ön provizyon henüz tahsil edilmemiştir.
+        if ((string) ($this->pick($transaction, ['TransactionType']) ?? '') === 'Auth' && ! $flag('IsCaptured')) {
+            return StatusResponse::STATUS_PRE_AUTHORIZED;
+        }
+
+        return StatusResponse::STATUS_PAID;
+    }
+
     public function status(string $orderId, array $context = []): StatusResponse
     {
         $request = [
@@ -490,24 +596,16 @@ class PayFlexGateway extends AbstractBankGateway implements SupportsCancellation
             return StatusResponse::notFound($orderId, $response);
         }
 
-        $orderStatus = strtolower((string) ($this->pick($transaction, ['TransactionStatus']) ?? ''));
+        $amount = $this->pick($transaction, ['CurrencyAmount', 'Amount']);
 
         return new StatusResponse(
             found: true,
-            status: match ($orderStatus) {
-                'successful', 'success' => StatusResponse::STATUS_PAID,
-                'voided', 'void' => StatusResponse::STATUS_CANCELLED,
-                'refunded' => StatusResponse::STATUS_REFUNDED,
-                'unsuccessful', 'failed' => StatusResponse::STATUS_FAILED,
-                default => StatusResponse::STATUS_UNKNOWN,
-            },
+            status: $this->searchStatus($transaction, $amount),
             orderId: $orderId,
             paymentId: $this->pick($transaction, ['TransactionId']),
-            amount: ($amount = $this->pick($transaction, ['CurrencyAmount', 'Amount'])) !== null
-                ? Money::fromDecimal($amount)
-                : null,
+            amount: $amount !== null ? Money::fromDecimal($amount) : null,
             transactionTime: $this->pick($transaction, ['HostDate', 'TransactionDate']),
-            maskedCardNumber: $this->pick($transaction, ['CardNumber', 'Pan']),
+            maskedCardNumber: $this->pick($transaction, ['PanMasked', 'CardNumber', 'Pan']),
             raw: $response,
         );
     }

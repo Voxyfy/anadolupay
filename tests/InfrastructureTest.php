@@ -311,3 +311,40 @@ describe('mükerrer ödeme koruması', function () {
         expect($gateway->createPayment(BankTestConfig::order())->success)->toBeTrue();
     });
 });
+
+describe('sonuç belirsizliği', function () {
+    /*
+     * `safeToRetry` ile `outcomeUncertain` farklı sorulardır. Kuveyt Türk'ün
+     * sorgu servisi JSON gövdeyi `415` ile reddedince paket bunu
+     * "sağlayıcıya ulaşılamadı, sonuç belirsiz" diye raporluyordu; oysa
+     * banka isteği okumadan reddetmişti — hiçbir şey olmamıştı.
+     */
+    it('4xx yanıtını kesin sonuç sayar', function () {
+        $e = GatewayHttpException::unexpectedStatus('kuveytturk', 'https://bank.test/api', 415);
+
+        expect($e->outcomeUncertain)->toBeFalse()
+            ->and($e->safeToRetry)->toBeFalse();
+    });
+
+    it('5xx yanıtını belirsiz sayar', function () {
+        $e = GatewayHttpException::unexpectedStatus('garanti', 'https://bank.test/api', 502);
+
+        expect($e->outcomeUncertain)->toBeTrue();
+    });
+
+    it('bağlantı kurulamadıysa sonuç kesindir', function () {
+        $e = GatewayUnreachableException::connectionFailed('garanti', 'https://bank.test/api');
+
+        // İstek bankaya hiç ulaşmadı; tekrar denemek güvenli.
+        expect($e->outcomeUncertain)->toBeFalse()
+            ->and($e->safeToRetry)->toBeTrue();
+    });
+
+    it('zaman aşımında sonuç belirsizdir', function () {
+        $e = GatewayUnreachableException::timedOut('garanti', 'https://bank.test/api', 30);
+
+        // İstek işlenmiş olabilir: tekrar denemek çift çekim üretir.
+        expect($e->outcomeUncertain)->toBeTrue()
+            ->and($e->safeToRetry)->toBeFalse();
+    });
+});
