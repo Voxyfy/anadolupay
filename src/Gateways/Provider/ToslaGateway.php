@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Voxyfy\AnadoluPay\Gateways\Provider;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
 use Voxyfy\AnadoluPay\Contracts\SupportsInstallmentQuery;
 use Voxyfy\AnadoluPay\Contracts\SupportsOrderHistory;
@@ -330,11 +332,18 @@ class ToslaGateway extends AbstractBankGateway implements SupportsCancellation, 
     }
 
     /**
-     * İsteğin zaman damgası (YmdHis).
+     * İsteğin zaman damgası (yyyyMMddHHmmss).
+     *
+     * **Türkiye saatinde üretilmelidir.** Tosla dokümanı şunu şart koşuyor:
+     * "GMT+3 zaman diliminde ve maksimum 1 saat farkla izin verilmektedir.
+     * Diğer durumlarda hash hatası alınır." Uygulama UTC'de çalışıyorsa
+     * `date()` üç saat geride bir damga üretir ve **her istek**
+     * `998 Validasyon Hatası` ile reddedilir — hata mesajı da bunu
+     * söylemez, yalnızca genel doğrulama hatası döner.
      */
     protected function timeSpan(): string
     {
-        return date('YmdHis');
+        return (new DateTimeImmutable('now', new DateTimeZone('Europe/Istanbul')))->format('YmdHis');
     }
 
     /**
@@ -437,18 +446,29 @@ class ToslaGateway extends AbstractBankGateway implements SupportsCancellation, 
         ];
 
         if ($bin !== null && $bin !== '') {
-            $request['bin'] = $bin;
-            $operation = 'GetCommissionAndInstallmentInfo';
-        } else {
-            $request['amount'] = $amount->minorUnits;
-            $request['isCommission'] = 1;
-            $operation = 'GetInstallmentOptions';
+            $request['bin'] = (int) substr($bin, 0, 6);
+            $request['hash'] = $this->createHash($request);
+
+            return $this->mapCommissionRates($this->postJson('GetCommissionAndInstallmentInfo', $request));
         }
 
+        $request['amount'] = $amount->minorUnits;
         $request['hash'] = $this->createHash($request);
 
-        $response = $this->postJson($operation, $request);
-        $rows = $response['Installments'] ?? $response['CommissionInfo'] ?? [];
+        return $this->mapInstallmentAmounts($this->postJson('GetInstallmentOptions', $request), $amount);
+    }
+
+    /**
+     * `GetInstallmentOptions` yanıtı: taksit sayısı ve karşılık gelen tutar.
+     *
+     * Tutarlar kuruş cinsindendir ve komisyon dâhildir.
+     *
+     * @param  array<string, mixed>  $response
+     * @return list<InstallmentOption>
+     */
+    protected function mapInstallmentAmounts(array $response, Money $amount): array
+    {
+        $rows = $response['InstallmentOptions'] ?? [];
 
         if (! is_array($rows)) {
             return [];
@@ -461,25 +481,70 @@ class ToslaGateway extends AbstractBankGateway implements SupportsCancellation, 
                 continue;
             }
 
-            $count = (int) ($this->pick($row, ['Count', 'InstallmentCount']) ?? 0);
+            $count = (int) ($this->pick($row, ['Installment']) ?? 0);
 
             if ($count < 1) {
                 continue;
             }
 
-            $total = $this->pick($row, ['TotalAmount', 'Amount']);
+            $total = $this->pick($row, ['Amount']);
 
             $options[] = new InstallmentOption(
                 count: $count,
-                // Tosla tutarları kuruş cinsinden döndürür.
                 totalPrice: $total !== null && is_numeric($total)
                     ? $amount->withAmount((int) $total)
                     : null,
-                commissionRate: ($rate = $this->pick($row, ['CommissionRate', 'Rate'])) !== null
-                    ? (float) $rate
-                    : null,
                 raw: $row,
             );
+        }
+
+        return $options;
+    }
+
+    /**
+     * `GetCommissionAndInstallmentInfo` yanıtı: BIN'e özel komisyon oranları.
+     *
+     * Oranlar `InstallmentRate` altında `T2`, `T3`… anahtarlarıyla gelir;
+     * anahtarın sayısal kısmı taksit sayısıdır. Tutar dönmediği için
+     * yalnızca oran doldurulur.
+     *
+     * @param  array<string, mixed>  $response
+     * @return list<InstallmentOption>
+     */
+    protected function mapCommissionRates(array $response): array
+    {
+        $packages = $response['CommissionPackages'] ?? [];
+
+        if (! is_array($packages)) {
+            return [];
+        }
+
+        $bankName = $this->pick($response, ['BankName']);
+        $options = [];
+
+        foreach ($packages as $package) {
+            $rates = is_array($package) ? ($package['InstallmentRate'] ?? []) : [];
+
+            if (! is_array($rates)) {
+                continue;
+            }
+
+            foreach ($rates as $key => $rate) {
+                $count = (int) ltrim((string) $key, 'Tt');
+
+                if ($count < 1 || ! is_array($rate)) {
+                    continue;
+                }
+
+                $options[] = new InstallmentOption(
+                    count: $count,
+                    commissionRate: isset($rate['Rate']) && is_numeric($rate['Rate'])
+                        ? (float) $rate['Rate']
+                        : null,
+                    bankName: $bankName,
+                    raw: $rate,
+                );
+            }
         }
 
         return $options;

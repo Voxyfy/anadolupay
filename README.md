@@ -72,6 +72,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `iyzico` | **Uçtan uca** | 2026-08-09, sandbox 3D Secure satış |
 | `craftgate` | Test vektörü | Resmî istemci depolarındaki üç vektör |
 | `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
+| `tosla` | **Uçtan uca** | 2026-08-09 — 3D satış, durum, taksit, iade ve iptal doğrulandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
 | NestPay bankaları | **Kısmen uçtan uca** | 2026-08-09, Ziraat test terminali — 3D hash ve API kimliği kabul edildi |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
@@ -613,6 +614,11 @@ düzelttiyse `ZIRAAT_KATILIM_VERIFY_HASH=true` yapın.
 işaretlidir; doğrusu `sdSha512`dir. Ayrıca durum sorgusu bir sipariş için
 **tüm** işlemleri döndürür; sadece satış kaydına bakarsanız iade edilmiş
 sipariş "ödendi" görünür.
+
+**Tosla zaman damgasını Türkiye saatinde ister.** `timeSpan` GMT+3'te ve
+en fazla 1 saat farkla kabul edilir. UTC'de çalışan bir uygulamada damga üç
+saat geride kalır ve her istek `998 Validasyon Hatası` alır — mesaj sebebi
+söylemez. Paket damgayı `Europe/Istanbul` üretir.
 
 **Moka'da üç ayrı kimlik vardır ve birbirinin yerine geçmezler:**
 

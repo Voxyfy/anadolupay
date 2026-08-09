@@ -16,6 +16,7 @@ use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
 use Voxyfy\AnadoluPay\Support\Money;
 use Voxyfy\AnadoluPay\Tests\Support\BankTestConfig;
+use Voxyfy\AnadoluPay\Tests\Support\CallsProtected;
 
 describe('PosNet V1 (Albaraka)', function () {
     beforeEach(function () {
@@ -206,23 +207,55 @@ describe('Tosla (AkÖde)', function () {
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/void'));
     });
 
-    it('taksit seçeneklerini BIN ile sorgular', function () {
+    /*
+     * Alan adları gerçek Tosla yanıtından alınmıştır; önceki test uydurma
+     * bir şema (`Installments` / `Count` / `TotalAmount`) varsaydığı için
+     * yeşil kalıyor ama sorgu üretimde hiç sonuç döndürmüyordu.
+     */
+    it('BIN’siz taksit sorgusunda tutarları okur', function () {
         Http::fake(['bank.test/*' => Http::response([
-            'Installments' => [
-                ['Count' => 3, 'TotalAmount' => 10450, 'CommissionRate' => 4.5],
-                ['Count' => 6, 'TotalAmount' => 10900, 'CommissionRate' => 9.0],
+            'IsExist' => true,
+            'InstallmentOptions' => [
+                ['Installment' => 1, 'Title' => 'Tek Çekim', 'Amount' => 10000, 'Currency' => 949],
+                ['Installment' => 2, 'Title' => '2 Taksit', 'Amount' => 10101, 'Currency' => 949],
             ],
+            'Code' => 0,
         ])]);
 
-        $options = $this->gateway->installmentOptions(Money::fromMinorUnits(10000), '415565');
+        $options = $this->gateway->installmentOptions(Money::fromMinorUnits(10000));
 
         expect($options)->toHaveCount(2)
-            ->and($options[0]->count)->toBe(3)
-            ->and($options[0]->totalPrice?->minorUnits)->toBe(10450)
-            ->and($options[0]->commissionRate)->toBe(4.5);
+            ->and($options[1]->count)->toBe(2)
+            // Tutar kuruş cinsindendir.
+            ->and($options[1]->totalPrice?->minorUnits)->toBe(10101);
 
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/GetInstallmentOptions'));
+    });
+
+    it('BIN’li sorguda komisyon oranlarını T2/T3 anahtarlarından çözer', function () {
+        Http::fake(['bank.test/*' => Http::response([
+            'CardPrefix' => 454671,
+            'BankName' => 'Ziraat Bankası',
+            'CommissionPackages' => [[
+                'InstallmentRate' => [
+                    'T2' => ['Rate' => 1.78, 'Constant' => 0.0],
+                    'T3' => ['Rate' => 1.99, 'Constant' => 0.0],
+                ],
+                'BankCommission' => 1.44,
+            ]],
+            'Code' => 0,
+        ])]);
+
+        $options = $this->gateway->installmentOptions(Money::fromMinorUnits(10000), '4546711234567894');
+
+        expect($options)->toHaveCount(2)
+            ->and($options[0]->count)->toBe(2)
+            ->and($options[0]->commissionRate)->toBe(1.78)
+            ->and($options[0]->bankName)->toBe('Ziraat Bankası');
+
+        // Tosla BIN'i altı haneli sayı olarak ister.
         Http::assertSent(fn ($request) => str_ends_with($request->url(), '/GetCommissionAndInstallmentInfo')
-            && str_contains($request->body(), '"bin":"415565"'));
+            && str_contains($request->body(), '"bin":454671'));
     });
 });
 
@@ -432,5 +465,60 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
         Http::fake(['bank.test/query' => Http::response('<SearchResponse></SearchResponse>')]);
 
         expect($this->gateway->status('YOK')->status)->toBe(StatusResponse::STATUS_UNKNOWN);
+    });
+    /*
+     * Tosla `timeSpan` alanını GMT+3'te ve en fazla 1 saat farkla kabul
+     * eder; aksi hâlde genel bir `998 Validasyon Hatası` döner. Uygulama
+     * UTC'de çalışırken `date()` kullanmak üç saat geride bir damga
+     * üretiyordu ve **her istek** reddediliyordu.
+     */
+    it('zaman damgasını uygulamanın saat diliminden bağımsız üretir', function () {
+        $onceki = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+
+        try {
+            $damga = CallsProtected::call(BankTestConfig::make(ToslaGateway::class), 'timeSpan');
+        } finally {
+            date_default_timezone_set($onceki);
+        }
+
+        $istanbul = new DateTimeImmutable('now', new DateTimeZone('Europe/Istanbul'));
+
+        expect($damga)->toMatch('/^\d{14}$/')
+            // Aynı dakikada üretildiği için ilk 12 hane eşleşmeli.
+            ->and(substr($damga, 0, 12))->toBe($istanbul->format('YmdHi'))
+            // UTC damgası olmadığını açıkça doğrula.
+            ->and(substr($damga, 0, 12))->not->toBe(gmdate('YmdHi'));
+    });
+    /*
+     * Tosla'nın gerçek test ortamından 2026-08-09'da gelen 3D dönüşü.
+     * `BankResponseMessage` boş geldiği için `null`dur — Tosla bu alanı
+     * hash'e boş dizgi olarak katar; atlanırsa imza tutmaz.
+     */
+    it('gerçek 3D dönüşünün imzasını doğrular', function () {
+        $payload = [
+            'ClientId' => '1000000494',
+            'OrderId' => 'TEST-XMIGIWCM42',
+            'MdStatus' => '1',
+            'ThreeDSessionId' => 'PBD27BF79FCC74434AA09E42D548770D056FC34022525435C8A726520E8549468',
+            'BankResponseCode' => '00',
+            'BankResponseMessage' => null,
+            'RequestStatus' => '1',
+            'HashParameters' => 'ClientId,ApiUser,OrderId,MdStatus,BankResponseCode,BankResponseMessage,RequestStatus',
+            'Hash' => 'k/59H7yIOeZXMm/SxuA1+81g0lrWqPdE9lXZ2Z6kR+clnCYAey8iUBxJ2UsQD+dBsiuRGl0N+39FUfB5m07tNg==',
+        ];
+
+        $gateway = BankTestConfig::make(ToslaGateway::class, [
+            'merchant_id' => '1000000494',
+            'username' => 'POS_ENT_Test_001',
+            'secret_key' => 'POS_ENT_Test_001!*!*',
+        ]);
+
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeTrue();
+
+        // Tek alan değişince reddedilmeli.
+        $payload['MdStatus'] = '0';
+
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeFalse();
     });
 });

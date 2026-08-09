@@ -28,6 +28,51 @@ tanımlı değil. Tanımsız bir bankanın kartıyla ödeme `VirtualPosNotAvaila
 verir; hata kartın bankasıyla ilgilidir, tutar ve taksit etkilemez.
 Belgelendi.
 
+### Düzeltildi — Tosla taksit sorgusu hiç sonuç döndürmüyordu
+
+Driver yanıtı `Installments` / `Count` / `TotalAmount` alanlarında arıyordu;
+Tosla'nın gerçek yanıtı ise şöyle:
+
+* `GetInstallmentOptions` → `InstallmentOptions: [{Installment, Title, Amount}]`
+  (tutar kuruş cinsinden, komisyon dâhil)
+* `GetCommissionAndInstallmentInfo` → `CommissionPackages[].InstallmentRate`
+  altında `T2`, `T3`… anahtarları; anahtarın sayısal kısmı taksit sayısıdır
+
+Sorgu bu yüzden her zaman boş liste döndürüyordu. Eşleme gerçek yanıta göre
+yeniden yazıldı ve canlı test ortamında doğrulandı: BIN'siz sorgu 12 seçenek
+(2 taksit → 101,01 TL), BIN'li sorgu 11 oran (Ziraat Bankası) döndürüyor.
+
+Eski birim testi uydurma bir şema varsaydığı için yeşil kalıyordu; gerçek
+alan adlarıyla değiştirildi.
+
+### Doğrulandı — Tosla uçtan uca
+
+Düzeltmeden sonra Tosla'nın gerçek test ortamında tarayıcıyla tamamlanan bir
+3D Secure satış driver'ı uçtan uca doğruladı: oturum açıldı, 3D geçildi ve
+dönüş imzası doğrulandı (`MdStatus: 1`, `BankResponseCode: 00`).
+
+Aynı oturumda durum sorgusu (`paid`, 100,00 TL), **iade** ve **iptal** de
+gerçek ortamda çalıştırıldı; ikisi de `Code: 0 Başarılı` döndü.
+
+Dönüş bağımsız olarak yeniden hesaplanıp bire bir eşleştiği görüldü ve kalıcı
+test vektörü olarak eklendi. Yükte `BankResponseMessage` **null** geliyor;
+Tosla bu alanı hash'e boş dizgi olarak katıyor — atlanırsa imza tutmaz.
+
+### Düzeltildi — Tosla UTC'de çalışan uygulamalarda hiç çalışmıyordu
+
+Tosla `timeSpan` alanını **GMT+3'te ve en fazla 1 saat farkla** kabul ediyor.
+Driver `date('YmdHis')` kullandığı için uygulama UTC'de çalışırken üç saat
+geride bir damga üretiyor ve **her istek** `998 Validasyon Hatası` ile
+reddediliyordu. Hata mesajı sebebi söylemiyor, yalnızca genel doğrulama
+hatası dönüyor — bu yüzden kimlik bilgilerinin geçersiz olduğu sanılabilir.
+
+Damga artık uygulamanın saat diliminden bağımsız olarak `Europe/Istanbul`
+üretiliyor. UTC'de çalışan bir uygulamadan gerçek test ortamında 3D oturumu
+açılarak doğrulandı; regresyon testi damganın UTC olmadığını da kontrol eder.
+
+`TEST-KARTLARI.md` dosyasına Tosla'nın resmî test kartları ve açık yayınlanan
+test üye işyeri bilgileri eklendi.
+
 ### Değişti — Moka'da işlem kodu tahmin edilmiyor
 
 `reference()` verilen değerin `ORDER-` ile başlamasına bakarak onu Moka'nın

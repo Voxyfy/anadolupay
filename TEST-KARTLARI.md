@@ -364,6 +364,69 @@ yalnızca uç nokta ve kimlik bilgileri değişir.
 
 ---
 
+## Tosla (AkÖde)
+
+**Kaynak:** [tosla.com/isim-icin/gelistirici-merkezi](https://tosla.com/isim-icin/gelistirici-merkezi) — resmî
+
+| Kart numarası | SKT | CVV |
+|---|---|---|
+| `4546711234567894` | 12/26 | 000 |
+| `4531444531442283` | 12/26 | 001 |
+| `5406675406675403` | 12/26 | 000 |
+
+Test üye işyeri bilgileri de **açık yayınlanıyor**:
+
+```env
+TOSLA_CLIENT_ID=1000000494
+TOSLA_API_USER=POS_ENT_Test_001
+TOSLA_API_PASS=POS_ENT_Test_001!*!*
+TOSLA_PAYMENT_API=https://prepentegrasyon.tosla.com/api/Payment
+TOSLA_TEST_MODE=true
+```
+
+Adres erişiminde IP kontrolü yoktur; 2026-08-09'da bu bilgilerle 3D oturumu
+açıldığı doğrulanmıştır.
+
+> **Zaman damgası Türkiye saatinde olmalıdır.** Tosla `timeSpan` alanını
+> GMT+3'te ve en fazla 1 saat farkla kabul eder. Uygulamanız UTC'de
+> çalışıyorsa damga üç saat geride kalır ve **her istek**
+> `998 Validasyon Hatası` ile reddedilir — mesaj sebebi söylemez. Paket
+> damgayı uygulamanın saat diliminden bağımsız olarak İstanbul saatinde
+> üretir.
+
+---
+
+## Kuveyt Türk (BOA)
+
+**Kaynak:** Kuveyt Türk entegrasyon dokümanları ve
+[Paratika'nın resmî tablosu](https://docs.paratika.com.tr/test-kartlari) —
+aynı numara iki kaynakta da geçiyor.
+
+| Kart numarası | SKT | CVV |
+|---|---|---|
+| `5188961939192544` | 06/2025 | 929 |
+
+> **Son kullanma tarihi geçmiştir** (06/2025). Test ortamları tarihi
+> doğrulamayabilir ama reddedilirse bankadan güncel kartı isteyin.
+
+Dokümanlarda dolaşan test üye işyeri bilgileri:
+
+```env
+KUVEYTTURK_MERCHANT_ID=496
+KUVEYTTURK_USERNAME=apiuser1
+KUVEYTTURK_SECRET_KEY=api123
+KUVEYTTURK_CUSTOMER_ID=400235
+KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services/Home
+```
+
+> 2026-08-09'da denendi: istek kabul edilip imzalı bir yanıt üretildi, ancak
+> banka `ResponseCode: AssemblyNotFound` döndürdü — "Call couldn't find the
+> method in the orchestration assembly". Bu **bankanın test sunucusundaki**
+> bir sorundur, istemci tarafından düzeltilemez. Kendi test terminaliniz
+> varsa onu kullanın.
+
+---
+
 ## Diğer bankalar
 
 Aşağıdaki sağlayıcılar test kartlarını herkese açık yayınlamaz; kartlar test
