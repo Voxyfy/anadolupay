@@ -327,7 +327,13 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
             status: OrderStatus::map($orderStatus, OrderStatus::NESTPAY),
             orderId: $orderId,
             paymentId: $this->pick($response, ['TransId']),
-            amount: $this->parseAmount($this->pick($extra, ['ORIG_TRANS_AMT'])),
+            // Birleşik alandaki tutarlar **kuruş** cinsindendir; düz gelen
+            // `Extra.ORIG_TRANS_AMT` ise ondalıktır. Gerçek terminalde
+            // 100,00 TL'lik ödeme `ORIG_TRANS_AMT:10000` olarak döndü —
+            // ondalık sayılırsa tutar 100 kat büyük raporlanır.
+            amount: $compound
+                ? $this->parseMinorAmount($this->pick($extra, ['ORIG_TRANS_AMT', 'CAPTURE_AMT']))
+                : $this->parseAmount($this->pick($extra, ['ORIG_TRANS_AMT'])),
             transactionTime: $this->pick($extra, ['TRXDATE', 'AUTH_DTTM']),
             maskedCardNumber: $this->pick($extra, ['NUMCODE']) === null
                 ? $this->pick($response, ['MaskedPan'])
@@ -335,6 +341,16 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
             errorMessage: $this->pick($response, ['ErrMsg']),
             raw: $response,
         );
+    }
+
+    /**
+     * Kuruş cinsinden gelen tutarı `Money`ye çevirir.
+     */
+    protected function parseMinorAmount(?string $value): ?Money
+    {
+        return $value !== null && is_numeric($value)
+            ? Money::fromMinorUnits((int) $value)
+            : null;
     }
 
     /**

@@ -197,7 +197,8 @@ describe('Kuveyt Türk iptal', function () {
         Http::fake([
             'bank.test/*' => Http::response(
                 '<CC5Response><ProcReturnCode>00</ProcReturnCode><TransId>TRX-1</TransId><Extra>'
-                .'<ORDERSTATUS>ORD_ID:ORDER-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:199.90 CAPTURE_AMT:199.90 '
+                // Birleşik alandaki tutarlar kuruş cinsindendir.
+                .'<ORDERSTATUS>ORD_ID:ORDER-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:19990 CAPTURE_AMT:19990 '
                 .'TRANS_STAT:A AUTH_DTTM:2026-08-09 19:12:07 CAPTURE_DTTM:2026-08-09 19:12:07 AUTH_CODE:123456</ORDERSTATUS>'
                 .'</Extra></CC5Response>'
             ),

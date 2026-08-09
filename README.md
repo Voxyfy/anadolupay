@@ -74,7 +74,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
 | `tosla` | **Uçtan uca** | 2026-08-09 — 3D satış, durum, taksit, iade ve iptal doğrulandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
-| NestPay bankaları | **Kısmen uçtan uca** | 2026-08-09, Ziraat test terminali — 3D hash ve API kimliği kabul edildi |
+| NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
@@ -670,6 +670,10 @@ sayfası döner; `PaymentResponse::$htmlContent` içinde gelir ve doğrudan
 tarayıcıya basılır. Ayrıca kısmi iade ödeme değil **işlem** bazındadır:
 `metadata['payment_transaction_id']` vermezseniz paket sessizce tam iade
 yapmak yerine hata verir.
+
+**NestPay sorgu yanıtında tutarlar kuruş cinsindendir.** Birleşik
+`ORDERSTATUS` alanındaki `ORIG_TRANS_AMT` ve `CAPTURE_AMT` kuruştur; ondalık
+sanılırsa tutar yüz katı raporlanır. Paket bunu ayırır.
 
 **NestPay dönüşünde boş alanlar `null` olmamalı.** Banka boş alanları hash'e
 boş dizgi olarak katar. Laravel'in varsayılan `ConvertEmptyStringsToNull`

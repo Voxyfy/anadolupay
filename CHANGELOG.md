@@ -99,6 +99,27 @@ Gerçek Moka test servisinde ortaya çıktı: servislerin çoğu istek gövdesin
 farklı olanı kullanıyor. Düzeltmeden sonra gerçek serviste doğrulandı:
 `41834411 → İŞ BANKASI / VISA / credit`.
 
+### Düzeltildi — NestPay durum sorgusu tutarı 100 kat büyük raporluyordu
+
+Birleşik `ORDERSTATUS` alanındaki `ORIG_TRANS_AMT` ve `CAPTURE_AMT`
+**kuruş** cinsindendir; driver bunları ondalık sayıyordu. Gerçek terminalde
+100,00 TL'lik bir ödeme `ORIG_TRANS_AMT:10000` olarak dönüyor ve paket bunu
+**10.000,00 TL** olarak raporluyordu.
+
+Mutabakatta sessizce yanlış davranan cinsten bir kusur: sorgu başarılı
+görünüyor, durum doğru, yalnızca tutar yüz katı. Birleşik alandan gelen
+tutarlar artık kuruş olarak okunuyor; düz `Extra.ORIG_TRANS_AMT` döndüren
+kurulumlarda davranış değişmedi.
+
+Eski birim testi uydurma bir değer (`ORIG_TRANS_AMT:199.90`) kullandığı için
+kusuru göremiyordu; gerçek biçimle değiştirildi.
+
+### Doğrulandı — NestPay iade ve iptal
+
+Ziraat test terminalinde 100,00 TL'lik bir ödemenin yarısı iade, yarısı iptal
+edildi; ikisi de `Response: Approved` / `ProcReturnCode: 00` döndü. Durum
+sorgusu da doğru tutarla (100,00 TL) yanıt veriyor.
+
 ### Düzeltildi — NestPay 3D dönüşü Laravel'de hiç doğrulanamıyordu
 
 Gerçek bir Ziraat 3D dönüşüyle ortaya çıktı. Banka boş alanları hash'e **boş
