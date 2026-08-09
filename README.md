@@ -41,7 +41,8 @@ uygulamanızın işi.
 >
 > Bu paketteki protokoller bankaların public dokümantasyonuna göre yazıldı ve
 > istek üretimi, imza ve yanıt eşlemesi birim testleriyle kilitlendi. **Ancak
-> hiçbir driver gerçek bir bankaya karşı çalıştırılmadı.**
+> banka driver'larının çoğu gerçek bir bankaya karşı çalıştırılmadı.**
+> (İstisna: NestPay ailesi Ziraat test terminalinde kısmen doğrulandı.)
 >
 > Testler benim yazdığım algoritmayı doğrular, bankanın beklediğini değil. Bir
 > alanın sırası yanlışsa test yeşil kalır, banka işlemi reddeder. Kullanacağınız
@@ -70,9 +71,10 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 |---|---|---|
 | `iyzico` | **Uçtan uca** | 2026-08-09, sandbox 3D Secure satış |
 | `craftgate` | Test vektörü | Resmî istemci depolarındaki üç vektör |
-| `moka` | Test vektörü | Dokümantasyondaki dönüş hash'i vektörü |
+| `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
-| Banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
+| NestPay bankaları | **Kısmen uçtan uca** | 2026-08-09, Ziraat test terminali — 3D hash ve API kimliği kabul edildi |
+| Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
 
@@ -612,6 +614,35 @@ işaretlidir; doğrusu `sdSha512`dir. Ayrıca durum sorgusu bir sipariş için
 **tüm** işlemleri döndürür; sadece satış kaydına bakarsanız iade edilmiş
 sipariş "ödendi" görünür.
 
+**Moka'da üç ayrı kimlik vardır ve birbirinin yerine geçmezler:**
+
+| Alan | Nedir | Nerede kullanılır |
+|---|---|---|
+| `OtherTrxCode` | Sizin sipariş numaranız | durum sorgusu, iptal, iade |
+| `VirtualPosOrderId` / `trxCode` | Moka'nın işlem kodu (3D dönüşünde gelir) | iptal, iade |
+| `DealerPaymentId` | Moka'nın sayısal ödeme kaydı | yalnızca detay sorgusu |
+
+Paket verdiğiniz değeri **sipariş numaranız** sayar; Moka'nın kendi kodunu
+kullanacaksanız `metadata['virtual_pos_order_id']` ile bildirin. Biçime bakarak
+tahmin edilmez: kod dokümanda `ORDER-…` görünse de gerçek bir bayide
+`Test-df91b14d-…` biçiminde geldi.
+
+Durum sorgusundan dönen `paymentId` **`DealerPaymentId`**'dir; onu iptal veya
+iadeye verirseniz `PaymentNotFound` alırsınız.
+
+**Moka'da durum sorgusu ödeme numarasını değil sipariş numaranızı ister.**
+`GetDealerPaymentTrxDetailList` ucu `OtherTrxCode` (sizin sipariş numaranız)
+ya da `PaymentId` (Moka'nın sayısal kaydı) kabul eder. Dönüşteki `trxCode`
+bunların hiçbiri değildir — iptal ve iade için kullanılır.
+
+**Moka'da her banka her bayide tanımlı değildir.** Sanal POS'u tanımlanmamış
+bir bankanın kartıyla ödeme başlatırsanız `VirtualPosNotAvailable` alırsınız.
+Hata kartın bankasıyla ilgilidir — tutar veya taksit değiştirmek çözmez.
+
+**Moka'da BIN sorgusu farklı bir sarmalayıcı ister.** Diğer servisler
+`PaymentDealerRequest`, BIN sorgusu `BankCardInformationRequest` bekler.
+Paket bunu kendisi ayırır; kendi isteğinizi yazıyorsanız dikkat edin.
+
 **Moka başarıyı ayrı bir alanda söylemez.** 3D dönüşündeki `resultCode`
 başarılı işlemlerde boş gelir; sonuç `hashValue` içindedir. Ödeme başlatılırken
 dönen `CodeForHash` saklanmazsa dönüş yorumlanamaz.
@@ -633,6 +664,17 @@ sayfası döner; `PaymentResponse::$htmlContent` içinde gelir ve doğrudan
 tarayıcıya basılır. Ayrıca kısmi iade ödeme değil **işlem** bazındadır:
 `metadata['payment_transaction_id']` vermezseniz paket sessizce tam iade
 yapmak yerine hata verir.
+
+**NestPay dönüşünde boş alanlar `null` olmamalı.** Banka boş alanları hash'e
+boş dizgi olarak katar. Laravel'in varsayılan `ConvertEmptyStringsToNull`
+middleware'i bunları `null` yapar; paket `null`'ı boş dizgi sayarak bunu
+telafi eder. Dönüş yükünü kendiniz işliyorsanız aynı kurala uyun, yoksa imza
+hiçbir zaman tutmaz.
+
+**Bankanın dönüş POST'u siteler arasıdır.** `SameSite=lax` çerezi bu istekte
+gönderilmez; dönüşte oturum boş gelir. Sipariş bağlamını oturumda değil,
+`okUrl`in sorgu dizgisinde taşıyın. Doğrulamaya yalnızca POST gövdesini verin —
+sorgu parametreleri bankanın imzasına dâhil değildir.
 
 **NestPay hash'i alanları sıralar.** Alanlar doğal sırada (harf duyarsız)
 sıralanır, `hash`/`encoding`/`nationalidno` çıkarılır, sona secret key eklenir,
@@ -921,9 +963,16 @@ $result = AnadoluPay::driver('moka')->verify(new VerifyPaymentData(
 
 Hash ne `T` ne `F` varyantıyla eşleşiyorsa `InvalidSignatureException` atılır.
 
-**İptal ve iade ayrı uçlardır.** Aynı gün saat 22.00'ye kadar `cancel()`
-(`DoVoid`), sonrasında `refund()` (`DoCreateRefundRequest`). İade tutarı
-verilmezse kalan tutarın tamamı iade edilir.
+**İptal ve iade ayrı uçlardır ve aynı şey değildir.** Aynı gün saat 22.00'ye
+kadar `cancel()` (`DoVoid`) işlemi **anında** iptal eder. `refund()`
+(`DoCreateRefundRequest`) ise bir **iade talebi** oluşturur: yanıtta
+`RefundRequestId` döner, ödemenin durumu hemen değişmez ve `RefAmount` bir
+süre `0` kalır. Gerçek test servisinde ölçüldü — talep başarıyla kabul
+edildikten sonra sipariş hâlâ `paid` görünüyordu.
+
+Yani `refund()` başarılı dönmesi "para geri gitti" demek değil, "talep
+alındı" demektir. Aynı gün geri ödeme istiyorsanız `cancel()` kullanın.
+İade tutarı verilmezse kalan tutarın tamamı talep edilir.
 
 Referans olarak hem Moka'nın numarası hem sizinki kullanılabilir; paket
 `ORDER-` ile başlayan değerleri Moka'nın numarası (`VirtualPosOrderId`),
@@ -1128,9 +1177,14 @@ Bilinen eksikler. Bir maddeye başlamadan önce issue açmanız çakışmayı ö
 - [x] ~~iyzico uçtan uca doğrulaması.~~ 2026-08-09, sandbox 3D Secure satış:
       dört imza şeması da gerçek trafikle doğrulandı. Bkz.
       [Doğrulama durumu](#doğrulama-durumu).
-- [ ] **Gerçek banka testi.** Hiçbir banka driver'ı gerçek bir test
-      terminaline karşı çalıştırılmadı. Kapsamı yatay büyütmek (yeni banka,
-      yeni kuruluş) bu doğrulama yapılmadan riski azaltmıyor.
+- [x] ~~İlk banka terminali.~~ Ziraat NestPay test terminalinde 3D hash'i ve
+      API kimlik doğrulaması kabul edildi; durum sorgusunda bulunan bir kusur
+      düzeltildi.
+- [ ] **NestPay'de 3D akışını tamamla.** Form kabul ediliyor ama tarayıcıdan
+      3D onayı geçilip provizyon ve iade denenmedi.
+- [ ] **Diğer altyapılar için gerçek terminal testi** — Garanti, PosNet,
+      PayFlex, PayFor, InterPos, BOA. Kapsamı yatay büyütmek bu doğrulama
+      yapılmadan riski azaltmıyor.
 - [x] ~~iyzico'nun işlem kapsamı.~~ İade, durum, BIN ve taksit sorgusu
       sandbox'ta doğrulandı; iade tutarsız çağrıda hiç çalışmıyordu, düzeltildi.
       İptal ayrı bir işlem değil — iyzico tam iadeyi iptal olarak işliyor.

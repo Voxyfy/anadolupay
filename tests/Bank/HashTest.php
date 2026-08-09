@@ -235,3 +235,153 @@ it('Param istek imzasını ISO-8859-9 üzerinden üretir', function () {
 
     expect($hash)->toBe('IiUBJwBitFJWiH4x3jTSYjYM/NE=');
 });
+
+describe('NestPay gerçek banka dönüşü', function () {
+    /*
+     * Ziraat'in NestPay test terminalinden 2026-08-09'da gelen gerçek 3D
+     * dönüşü. Boş alanlar burada `null` — Laravel'in
+     * `ConvertEmptyStringsToNull` middleware'inin bıraktığı hâl. Banka bu
+     * alanları hash'e boş dizgi olarak kattığı için driver da öyle
+     * saymalıdır; atlarsa imza hiçbir zaman tutmaz.
+     */
+    it('gerçek dönüşün ver3 hash’ini doğrular', function () {
+        $payload = [
+            'ACQBIN' => '454672',
+            'amount' => '100',
+            'callbackCall' => 'true',
+            'cavv' => 'ABABBjRAAwAAACcQlJIhdUhABZc=',
+            'cavvAlgorithm' => null,
+            'checkout-id' => '190000300-56a6cc2b-f35c-41e9-bc70-b2b3c6546a4b',
+            'clientid' => '190000300',
+            'clientIp' => '88.231.133.14',
+            'currency' => '949',
+            'digest' => 'digest',
+            'dsId' => '1',
+            'eci' => '05',
+            'Ecom_Payment_Card_ExpDate_Month' => '12',
+            'Ecom_Payment_Card_ExpDate_Year' => '26',
+            'ErrMsg' => null,
+            'failUrl' => 'https://anadolupay-laravel.test/payment/callback',
+            'HASH' => 'rnnuZX4e29FAwb/VZIcNAUyKEO7cuhjU0Pdu0ebWxkDq+xRBMua3Tn7f+DGz1OWEyaIq6cVI78M9TZNRV56wSQ==',
+            'hashAlgorithm' => 'ver3',
+            'iReqCode' => null,
+            'iReqDetail' => null,
+            'lang' => 'tr',
+            'maskedCreditCard' => '4546 71** **** 7894',
+            'MaskedPan' => '454671***7894',
+            'md' => '454671:E49854A3405034CB5BD417C473652671B689BECD9DEB00D89991EFE378025021A83B7FFE86F4358B664750FB727ADE11:6393:',
+            'mdErrorMsg' => 'Y-status/Challenge authentication via ACS: https://3ds-acs.test.modirum.com/mdpayacs/creq;token=377232591.1786302986.ZOH_KJOa__A',
+            'mdStatus' => '1',
+            'merchantID' => '190000300',
+            'merchantName' => 'EMU Test',
+            'oid' => 'TEST-VDCYPWVUBI',
+            'okUrl' => 'https://anadolupay-laravel.test/payment/callback',
+            'PAResSyntaxOK' => 'true',
+            'paresTxStatus' => 'Y',
+            'PAResVerified' => 'true',
+            'payResults_dsId' => '1',
+            'protocol' => '3DS2.2.0',
+            'rnd' => 'vJmqS8eyrBJl5d/dwZqV',
+            'sID' => '1',
+            'storetype' => '3d',
+            'taksit' => null,
+            'TDS2_acsOperatorID' => '3DS_LOA_ACS_MOMD_020301_00793',
+            'TDS2_acsReferenceNumber' => '3DS_LOA_ACS_MOMD_020301_00793',
+            'TDS2_acsTransID' => '261e7dd8-0d4b-4d6c-b163-a7e4de688333',
+            'TDS2_AResExtensions' => '[{"name":"Bridging","id":"A000000802-004","criticalityIndicator":false,"data":{"addData":{"authenticationMethod":["10"]},"version":"2.0"}}]',
+            'TDS2_authenticationType' => '01',
+            'TDS2_authTimestamp' => '202608091916',
+            'TDS2_dsTransID' => 'd1835ce6-ee80-5c4d-8000-0000109491ed',
+            'TDS2_RReqExtensions' => '[{"name":"Bridging","id":"A000000802-004","criticalityIndicator":false,"data":{"addData":{"authenticationMethod":["10"]},"version":"2.0"}}]',
+            'TDS2_threeDSServerTransID' => 'e1a85018-d686-501f-8000-0000036e09f9',
+            'TDS2_transStatus' => 'Y',
+            'THREED_ID' => '26221TQTHAkhihr0055',
+            'traceId' => '6a78d203138f7f11966455d30c78b187',
+            'TRANID' => null,
+            'TranType' => 'Auth',
+            'tsl' => '1',
+            'vendorCode' => null,
+            'veresEnrolledStatus' => 'Y',
+            'version' => '4.0',
+            'xid' => 'wSpz43MzGED+TOlB4rJW4kNtIEs=',
+        ];
+
+        $gateway = BankTestConfig::make(AssecoGateway::class, [
+            'merchant_id' => '190000300',
+            'secret_key' => 'TEST1234',
+        ]);
+
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeTrue();
+    });
+
+    it('değiştirilmiş dönüşü reddeder', function () {
+        $payload = [
+            'ACQBIN' => '454672',
+            'amount' => '100',
+            'callbackCall' => 'true',
+            'cavv' => 'ABABBjRAAwAAACcQlJIhdUhABZc=',
+            'cavvAlgorithm' => null,
+            'checkout-id' => '190000300-56a6cc2b-f35c-41e9-bc70-b2b3c6546a4b',
+            'clientid' => '190000300',
+            'clientIp' => '88.231.133.14',
+            'currency' => '949',
+            'digest' => 'digest',
+            'dsId' => '1',
+            'eci' => '05',
+            'Ecom_Payment_Card_ExpDate_Month' => '12',
+            'Ecom_Payment_Card_ExpDate_Year' => '26',
+            'ErrMsg' => null,
+            'failUrl' => 'https://anadolupay-laravel.test/payment/callback',
+            'HASH' => 'rnnuZX4e29FAwb/VZIcNAUyKEO7cuhjU0Pdu0ebWxkDq+xRBMua3Tn7f+DGz1OWEyaIq6cVI78M9TZNRV56wSQ==',
+            'hashAlgorithm' => 'ver3',
+            'iReqCode' => null,
+            'iReqDetail' => null,
+            'lang' => 'tr',
+            'maskedCreditCard' => '4546 71** **** 7894',
+            'MaskedPan' => '454671***7894',
+            'md' => '454671:E49854A3405034CB5BD417C473652671B689BECD9DEB00D89991EFE378025021A83B7FFE86F4358B664750FB727ADE11:6393:',
+            'mdErrorMsg' => 'Y-status/Challenge authentication via ACS: https://3ds-acs.test.modirum.com/mdpayacs/creq;token=377232591.1786302986.ZOH_KJOa__A',
+            'mdStatus' => '1',
+            'merchantID' => '190000300',
+            'merchantName' => 'EMU Test',
+            'oid' => 'TEST-VDCYPWVUBI',
+            'okUrl' => 'https://anadolupay-laravel.test/payment/callback',
+            'PAResSyntaxOK' => 'true',
+            'paresTxStatus' => 'Y',
+            'PAResVerified' => 'true',
+            'payResults_dsId' => '1',
+            'protocol' => '3DS2.2.0',
+            'rnd' => 'vJmqS8eyrBJl5d/dwZqV',
+            'sID' => '1',
+            'storetype' => '3d',
+            'taksit' => null,
+            'TDS2_acsOperatorID' => '3DS_LOA_ACS_MOMD_020301_00793',
+            'TDS2_acsReferenceNumber' => '3DS_LOA_ACS_MOMD_020301_00793',
+            'TDS2_acsTransID' => '261e7dd8-0d4b-4d6c-b163-a7e4de688333',
+            'TDS2_AResExtensions' => '[{"name":"Bridging","id":"A000000802-004","criticalityIndicator":false,"data":{"addData":{"authenticationMethod":["10"]},"version":"2.0"}}]',
+            'TDS2_authenticationType' => '01',
+            'TDS2_authTimestamp' => '202608091916',
+            'TDS2_dsTransID' => 'd1835ce6-ee80-5c4d-8000-0000109491ed',
+            'TDS2_RReqExtensions' => '[{"name":"Bridging","id":"A000000802-004","criticalityIndicator":false,"data":{"addData":{"authenticationMethod":["10"]},"version":"2.0"}}]',
+            'TDS2_threeDSServerTransID' => 'e1a85018-d686-501f-8000-0000036e09f9',
+            'TDS2_transStatus' => 'Y',
+            'THREED_ID' => '26221TQTHAkhihr0055',
+            'traceId' => '6a78d203138f7f11966455d30c78b187',
+            'TRANID' => null,
+            'TranType' => 'Auth',
+            'tsl' => '1',
+            'vendorCode' => null,
+            'veresEnrolledStatus' => 'Y',
+            'version' => '4.0',
+            'xid' => 'wSpz43MzGED+TOlB4rJW4kNtIEs=',
+        ];
+        $payload['amount'] = '999';
+
+        $gateway = BankTestConfig::make(AssecoGateway::class, [
+            'merchant_id' => '190000300',
+            'secret_key' => 'TEST1234',
+        ]);
+
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeFalse();
+    });
+});

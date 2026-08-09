@@ -16,6 +16,93 @@
 
 ## Yayımlanmamış
 
+### Doğrulandı — Moka uçtan uca
+
+Moka test servisinde tarayıcıyla tamamlanan bir 3D Secure satış driver'ı
+uçtan uca doğruladı: `DoDirectPaymentThreeD` ile bağlantı alındı, 3D
+tamamlandı, dönüş `sha256(CodeForHash + "T")` ile doğrulandı ve durum
+sorgusu ödemeyi `paid` olarak raporladı.
+
+Sağlayıcı sınırı olarak görüldü: test bayisinde her bankanın sanal POS'u
+tanımlı değil. Tanımsız bir bankanın kartıyla ödeme `VirtualPosNotAvailable`
+verir; hata kartın bankasıyla ilgilidir, tutar ve taksit etkilemez.
+Belgelendi.
+
+### Değişti — Moka'da işlem kodu tahmin edilmiyor
+
+`reference()` verilen değerin `ORDER-` ile başlamasına bakarak onu Moka'nın
+işlem kodu sayıyordu. Gerçek bir test bayisinde kod `Test-df91b14d-…`
+biçiminde geldi; yani tahmin yanlış yönlendiriyordu.
+
+Artık verilen değer her zaman sizin sipariş numaranız (`OtherTrxCode`)
+sayılır. Moka'nın kendi kodunu kullanmak isterseniz
+`metadata['virtual_pos_order_id']` ile bildirin.
+
+Moka'nın üç kimliği (`OtherTrxCode`, `VirtualPosOrderId`/`trxCode`,
+`DealerPaymentId`) ve hangisinin nerede geçerli olduğu belgelendi. Durum
+sorgusundan dönen `paymentId` `DealerPaymentId`'dir ve iptal/iadede
+kullanılamaz — `PaymentNotFound` verir.
+
+### Düzeltildi — Moka BIN sorgusu hiç çalışmıyordu
+
+Gerçek Moka test servisinde ortaya çıktı: servislerin çoğu istek gövdesini
+`PaymentDealerRequest` altında bekler ama **BIN sorgusu
+`BankCardInformationRequest` ister**. Yanlış sarmalayıcıyla istek
+`GetBankCardInformation.InvalidRequest` ile reddediliyordu.
+
+`post()` artık sarmalayıcı adını parametre alıyor; yalnızca BIN sorgusu
+farklı olanı kullanıyor. Düzeltmeden sonra gerçek serviste doğrulandı:
+`41834411 → İŞ BANKASI / VISA / credit`.
+
+### Düzeltildi — NestPay 3D dönüşü Laravel'de hiç doğrulanamıyordu
+
+Gerçek bir Ziraat 3D dönüşüyle ortaya çıktı. Banka boş alanları hash'e **boş
+dizgi** olarak katar; Laravel'in varsayılan `ConvertEmptyStringsToNull`
+middleware'i ise dönüş yükündeki boş alanları `null` yapar. `createHash()`
+skaler olmayanı atladığı için bu alanlar hash'ten düşüyor ve imza **hiçbir
+zaman** tutmuyordu.
+
+Artık `null` boş dizgi sayılıyor. Bankadan gelen gerçek dönüş, kalıcı bir test
+vektörü olarak `tests/Bank/HashTest.php` dosyasına eklendi — doğrulanıyor,
+tek alanı değiştirilince reddediliyor.
+
+Kusur `hashAlgorithm=ver3` kullanan tüm NestPay driver'larını etkiliyordu.
+
+### Düzeltildi — NestPay durum sorgusu hiç doğru çalışmıyordu
+
+Gerçek bir Ziraat NestPay test terminaline sorulduğunda ortaya çıktı: sorgu
+yanıtında `Extra.ORDERSTATUS` tek harflik bir durum kodu değil, **birleşik bir
+alandır**:
+
+```
+ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A AUTH_DTTM:… AUTH_CODE:…
+```
+
+Driver bu dizginin tamamını durum kodu sanıyordu. Sonuç: var olan bir sipariş
+`unknown` görünüyor, **var olmayan bir sipariş ise `found: true` dönüyordu** —
+çünkü boş şablon (`ORD_ID: CHARGE_TYPE_CD: …`) dolu bir değer sayılıyordu.
+
+Alan artık bilinen anahtarlara göre ayrıştırılıyor, durum `TRANS_STAT`ten
+okunuyor ve boş şablon "bulunamadı" olarak yorumlanıyor. Ayrıştırma tarihlerin
+içindeki boşluğu da doğru geçiyor. Tek harflik `ORDERSTATUS` döndüren
+kurulumlar etkilenmez.
+
+Bu **yedi NestPay banka driver'ının tamamını** ilgilendiriyordu (Akbank, İş
+Bankası, Ziraat, Halkbank, QNB, TEB, Şekerbank ve yeni eklenen ING, Alternatif
+Bank, Türkiye Finans).
+
+### Doğrulandı — ilk banka driver'ı gerçek terminale karşı
+
+Ziraat'in NestPay test terminalinde (`torus-stage-ziraat.asseco-see.com.tr`):
+
+* **3D form ve `ver3` hash'i kabul edildi** — banka isteği işleyip müşteriyi
+  BKM'nin gerçek 3D onay sayfasına yönlendirdi.
+* **API kimlik doğrulaması ve XML istek biçimi kabul edildi** — sorgu ucu
+  isteği işledi.
+
+Paketin banka tarafında ilk kez gerçek bir terminale karşı ölçülen driver'ı.
+`TEST-KARTLARI.md` dosyasına NestPay bölümü eklendi.
+
 ### Düzeltildi — Param'ın belgelenen test adresi kapanmış
 
 README'de test ortamı olarak gösterilen `test-dmz.param.com.tr` artık `404`

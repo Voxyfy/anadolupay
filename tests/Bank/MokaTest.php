@@ -215,10 +215,15 @@ describe('Moka ödeme akışı', function () {
         Http::assertSent(function (Request $request) {
             $body = json_decode($request->body(), true)['PaymentDealerRequest'];
 
+            /*
+             * Verilen değer sizin sipariş numaranız sayılır. Moka'nın işlem
+             * kodu biçimi kuruluma göre değişiyor (dokümanda `ORDER-…`,
+             * gerçek bir bayide `Test-df91b14d-…`), bu yüzden biçime bakarak
+             * tahmin edilmiyor.
+             */
             return str_ends_with($request->url(), '/PaymentDealer/DoCapture')
-                // ORDER- ile başlayan referans Moka'nın kendi numarasıdır.
-                && $body['VirtualPosOrderId'] === 'ORDER-17131QQFG04026575'
-                && $body['OtherTrxCode'] === ''
+                && $body['OtherTrxCode'] === 'ORDER-17131QQFG04026575'
+                && $body['VirtualPosOrderId'] === ''
                 && (float) $body['Amount'] === 50.0;
         });
     });
@@ -436,5 +441,53 @@ describe('Moka sorgular', function () {
         expect($history)->toHaveKey('PaymentTrxDetailList');
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/PaymentDealer/GetDealerPaymentTrxDetailList'));
+    });
+    /*
+     * Gerçek Moka test servisinde ortaya çıktı: servislerin çoğu istek
+     * gövdesini `PaymentDealerRequest` altında bekler ama BIN sorgusu
+     * `BankCardInformationRequest` ister. Yanlış sarmalayıcıya
+     * `GetBankCardInformation.InvalidRequest` döner — yani BIN sorgusu
+     * hiç çalışmıyordu.
+     */
+    it('BIN sorgusunu BankCardInformationRequest sarmalayıcısıyla gönderir', function () {
+        Http::fake(['service.refmokaunited.com/*' => Http::response(mokaData([
+            'BankName' => 'İŞ BANKASI', 'CardType' => 'VISA', 'CreditType' => 'CreditCard',
+        ]))]);
+
+        moka()->binLookup('41834411');
+
+        Http::assertSent(function (Request $request) {
+            $body = json_decode($request->body(), true);
+
+            return array_key_exists('BankCardInformationRequest', $body)
+                && ! array_key_exists('PaymentDealerRequest', $body)
+                && $body['BankCardInformationRequest']['BinNumber'] === '41834411';
+        });
+    });
+
+    it('diğer servisler PaymentDealerRequest kullanmaya devam eder', function () {
+        Http::fake(['service.refmokaunited.com/*' => Http::response(mokaData(['IsSuccessful' => true]))]);
+
+        moka()->refund(new RefundPaymentData(paymentId: 'ORDER-1'));
+
+        Http::assertSent(fn (Request $request) => array_key_exists(
+            'PaymentDealerRequest',
+            json_decode($request->body(), true),
+        ));
+    });
+    it('Moka’nın işlem kodu bildirilirse VirtualPosOrderId olarak gönderir', function () {
+        Http::fake(['service.refmokaunited.com/*' => Http::response(mokaData(['IsSuccessful' => true]))]);
+
+        moka()->cancel(new RefundPaymentData(
+            paymentId: 'SIPARIS-1',
+            metadata: ['virtual_pos_order_id' => 'Test-df91b14d-4d37-41e6-9ce6-491542b9a35b'],
+        ));
+
+        Http::assertSent(function (Request $request) {
+            $body = json_decode($request->body(), true)['PaymentDealerRequest'];
+
+            return $body['VirtualPosOrderId'] === 'Test-df91b14d-4d37-41e6-9ce6-491542b9a35b'
+                && $body['OtherTrxCode'] === '';
+        });
     });
 });

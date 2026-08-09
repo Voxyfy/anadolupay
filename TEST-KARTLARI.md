@@ -259,6 +259,14 @@ sistemi üretir. Hepsinin son kullanma tarihi `12/2030`, CVC'si `000`.
 | `9792061122223337` | Ziraat Bankası | Troy |
 | `6549971122223339` | İş Bankası | Troy |
 
+> **Kart listede olması çalışacağı anlamına gelmez.** Test bayinizde her
+> bankanın sanal POS'u tanımlı olmayabilir; tanımsız bir bankanın kartıyla
+> ödeme başlatırsanız Moka
+> `PaymentDealer.DoDirectPayment3dRequest.VirtualPosNotAvailable` döner.
+> Hata kartın **bankasıyla** ilgilidir; tutar ve taksit sayısı etkilemez.
+> 2026-08-09'da bir test bayisinde İş Bankası, Akbank ve Ziraat kartları
+> çalışırken Garanti kartı bu hatayı verdi.
+
 Portalda ikinci bir tablo daha var: o kartlarla yapılan işlemler **gerçekten
 bankaya gider** ve yanıt bankadan döner. Uçtan uca 3D akışını denemek
 istiyorsanız onları kullanın; günlük hayatta yukarıdaki liste yeterlidir.
@@ -318,6 +326,41 @@ CRAFTGATE_TEST_MODE=true
 `CRAFTGATE_CALLBACK_KEY`, API anahtarından **farklı** bir değerdir (panelde
 "3D Secure Callback Key"). Boş bırakırsanız 3D dönüşü imza doğrulamasında
 reddedilir.
+
+---
+
+## NestPay (Asseco / Payten) — Ziraat
+
+**Kaynak:** Ziraat NestPay test terminali (`torus-stage-ziraat.asseco-see.com.tr`)
+ve [Paratika'nın resmî test kartı tablosu](https://docs.paratika.com.tr/test-kartlari)
+— aynı numaralar iki kaynakta da geçiyor.
+
+| Kart numarası | SKT | CVV | Tip |
+|---|---|---|---|
+| `4546711234567894` | 12/2026 | 000 | Visa |
+| `5401341234567891` | 12/2026 | 000 | Mastercard |
+
+3D Secure adımında istenen SMS şifresi test terminallerinde **`a`**'dır.
+
+> Bu kartların son kullanma tarihi **12/2026** — yani yakında geçecek.
+> Reddedilmeye başlarlarsa bankadan güncel listeyi isteyin, kart numarasını
+> tahmin etmeye çalışmayın.
+
+Terminale erişim bilgileri bankadan gelir; `clientid` + `storekey` 3D formu
+üretmeye yeter, provizyon ve sorgular ayrıca API kullanıcı adı/şifresi ister.
+
+```env
+ZIRAAT_MERCHANT_ID=190000300
+ZIRAAT_SECRET_KEY=TEST1234
+ZIRAAT_USERNAME=...api
+ZIRAAT_PASSWORD=...
+ZIRAAT_PAYMENT_API=https://torus-stage-ziraat.asseco-see.com.tr/fim/api
+ZIRAAT_GATEWAY_3D=https://torus-stage-ziraat.asseco-see.com.tr/fim/est3Dgate
+```
+
+Aynı kart ve akış diğer NestPay bankalarında da (Akbank, İş Bankası,
+Halkbank, QNB, TEB, Şekerbank, ING, Alternatif Bank, Türkiye Finans) geçerlidir;
+yalnızca uç nokta ve kimlik bilgileri değişir.
 
 ---
 

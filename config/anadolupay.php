@@ -115,6 +115,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | İstek zaman aşımı (saniye)
+    |--------------------------------------------------------------------------
+    |
+    | Banka test terminalleri canlıdan belirgin biçimde yavaş olabiliyor;
+    | 3D provizyonu 30 saniyeyi aşabilir. Her banka preset'i kendi
+    | `timeout` değerini tanımlayarak bunu geçersiz kılabilir.
+    |
+    | Zaman aşımı hiçbir zaman tekrar denenmez: istek bankaya ulaşmış ve
+    | işlenmiş olabilir, tekrar denemek çift çekim üretir. Böyle bir durumda
+    | sonucu durum sorgusuyla netleştirin.
+    |
+    */
+
+    'timeout' => env('ANADOLUPAY_TIMEOUT', 30),
+
+    /*
+    |--------------------------------------------------------------------------
     | Mükerrer Ödeme Koruması
     |--------------------------------------------------------------------------
     |
@@ -198,6 +215,8 @@ return [
             'password' => env('ZIRAAT_PASSWORD'),
             'secret_key' => env('ZIRAAT_SECRET_KEY'),
             'test_mode' => env('ZIRAAT_TEST_MODE', false),
+            // Ziraat'in stage terminali yavaş; basit bir sorgu bile ~8 sn sürüyor.
+            'timeout' => env('ZIRAAT_TIMEOUT'),
             'endpoints' => [
                 'payment_api' => env('ZIRAAT_PAYMENT_API', 'https://sanalpos2.ziraatbank.com.tr/fim/api'),
                 'gateway_3d' => env('ZIRAAT_GATEWAY_3D', 'https://sanalpos2.ziraatbank.com.tr/fim/est3Dgate'),

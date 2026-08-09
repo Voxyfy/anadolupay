@@ -61,7 +61,7 @@ abstract class AbstractBankGateway implements PaymentGatewayInterface
         $retry = config('anadolupay.retry', []);
 
         $client = new BankHttpClient(
-            timeout: (int) ($config['timeout'] ?? 30),
+            timeout: (int) ($config['timeout'] ?? config('anadolupay.timeout', 30)),
             verifySsl: (bool) ($config['verify_ssl'] ?? true),
             logger: static::resolveLogger(),
             bank: $bank,

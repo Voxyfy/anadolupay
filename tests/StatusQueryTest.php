@@ -187,4 +187,46 @@ describe('Kuveyt Türk iptal', function () {
                 && $body['request']['ProvisionNumber'] === 'AUTH-1';
         });
     });
+    /*
+     * Gerçek NestPay terminaline sorulduğunda ortaya çıktı: sorgu yanıtında
+     * `ORDERSTATUS` tek harflik bir durum kodu değil, birleşik bir alandır.
+     * Driver bunu durum kodu sandığı için var olan sipariş `unknown`, var
+     * olmayan sipariş de `found: true` görünüyordu.
+     */
+    it('birleşik ORDERSTATUS alanını çözümleyip TRANS_STAT’i kullanır', function () {
+        Http::fake([
+            'bank.test/*' => Http::response(
+                '<CC5Response><ProcReturnCode>00</ProcReturnCode><TransId>TRX-1</TransId><Extra>'
+                .'<ORDERSTATUS>ORD_ID:ORDER-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:199.90 CAPTURE_AMT:199.90 '
+                .'TRANS_STAT:A AUTH_DTTM:2026-08-09 19:12:07 CAPTURE_DTTM:2026-08-09 19:12:07 AUTH_CODE:123456</ORDERSTATUS>'
+                .'</Extra></CC5Response>'
+            ),
+        ]);
+
+        $status = BankTestConfig::make(AssecoGateway::class)->status('ORDER-1');
+
+        expect($status->found)->toBeTrue()
+            ->and($status->status)->toBe(StatusResponse::STATUS_PAID)
+            ->and($status->amount?->minorUnits)->toBe(19990)
+            // Tarih boşluk içeriyor; ayrıştırma bunu kesmemeli.
+            ->and($status->transactionTime)->toBe('2026-08-09 19:12:07');
+    });
+
+    it('sipariş bulunamadığında boş şablonu durum sanmaz', function () {
+        // Bankanın var olmayan sipariş için gerçekte döndürdüğü yanıt.
+        Http::fake([
+            'bank.test/*' => Http::response(
+                '<CC5Response><Response>Declined</Response><ProcReturnCode>99</ProcReturnCode>'
+                .'<ErrMsg>Kayıt bulunamadı YOK-1</ErrMsg><Extra>'
+                .'<ORDERSTATUS>ORD_ID: CHARGE_TYPE_CD: ORIG_TRANS_AMT: CAPTURE_AMT: TRANS_STAT: '
+                .'AUTH_DTTM: CAPTURE_DTTM: AUTH_CODE:</ORDERSTATUS><NUMCODE>99</NUMCODE>'
+                .'</Extra></CC5Response>'
+            ),
+        ]);
+
+        $status = BankTestConfig::make(AssecoGateway::class)->status('YOK-1');
+
+        expect($status->found)->toBeFalse()
+            ->and($status->status)->toBe(StatusResponse::STATUS_UNKNOWN);
+    });
 });

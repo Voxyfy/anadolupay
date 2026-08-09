@@ -299,20 +299,32 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
         ]);
 
         $extra = is_array($response['Extra'] ?? null) ? $response['Extra'] : [];
-        $orderStatus = $this->pick($extra, ['ORDERSTATUS', 'ORD_STAT']);
 
-        // Banka siparişi tanımıyorsa ProcReturnCode başarılı olsa bile
-        // durum alanı boş döner.
-        if ($orderStatus === null && $this->pick($extra, ['TRANS_STAT']) === null) {
+        // Sorgu yanıtında `ORDERSTATUS` tek harflik bir durum kodu değil,
+        // birleşik bir alandır: "ORD_ID:… TRANS_STAT:… AUTH_CODE:…".
+        // Çözümlenen alanlar `Extra`ya katılır; böylece aşağıdaki aramalar
+        // hem birleşik hem düz gelen kurulumlarda çalışır.
+        $raw = $this->pick($extra, ['ORDERSTATUS']);
+        $extra += $this->parseOrderStatus($raw);
+
+        // Alanın birleşik olup olmadığını içeriğine göre değil biçimine göre
+        // ayırmak gerekir: sipariş bulunamadığında birleşik alan gelir ama
+        // içi boştur. Ham dizgiye düşülürse o boş şablon durum kodu sanılır.
+        $compound = $raw !== null && str_contains($raw, ':');
+
+        $orderStatus = $compound
+            ? $this->pick($extra, ['TRANS_STAT', 'ORD_STAT'])
+            : ($raw ?? $this->pick($extra, ['ORD_STAT', 'TRANS_STAT']));
+
+        // Sipariş yoksa banka tüm alanları boş döndürür; `ORDERSTATUS`
+        // alanı dolu görünse bile içi boştur.
+        if ($orderStatus === null) {
             return StatusResponse::notFound($orderId, $response);
         }
 
         return new StatusResponse(
             found: true,
-            status: OrderStatus::map(
-                $orderStatus ?? $this->pick($extra, ['TRANS_STAT']),
-                OrderStatus::NESTPAY,
-            ),
+            status: OrderStatus::map($orderStatus, OrderStatus::NESTPAY),
             orderId: $orderId,
             paymentId: $this->pick($response, ['TransId']),
             amount: $this->parseAmount($this->pick($extra, ['ORIG_TRANS_AMT'])),
@@ -323,6 +335,48 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
             errorMessage: $this->pick($response, ['ErrMsg']),
             raw: $response,
         );
+    }
+
+    /**
+     * Birleşik `ORDERSTATUS` alanını ayrıştırır.
+     *
+     * Banka şu biçimde döndürür; değerler boşluk içerebildiği için
+     * (tarihler) ayrıştırma bilinen anahtarlara göre yapılır:
+     *
+     *     ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A …
+     *
+     * Değerlerin tamamı boşsa dizi boş döner — sipariş bulunamamış demektir.
+     *
+     * @return array<string, string>
+     */
+    protected function parseOrderStatus(?string $value): array
+    {
+        $keys = [
+            'ORD_ID', 'CHARGE_TYPE_CD', 'ORIG_TRANS_AMT', 'CAPTURE_AMT',
+            'TRANS_STAT', 'AUTH_DTTM', 'CAPTURE_DTTM', 'AUTH_CODE',
+        ];
+
+        if ($value === null || ! str_contains($value, ':')) {
+            return [];
+        }
+
+        $pattern = '/(?P<key>'.implode('|', $keys).'):(?P<value>.*?)(?=\s+(?:'.implode('|', $keys).'):|$)/s';
+
+        if (preg_match_all($pattern, $value, $matches, PREG_SET_ORDER) === 0) {
+            return [];
+        }
+
+        $parsed = [];
+
+        foreach ($matches as $match) {
+            $field = trim($match['value']);
+
+            if ($field !== '') {
+                $parsed[$match['key']] = $field;
+            }
+        }
+
+        return $parsed;
     }
 
     /**
@@ -347,11 +401,22 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
         $values = [];
 
         foreach ($fields as $key => $value) {
-            if (! is_scalar($value)) {
+            if (in_array(strtolower((string) $key), self::HASH_EXCLUDED_FIELDS, true)) {
                 continue;
             }
 
-            if (in_array(strtolower((string) $key), self::HASH_EXCLUDED_FIELDS, true)) {
+            // `null` boş dizgi sayılır, atlanmaz. Banka boş alanları hash'e
+            // boş dizgi olarak katar; Laravel'in `ConvertEmptyStringsToNull`
+            // middleware'i ise dönüş yükündeki boş alanları `null` yapar.
+            // Atlanırsa o alanlar hash'ten düşer ve **her** 3D dönüşü imza
+            // hatası verir.
+            if ($value === null) {
+                $values[(string) $key] = '';
+
+                continue;
+            }
+
+            if (! is_scalar($value)) {
                 continue;
             }
 

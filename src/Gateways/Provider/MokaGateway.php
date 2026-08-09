@@ -299,10 +299,20 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
      * Ertesi gün ve sonrasındaki iadeler.
      *
      * Tutar verilmezse kalan tutarın tamamı iade edilir.
+     *
+     * **Bu bir iade _talebi_ oluşturur, iadeyi anında gerçekleştirmez.**
+     * Moka yanıtta `RefundRequestId` döner ve ödemenin durumu hemen
+     * değişmez: gerçek test servisinde talep kabul edildikten sonra sipariş
+     * `paid` kalmış, `RefAmount` 0 görünmüştür. Talep Moka tarafında
+     * işlendikçe durum değişir.
+     *
+     * Aynı gün (22.00'ye kadar) parayı geri vermek istiyorsanız
+     * `cancel()` kullanın — o `DoVoid` ucuna gider ve işlemi anında iptal
+     * eder.
      */
     protected function performRefund(RefundPaymentData $data): RefundResponse
     {
-        $request = $this->reference($data->paymentId);
+        $request = $this->reference($data->paymentId, $this->virtualPosOrderId($data->metadata));
 
         if (($amount = $data->money()) !== null) {
             $request['Amount'] = $this->amount($amount);
@@ -316,7 +326,7 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
      */
     public function cancel(RefundPaymentData $data): RefundResponse
     {
-        $request = $this->reference($data->paymentId) + [
+        $request = $this->reference($data->paymentId, $this->virtualPosOrderId($data->metadata)) + [
             'ClientIP' => (string) ($data->meta('ip') ?? '127.0.0.1'),
             'VoidRefundReason' => self::REASON_EXTERNAL,
         ];
@@ -329,7 +339,7 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
      */
     public function capture(CapturePaymentData $data): PaymentResponse
     {
-        $request = $this->reference($data->orderId) + [
+        $request = $this->reference($data->orderId, $this->virtualPosOrderId($data->metadata)) + [
             'ClientIP' => $data->clientIp(),
         ];
 
@@ -406,7 +416,11 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
      */
     public function binLookup(string $bin, array $context = []): BinResponse
     {
-        $response = $this->post('/PaymentDealer/GetBankCardInformation', ['BinNumber' => $bin]);
+        $response = $this->post(
+            '/PaymentDealer/GetBankCardInformation',
+            ['BinNumber' => $bin],
+            'BankCardInformationRequest',
+        );
 
         $bankName = $this->pick($response, ['BankName']);
 
@@ -470,11 +484,30 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
      *
      * @return array<string, string>
      */
-    protected function reference(string $id): array
+    protected function reference(string $id, ?string $virtualPosOrderId = null): array
     {
-        return str_starts_with($id, 'ORDER-')
-            ? ['VirtualPosOrderId' => $id, 'OtherTrxCode' => '']
+        // Moka'nın işlem kodu biçimi kuruluma göre değişiyor: dokümanda
+        // `ORDER-…`, gerçek bir test bayisinde `Test-df91b14d-…` görüldü.
+        // Bu yüzden biçime bakarak tahmin etmiyoruz — verilen değer sizin
+        // sipariş numaranız sayılır, Moka'nın kodu ayrıca bildirilir.
+        return $virtualPosOrderId !== null && $virtualPosOrderId !== ''
+            ? ['VirtualPosOrderId' => $virtualPosOrderId, 'OtherTrxCode' => '']
             : ['VirtualPosOrderId' => '', 'OtherTrxCode' => $id];
+    }
+
+    /**
+     * Moka'nın kendi işlem kodu (`trxCode` / `VirtualPosOrderId`).
+     *
+     * 3D dönüşündeki `trxCode` budur ve iptal/iade işlemleri için
+     * `metadata['virtual_pos_order_id']` ile bildirilebilir.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    protected function virtualPosOrderId(array $metadata): ?string
+    {
+        $value = $metadata['virtual_pos_order_id'] ?? null;
+
+        return is_scalar($value) && (string) $value !== '' ? (string) $value : null;
     }
 
     /**
@@ -556,10 +589,14 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
     /**
      * Kimlik bloğunu ekleyip isteği gönderir ve `Data` zarfını açar.
      *
+     * Servislerin çoğu istek gövdesini `PaymentDealerRequest` altında
+     * bekler ama hepsi değil: BIN sorgusu `BankCardInformationRequest`
+     * ister ve yanlış sarmalayıcıya `InvalidRequest` döner.
+     *
      * @param  array<string, mixed>  $request
      * @return array<string, mixed>
      */
-    protected function post(string $path, array $request): array
+    protected function post(string $path, array $request, string $wrapper = 'PaymentDealerRequest'): array
     {
         $this->config->require(['merchantId', 'username', 'password']);
 
@@ -572,7 +609,7 @@ class MokaGateway extends AbstractBankGateway implements ProvidesWebhookAcknowle
                     'Password' => $this->config->password,
                     'CheckKey' => $this->checkKey(),
                 ],
-                'PaymentDealerRequest' => $request,
+                $wrapper => $request,
             ],
         );
 
