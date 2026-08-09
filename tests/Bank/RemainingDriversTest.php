@@ -12,6 +12,7 @@ use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\PayFlexGateway;
 use Voxyfy\AnadoluPay\Gateways\Bank\PosNetV1Gateway;
+use Voxyfy\AnadoluPay\Gateways\Provider\AkbankPosGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
 use Voxyfy\AnadoluPay\Support\Money;
@@ -649,4 +650,68 @@ describe('PayFlex (VakıfBank / Ziraat)', function () {
 
         expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeFalse();
     });
+});
+
+describe('Akbank Sanal POS', function () {
+    beforeEach(function () {
+        $this->gateway = BankTestConfig::make(AkbankPosGateway::class);
+    });
+
+    /**
+     * Akbank iade ve iptali banka referansıyla (rrn) değil sipariş
+     * numarasıyla eşler; yanlışı gönderilirse `VPS-1007 Orjinal İşlem
+     * bulunamadı` döner. Bu yüzden ödeme yanıtı `paymentId` olarak sipariş
+     * numarasını verir — sonraki işlem doğrudan onunla yapılabilsin diye.
+     * Akbank test ortamında canlı olarak doğrulandı.
+     */
+    it('ödeme yanıtında sipariş numarasını paymentId olarak verir', function () {
+        Http::fake(['bank.test/*' => Http::response([
+            'responseCode' => 'VPS-0000',
+            'transaction' => ['rrn' => '622326253970', 'authCode' => '392237'],
+        ])]);
+
+        $response = $this->gateway->createPayment(
+            BankTestConfig::order(paymentModel: CreatePaymentData::MODEL_NON_SECURE)
+        );
+
+        expect($response->success)->toBeTrue()
+            ->and($response->paymentId)->toBe('ORDER-1');
+    });
+
+    it('iadede tutar verilmezse siparişten kalanı hesaplar', function () {
+        Http::fake(['bank.test/*' => Http::sequence()
+            // İşlem geçmişi: 11.00 satış, 4.00 iade → kalan 7.00
+            ->push([
+                'responseCode' => 'VPS-0000',
+                'txnDetailList' => [
+                    ['txnCode' => '1000', 'amount' => 11, 'responseCode' => 'VPS-0000'],
+                    ['txnCode' => '1002', 'amount' => 4, 'responseCode' => 'VPS-0000'],
+                    // Başarısız kayıt hesaba katılmamalı.
+                    ['txnCode' => '1000', 'amount' => 50, 'responseCode' => 'VPS-1007'],
+                ],
+            ])
+            ->push(['responseCode' => 'VPS-0000', 'transaction' => ['rrn' => 'R-1']]),
+        ]);
+
+        $result = $this->gateway->refund(new RefundPaymentData(paymentId: 'ORDER-1'));
+
+        expect($result->success)->toBeTrue();
+
+        // Tutarsız gönderilirse alan 0.00 gider ve banka "Hatalı Tutar" der.
+        Http::assertSent(fn ($request) => ! str_contains($request->body(), '"amount":"0.00"'));
+        Http::assertSent(fn ($request) => $request['txnCode'] !== '1002'
+            || $request['transaction']['amount'] === '7.00');
+    });
+
+    it('kalan tutar yoksa açık hata verir', function () {
+        Http::fake(['bank.test/*' => Http::response([
+            'responseCode' => 'VPS-0000',
+            'txnDetailList' => [
+                ['txnCode' => '1000', 'amount' => 11, 'responseCode' => 'VPS-0000'],
+                ['txnCode' => '1003', 'amount' => 11, 'responseCode' => 'VPS-0000'],
+            ],
+        ])]);
+
+        $this->gateway->refund(new RefundPaymentData(paymentId: 'ORDER-1'));
+    })->throws(PaymentFailedException::class);
 });

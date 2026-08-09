@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Http;
+use Voxyfy\AnadoluPay\DTO\CreatePaymentData;
 use Voxyfy\AnadoluPay\Gateways\Bank\AssecoGateway;
 use Voxyfy\AnadoluPay\Gateways\Bank\GarantiGateway;
 use Voxyfy\AnadoluPay\Gateways\Bank\InterPosGateway;
@@ -383,5 +385,127 @@ describe('NestPay gerçek banka dönüşü', function () {
         ]);
 
         expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeFalse();
+    });
+});
+
+describe('NestPay işlem modu', function () {
+    /*
+     * NestPay `Mode` alanı `P` (canlı) ve `T` (test) değerlerini alır; `T`
+     * gönderilen işlem bankaya ulaşır ama finansal kayda geçmez. Alan sabit
+     * `P` yazılıydı, `test_mode` yapılandırması hiç okunmuyordu — canlı bir
+     * terminale test kastıyla bağlanan gerçek tahsilat yapıyordu.
+     *
+     * İki değerin de kabul edildiği Ziraat test terminalinde doğrulandı.
+     */
+    it('test_mode kapalıyken canlı modu gönderir', function () {
+        Http::fake(['bank.test/*' => Http::response(
+            '<CC5Response><Response>Approved</Response><ProcReturnCode>00</ProcReturnCode></CC5Response>'
+        )]);
+
+        BankTestConfig::make(AssecoGateway::class)
+            ->createPayment(BankTestConfig::order(paymentModel: CreatePaymentData::MODEL_NON_SECURE));
+
+        Http::assertSent(fn ($request) => str_contains(urldecode($request->body()), '<Mode>P</Mode>'));
+    });
+
+    it('test_mode açıkken test modunu gönderir', function () {
+        Http::fake(['bank.test/*' => Http::response(
+            '<CC5Response><Response>Approved</Response><ProcReturnCode>00</ProcReturnCode></CC5Response>'
+        )]);
+
+        BankTestConfig::make(AssecoGateway::class, ['test_mode' => true])
+            ->createPayment(BankTestConfig::order(paymentModel: CreatePaymentData::MODEL_NON_SECURE));
+
+        Http::assertSent(fn ($request) => str_contains(urldecode($request->body()), '<Mode>T</Mode>'));
+    });
+});
+
+describe('PayFor gerçek banka dönüşü', function () {
+    /*
+     * QNB'nin demo test ortamından 2026-08-10'da gelen gerçek 3D dönüşü.
+     * Banka bu payload için `ResponseHash` olarak
+     * `fb/2h133EqJX95AKSFe3AsIcZj8=` üretti; aşağıdaki formül onunla birebir
+     * eşleşiyor. `AuthCode` dönüşte `null` — Laravel'in
+     * `ConvertEmptyStringsToNull` middleware'inin bıraktığı hâl; banka bunu
+     * hash'e boş dizgi olarak kattığı için driver da öyle saymalıdır.
+     */
+    it('bankanın ürettiği ResponseHash ile birebir eşleşir', function () {
+        $gateway = BankTestConfig::make(PayForGateway::class, [
+            'merchant_id' => '085300000009597',
+            'secret_key' => '12345678',
+            'username' => 'QNB_API_KULLANICI',
+        ]);
+
+        $eslesti = CallsProtected::call($gateway, 'checkCallbackHash', [
+            'OrderId' => 'TEST-ZLMWAIKANW',
+            'AuthCode' => null,
+            'ProcReturnCode' => 'V033',
+            '3DStatus' => '1',
+            'ResponseRnd' => 'PF639219180836647774',
+            'ResponseHash' => 'fb/2h133EqJX95AKSFe3AsIcZj8=',
+        ]);
+
+        expect($eslesti)->toBeTrue();
+    });
+
+    it('imza kurcalandığında reddeder', function () {
+        $gateway = BankTestConfig::make(PayForGateway::class, [
+            'merchant_id' => '085300000009597',
+            'secret_key' => '12345678',
+            'username' => 'QNB_API_KULLANICI',
+        ]);
+
+        // Tek alan değişti: onaylanmamış işlem onaylanmış gibi gösteriliyor.
+        $eslesti = CallsProtected::call($gateway, 'checkCallbackHash', [
+            'OrderId' => 'TEST-ZLMWAIKANW',
+            'AuthCode' => null,
+            'ProcReturnCode' => '00',
+            '3DStatus' => '1',
+            'ResponseRnd' => 'PF639219180836647774',
+            'ResponseHash' => 'fb/2h133EqJX95AKSFe3AsIcZj8=',
+        ]);
+
+        expect($eslesti)->toBeFalse();
+    });
+});
+
+describe('Akbank gerçek banka dönüşü', function () {
+    /*
+     * Akbank test store'undan 2026-08-10'da gelen gerçek 3D dönüşü. İmza,
+     * `hashParams` alanında artı ile ayrılan alanların değerlerinin ayraçsız
+     * birleştirilip secretKey ile HMAC-SHA512'lenmesiyle üretilir. Banka bu
+     * payload için aşağıdaki hash'i döndürdü.
+     */
+    it('bankanın ürettiği hash ile birebir eşleşir', function () {
+        $gateway = BankTestConfig::make(AkbankPosGateway::class, [
+            'secret_key' => '3230323330393034313735303032363031353172675f357637355f3273387373745f7233725f73323333383737335f323272383774767276327672323531355f',
+        ]);
+
+        $payload = [
+            'txnCode' => '3001',
+            'responseCode' => 'VPS-0000',
+            'responseMessage' => 'BAŞARILI',
+            'txnDateTime' => '2026-08-10T00:45:14.000',
+            'merchantSafeId' => '2023090417500272654BD9A49CF07574',
+            'terminalSafeId' => '2023090417500284633D137A249DBBEB',
+            'orderId' => 'TEST-S1VMRISGKX',
+            'secureId' => 'NEN3cjFKaDZIaDlnajM4RXRzSTY=',
+            'secureEcomInd' => '02',
+            'mdStatus' => '1',
+            'secureData' => 'kBMrDwEgAAAAAAAAAAAAAAAAAAAA',
+            'secureMd' => 'F34CC3A09A105540325226366434ABFFDCC3C67878A4870BF6C330D2E4E595CF',
+            'maskedCardNumber' => '557829******1055',
+            'amount' => '100.00',
+            'installCount' => '1',
+            'okUrl' => 'https://anadolupay-laravel.test/payment/callback?driver=akbank-pos&order=TEST-S1VMRISGKX',
+            'failUrl' => 'https://anadolupay-laravel.test/payment/callback?driver=akbank-pos&order=TEST-S1VMRISGKX',
+            'hashParams' => 'txnCode+responseCode+responseMessage+txnDateTime+merchantSafeId+terminalSafeId+orderId+secureId+secureEcomInd+mdStatus+secureData+secureMd+maskedCardNumber+amount+installCount+okUrl+failUrl',
+            'hash' => 'akaMTXqoq0YkH13hUGumSeaU6uCijvKctlnuBDbMJJA9zl0KMNKjhbi6wsOs5Q04UO0DqoPwQwv9BvZcyKAn3A==',
+        ];
+
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', $payload))->toBeTrue();
+
+        // Tutar değiştirilirse imza tutmamalı.
+        expect(CallsProtected::call($gateway, 'checkCallbackHash', ['amount' => '1.00'] + $payload))->toBeFalse();
     });
 });

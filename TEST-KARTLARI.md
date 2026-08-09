@@ -193,6 +193,104 @@ Kılavuzun eski sürümünde geçen `4289450189088488` / statik 3D şifresi
 
 ---
 
+## Akbank Sanal POS (JSON API)
+
+**Kaynak:** [sanalposteststore-prep.akbank.com/paymentTest](https://sanalposteststore-prep.akbank.com/paymentTest) —
+resmî test store, giriş gerektirmez.
+
+| Marka | Numara | SKT | CVV |
+|---|---|---|---|
+| MasterCard | `5578293000121055` | 11/40 | `238` |
+
+Test üye işyeri bilgileri:
+
+```
+Güvenli İşyeri Numarası : 2023090417500272654BD9A49CF07574
+Güvenli Terminal No     : 2023090417500284633D137A249DBBEB
+```
+
+Secret Key aynı sayfada yayınlanıyor. Test uçları:
+
+```
+API : https://apipre.akbank.com/api/v1/payment/virtualpos
+3D  : https://virtualpospaymentgatewaypre.akbank.com/securepay
+Host: https://virtualpospaymentgatewaypre.akbank.com/payhosting
+```
+
+**Gözlemlediğimiz tuhaflıklar:**
+
+- **İade ve iptal sipariş numarasıyla eşlenir**, banka referansıyla (`rrn`)
+  değil. Yanlışı gönderilirse `VPS-1007 Orjinal İşlem bulunamadı` döner.
+  Paket ödeme yanıtında sipariş numarasını `paymentId` olarak verir.
+- **Tutarsız iade kabul edilmez**; alan `0.00` giderse banka `Hatalı Tutar`
+  der. Paket tutar verilmediğinde kalanı işlem geçmişinden hesaplar.
+- Akbank'ın yeni API'si **tekil durum sorgusu sunmaz**; yerine işlem geçmişi
+  (`txnCode 1010`) vardır.
+
+## QNB (PayFor)
+
+**Kaynak:** QNB Sanal POS geliştirici dokümanı, "Üye İşyeri Test Ortamı" —
+resmî, giriş gerektirmez. Doküman test kullanıcı bilgilerinin
+**değiştirilmemesini** rica ediyor ve test siparişlerinin
+`SiparişNumarası+Tarih` biçiminde üretilmesini istiyor.
+
+"Demo Ortam Test Bilgileri" sayfasındaki kartlar:
+
+| Marka | Numara | SKT | CVV |
+|---|---|---|---|
+| Visa | `4022780198283155` | 01/50 | boş geçilebilir |
+| Troy | `9792091234123455` | 12/20 | `123` |
+
+"Test Kartları" sayfasındaki tam liste:
+
+| Marka | Numara | SKT | CVV |
+|---|---|---|---|
+| Visa | `4155650100416111` | 12/25 | `656` |
+| Visa | `4282405990002166` | 12/25 | `656` |
+| MasterCard | `5209882483498019` | 12/25 | `656` |
+| MasterCard | `5456165456165454` | 12/25 | `656` |
+| Troy | `36577312700094` | 08/20 | `483` |
+| Troy | `9792350046201275` | 07/27 | `993` |
+| Troy | `6501700194147183` | 03/23 | `136` |
+| Troy | `9792023757123604` | 01/26 | `861` |
+| Troy | `9792072000017956` | 01/20 | `843` |
+| Troy | `6500528865390837` | 01/21 | `686` |
+
+> Listedeki kartların çoğunun son kullanma tarihi geçmiştir. 2026-08-10'da
+> yaptığımız denemede yukarıdaki dört Visa/MasterCard kartı ve demo
+> sayfasındaki Visa kartı bankanın 3D doğrulama ekranını açtı; Troy kartlarını
+> ölçemedik. SKT'si geçmemiş tek kart `4022780198283155`'tir.
+
+Üç ayrı üye işyeri yayınlanıyor — her ödeme modeli için farklı hesap:
+
+| Model | Merchant Code | API kullanıcı | API şifre | SecureType |
+|---|---|---|---|---|
+| 3D | `085300000009597` | `QNB_API_KULLANICI` | `FwCX2` | `Payfor3DModel` |
+| 3D Pay | `085300000009704` | `QNB_API_KULLANICI_3DPAY` | `UcBN0` | `Payfor3DPay` |
+| 3D Host | `085300000009746` | `QNB_API_KULLANICI_HOST` | `Rxs42` | `Payfor3DHost` |
+
+Üçünde de `MerchantPass` (hash anahtarı) `12345678`, `MbrId` `5`.
+
+Test uçları:
+
+```
+XML  : https://vpostest.qnb.com.tr/Gateway/XmlGate.aspx
+3D   : https://vpostest.qnb.com.tr/Gateway/Default.aspx
+3D Host: https://vpostest.qnb.com.tr/Gateway/3DHost.aspx
+```
+
+**Gözlemlediğimiz tuhaflıklar:**
+
+- **QNB non-secure işlem sunmuyor**; 3D zorunlu. Doküman da yalnızca 3D
+  entegrasyon bilgisi paylaşıldığını söylüyor.
+- **Sorgu ucu (`SecureType=Inquiry`) API şifresini doğrulamıyor.** Kasten
+  yanlış şifreyle de doğru şifreyle de aynı `V013 Seçili İşlem Bulunamadı!`
+  yanıtı geliyor. Yani bu uçtan alınan yanıt, kimlik bilgilerinizin doğru
+  olduğunu **kanıtlamaz**.
+- 3D doğrulaması test ortamında bir simülatör sayfasında yapılır
+  (`PayforACSSimulator`); sayfa SMS şifresi ister ve şifre dokümanda
+  yayınlanmamıştır.
+
 ## Paratika (Payten)
 
 **Kaynak:** [docs.paratika.com.tr/test-kartlari](https://docs.paratika.com.tr/test-kartlari) — resmî, giriş gerektirmez

@@ -15,6 +15,7 @@ use Voxyfy\AnadoluPay\DTO\RecurringPlan;
 use Voxyfy\AnadoluPay\DTO\RefundPaymentData;
 use Voxyfy\AnadoluPay\DTO\RefundResponse;
 use Voxyfy\AnadoluPay\DTO\VerificationResponse;
+use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
 use Voxyfy\AnadoluPay\Support\Bank\Currency;
 use Voxyfy\AnadoluPay\Support\Money;
@@ -195,7 +196,9 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
 
         return new VerificationResponse(
             success: $approved,
-            paymentId: $this->pick($payload, ['authCode', 'rrn']) ?? $this->extractOrderId($payload),
+            // İade ve iptal sipariş numarasıyla çalışır; `paymentId` olarak
+            // banka referansı (rrn) verilirse sonraki işlem yapılamaz.
+            paymentId: $this->extractOrderId($payload),
             status: $approved ? 'success' : 'failed',
             raw: $payload,
         );
@@ -211,9 +214,7 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
 
         return new VerificationResponse(
             success: $approved,
-            paymentId: $this->transactionField($provision, 'rrn')
-                ?? $this->transactionField($provision, 'authCode')
-                ?? $this->extractOrderId($payload),
+            paymentId: $this->extractOrderId($payload),
             status: $approved ? 'success' : 'failed',
             raw: ['callback' => $payload, 'provision' => $provision],
         );
@@ -268,7 +269,7 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
 
         return new PaymentResponse(
             success: $approved,
-            paymentId: $this->transactionField($response, 'rrn') ?? $data->orderId,
+            paymentId: $data->orderId,
             errorMessage: $approved ? null : $this->pick($response, ['hostMessage', 'responseMessage']),
             raw: $response,
             errorCode: $approved ? null : $this->pick($response, ['responseCode']),
@@ -321,9 +322,9 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
             'txnCode' => '1002',
             'requestDateTime' => $this->requestDateTime(),
             'randomNumber' => $this->randomString(128),
-            'order' => ['orderId' => $data->paymentId],
+            'order' => ['orderId' => $this->reversalOrderId($data)],
             'transaction' => [
-                'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+                'amount' => $this->formatAmount($this->resolveRefundAmount($data)),
                 'currencyCode' => (int) Currency::numeric($data->currency),
             ],
             'customer' => ['ipAddress' => (string) ($data->meta('ip') ?? '127.0.0.1')],
@@ -344,8 +345,70 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
             'txnCode' => '1003',
             'requestDateTime' => $this->requestDateTime(),
             'randomNumber' => $this->randomString(128),
-            'order' => ['orderId' => $data->paymentId],
+            'order' => ['orderId' => $this->reversalOrderId($data)],
         ]));
+    }
+
+    /**
+     * İade edilecek tutar; verilmemişse siparişten çözülür.
+     *
+     * Akbank tutarsız iade kabul etmez — alan `0.00` gider ve banka
+     * `Hatalı Tutar` döndürür. Tutar verilmediğinde işlem geçmişinden
+     * (satışlar eksi önceki iadeler) kalan tutar hesaplanır.
+     */
+    protected function resolveRefundAmount(RefundPaymentData $data): Money
+    {
+        return $data->money() ?? $this->remainingAmount($this->reversalOrderId($data), $data->currency);
+    }
+
+    /**
+     * Sipariş üzerinde işlem yapılabilecek kalan tutar.
+     *
+     * Satış ve ön provizyon kayıtları eklenir, iade ve iptaller düşülür.
+     *
+     * @throws PaymentFailedException kalan tutar hesaplanamazsa
+     */
+    protected function remainingAmount(string $orderId, string $currency): Money
+    {
+        $history = $this->orderHistory($orderId);
+        $kurus = 0;
+
+        foreach ($history['txnDetailList'] ?? [] as $txn) {
+            if (! is_array($txn) || ($txn['responseCode'] ?? null) !== self::SUCCESS_CODE) {
+                continue;
+            }
+
+            $tutar = Money::fromDecimal((string) ($txn['amount'] ?? 0), $currency)->minorUnits;
+
+            $kurus += match ((string) ($txn['txnCode'] ?? '')) {
+                self::TXN_CODE_NON_SECURE, self::TXN_CODE_3D,
+                self::TXN_CODE_NON_SECURE_PRE_AUTH, self::TXN_CODE_3D_PRE_AUTH => $tutar,
+                '1002', '1003' => -$tutar,
+                default => 0,
+            };
+        }
+
+        if ($kurus <= 0) {
+            throw new PaymentFailedException(
+                message: 'Akbank siparişinde işlem yapılabilecek tutar bulunamadı; tutarı açıkça verin.',
+                context: ['order_id' => $orderId, 'response' => $history],
+            );
+        }
+
+        return Money::fromMinorUnits($kurus, $currency);
+    }
+
+    /**
+     * İade ve iptalin dayandığı sipariş numarası.
+     *
+     * Akbank bu işlemleri banka referansıyla (rrn) değil sipariş numarasıyla
+     * eşler; yanlışı gönderildiğinde `VPS-1007 Orjinal İşlem bulunamadı`
+     * döner. Sürücü ödeme yanıtında zaten sipariş numarasını `paymentId`
+     * olarak verir; eski kayıtlar için `metadata['order_id']` da okunur.
+     */
+    protected function reversalOrderId(RefundPaymentData $data): string
+    {
+        return (string) ($data->meta('order_id') ?? $data->paymentId);
     }
 
     /**
@@ -465,7 +528,8 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
             'randomNumber' => $this->randomString(128),
             'order' => ['orderId' => $data->orderId],
             'transaction' => [
-                'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
+                // Tutar verilmezse ön provizyonun tamamı kapatılır.
+                'amount' => $this->formatAmount($data->money() ?? $this->remainingAmount($data->orderId, $data->currency)),
                 'currencyCode' => (int) Currency::numeric($data->currency),
             ],
             'customer' => ['ipAddress' => $data->clientIp()],
@@ -475,7 +539,7 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
 
         return new PaymentResponse(
             success: $approved,
-            paymentId: $this->transactionField($response, 'rrn') ?? $data->orderId,
+            paymentId: $data->orderId,
             errorMessage: $approved ? null : $this->pick($response, ['hostMessage', 'responseMessage']),
             raw: $response,
             errorCode: $approved ? null : $this->pick($response, ['responseCode']),

@@ -77,6 +77,8 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
 | NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal |
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
+| `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
+| `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
@@ -593,6 +595,11 @@ PayFor ve Kuveyt Türk `'0'`, Param `'1'` bekler. PayFlex alanı hiç göndermez
 
 **Para birimi kodu her yerde ISO 4217 sayısal değil.** Kuveyt Türk dört haneli
 kullanır (`0949`), PosNet V1 harf kısaltması (`TL`, `US`, `EU`).
+
+**PayFor aynı gün içindeki işlemi iade ettirmez.** Gün sonu kapanmadan
+`Refund` denenirse banka `V014` ("Bu işlem geri alınamaz, lütfen asıl işlemi
+iptal edin.") döndürür; aynı gün için `cancel()` kullanın. Kart hamiline para
+iadesi açısından ikisi aynı sonucu verir, sadece muhasebe kaydı farklıdır.
 
 **PayFlex'te enrollment adımı diğer uçlardan ayrışır.** Provizyon ve sorgu
 istekleri `prmstr` alanında URL-kodlanmış XML ister; enrollment ise **düz form

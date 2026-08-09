@@ -164,7 +164,7 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
             'PayerTxnId' => $this->pick($payload, ['xid'], '') ?? '',
             'PayerSecurityLevel' => $this->pick($payload, ['eci'], '') ?? '',
             'PayerAuthenticationCode' => $this->pick($payload, ['cavv'], '') ?? '',
-            'Mode' => 'P',
+            'Mode' => $this->mode(),
         ];
 
         return $this->postXml($request);
@@ -227,7 +227,7 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
             'Number' => $card->number,
             'Expires' => $card->expiry('m/y'),
             'Cvv2Val' => $card->cvv,
-            'Mode' => 'P',
+            'Mode' => $this->mode(),
         ] + $this->recurringRequest($data));
 
         $approved = $this->pick($response, ['ProcReturnCode']) === self::SUCCESS_CODE;
@@ -458,6 +458,19 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
     /**
      * NestPay tek çekimde taksit alanını boş bekler.
      */
+    /**
+     * NestPay işlem modu: `P` canlı, `T` test.
+     *
+     * `T` gönderildiğinde işlem bankaya ulaşır ama finansal kayda geçmez.
+     * Test terminallerinde iki değer de kabul edilir; ayrımı yapmak, canlı
+     * terminale `test_mode` ile bağlananın gerçekten tahsilat yapmamasını
+     * sağlar.
+     */
+    protected function mode(): string
+    {
+        return $this->config->testMode ? 'T' : 'P';
+    }
+
     protected function formatInstallment(int $installment): string
     {
         return $installment > 1 ? (string) $installment : '';

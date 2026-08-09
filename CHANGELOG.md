@@ -16,6 +16,54 @@
 
 ## Yayımlanmamış
 
+### Düzeltildi — Akbank Sanal POS canlı test ortamına karşı
+
+Akbank'ın test store'u üye işyeri bilgilerini ve test kartını yayınlıyor.
+Driver bu ortamda çalıştırıldığında iki gerçek kusur çıktı:
+
+- **Ödeme yanıtındaki `paymentId` ile iade/iptal yapılamıyordu.** Alan banka
+  referansını (`rrn`) taşıyordu, oysa Akbank bu işlemleri sipariş numarasıyla
+  eşliyor ve yanlışı gönderildiğinde `VPS-1007 Orjinal İşlem bulunamadı`
+  döndürüyor. `paymentId` artık sipariş numarasıdır; `rrn` ham yanıtta
+  duruyor. Eski kayıtlar için `metadata['order_id']` da okunuyor.
+- **Tutarsız iade `0.00` gönderiyordu** ve banka `Hatalı Tutar` diyordu.
+  Tutar verilmediğinde işlem geçmişinden (satış ve ön provizyonlar eksi
+  önceki iade ve iptaller) kalan tutar hesaplanıyor; hesaplanamazsa açık bir
+  hata veriliyor. Aynı çözüm provizyon kapamasına da uygulandı.
+
+Doğrulanan işlemler: **tarayıcıyla tamamlanan 3D Secure satış** ve onun
+iptali, non-3D satış, kısmî iade, tutarsız tam iade, kısmî iadeden sonra
+kalanın iadesi, iptal, ön provizyon, tutarlı ve tutarsız kapama, işlem
+geçmişi.
+
+Dönüş imzası da ölçüldü: banka `hashParams` alanında hangi alanların hangi
+sırayla imzalandığını bildiriyor; bu alanların değerleri ayraçsız birleştirilip
+secretKey ile HMAC-SHA512'lendiğinde bankanın gönderdiği hash birebir çıktı.
+Test vektörü olarak kilitlendi.
+
+### Doğrulandı — QNB (PayFor) uçtan uca
+
+QNB, sanal POS demo ortamının üye işyeri bilgilerini ve test kartlarını
+dokümanında açıkça yayınlıyor. Driver bu ortamda tarayıcıyla tamamlanan bir
+3D Secure satışla doğrulandı (`ProcReturnCode 00`, "Onaylandı"); ardından
+durum sorgusu (`paid` → iptal sonrası `cancelled`) ve iptal da çalıştı.
+
+**Dönüş imzası artık ölçülmüş durumda.** Bankanın ürettiği `ResponseHash`,
+iki ayrı gerçek dönüşte formülümüzle birebir eşleşti; biri test vektörü olarak
+kilitlendi. Gerçek dönüşte `AuthCode` alanı `null` geliyor (Laravel'in
+`ConvertEmptyStringsToNull` middleware'i) — NestPay'dekiyle aynı tuzak; boş
+dizgi sayılmasaydı imza hiçbir zaman tutmazdı.
+
+Sağlayıcı sınırı olarak görüldü ve belgelendi: **aynı gün içindeki işlem iade
+edilemiyor**, banka `V014` ile "asıl işlemi iptal edin" diyor. Aynı gün için
+`cancel()` kullanılmalı.
+
+Test ortamına dair iki not `TEST-KARTLARI.md`'ye eklendi: demo sayfasındaki
+`4022780198283155` kartı provizyonda `96` ile reddediliyor — "Test Kartları"
+sayfasındaki kartları kullanın; ve sorgu ucu (`SecureType=Inquiry`) API
+şifresini doğrulamıyor, yanlış şifreyle de aynı yanıtı verdiği için oradan
+alınan sonuç kimlik bilgilerinin doğruluğunu kanıtlamaz.
+
 ### Düzeltildi — VakıfBank (PayFlex) canlı sandbox'a karşı
 
 VakıfBank, sanal POS sandbox'ını test üye işyeri ve kartlarıyla birlikte
