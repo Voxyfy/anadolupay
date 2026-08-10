@@ -2,6 +2,10 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.0 - 2026-08-10
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.9...v1.1.0
+
 ## v1.0.9 - 2026-08-09
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.8...v1.0.9
@@ -35,8 +39,8 @@ hashData     = base64( sha256( UPPER( applicationName + transactionId
                                       + transactionDateTime
                                       + [responseCode] + [cardToken]
                                       + secureCode + securityData ) ) )
-```
 
+```
 **Yanıt imzası ölçüldü.** Sağlayıcının test ortamından alınan gerçek bir kart
 token yanıtındaki `hashData`, formülümüzle birebir eşleşti ve test vektörü
 olarak kilitlendi. Ölçüm sırasında protokolün üç ayrıntısı da doğrulandı:
@@ -45,8 +49,7 @@ alanlar `header` altında ama `hashData` yanıtın kökünde geliyor, ve imza
 istekte gönderilen değil **yanıtta dönen** `transactionId` ile hesaplanıyor.
 
 3D oturumu da gerçek ortamda açıldı. Ödeme adımı doğrulanamadı: dokümanın
-yayınladığı ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank
-error` döndürüyor.
+yayınladığı ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank error` döndürüyor.
 
 ### Düzeltildi — Yapı Kredi PosNet, bankanın test ortamına karşı
 
@@ -341,6 +344,7 @@ alandır**:
 
 ```
 ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A AUTH_DTTM:… AUTH_CODE:…
+
 
 ```
 Driver bu dizginin tamamını durum kodu sanıyordu. Sonuç: var olan bir sipariş
