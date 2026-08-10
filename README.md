@@ -79,6 +79,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
 | `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
+| `denizbank` (InterPos) | Dokümana göre | 3D form imzası bağımsız bir implementasyonla birebir aynı; ölçüm yapılamadı — test ortamı IP tanımlaması istiyor ve test üye işyeri bilgileri yayınlanmıyor |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
@@ -159,42 +160,61 @@ Türkiye'deki sanal POS'lar birkaç ortak altyapı ailesine iner. Aynı aileyi
 kullanan bankalar aynı driver'ı paylaşır; aralarındaki fark yalnızca uç nokta
 ve kimlik bilgisidir.
 
-| Driver | Banka | Altyapı | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
-|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank` | Akbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `isbank` | İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ziraat` | Ziraat Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `halkbank` | Halkbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb` | QNB Finansbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `teb` | TEB | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `sekerbank` | Şekerbank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ing` | ING | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `alternatifbank` | Alternatif Bank | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `garanti` | Garanti BBVA | GVPS | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| `yapikredi` | Yapı Kredi | PosNet (XML) | ✅ | — | — | ✅ | ✅ | ✅ |
-| `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ✅ | — | ✅ | ✅ | ✅ | ✅ |
-| `vakifbank` | VakıfBank | PayFlex V4 | ✅ | — | — | ✅ | ✅ | ✅ |
-| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ✅ | — | — | ✅ | ✅ | ✅ |
-| `denizbank` | DenizBank | InterPos | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb-payfor` | QNB / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ziraat-katilim` | Ziraat Katılım | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `kuveytturk` | Kuveyt Türk | BOA / TDV2.0 | ✅ | — | — | ✅ | — | — |
-| `vakif-katilim` | Vakıf Katılım | BOA | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+Tablodaki **Test** sütunu, o driver'ın sağlayıcının kendi ortamına karşı
+koşulup koşulmadığını söyler — geri kalan sütunlar yalnızca protokolün
+uygulandığını gösterir, çalıştığını değil:
+
+| İşaret | Anlamı |
+|:-:|---|
+| ✅ | Sağlayıcının sandbox'ında uçtan uca gerçek bir ödeme tamamlandı |
+| ◐ | Kısmen ölçüldü — bazı akışlar doğrulandı, hepsi değil |
+| ⏳ | Henüz ölçülmedi; yalnızca dokümana göre uygulandı |
+
+| Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
+|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `akbank` | Akbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `isbank` | İş Bankası | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ziraat` | Ziraat Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `halkbank` | Halkbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb` | QNB Finansbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `teb` | TEB | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `sekerbank` | Şekerbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ing` | ING | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `garanti` | Garanti BBVA | GVPS | ⏳ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| `yapikredi` | Yapı Kredi | PosNet (XML) | ⏳ | ✅ | — | — | ✅ | ✅ | ✅ |
+| `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+| `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
+| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ⏳ † | ✅ | — | — | ✅ | ✅ | ✅ |
+| `denizbank` | DenizBank | InterPos | ⏳ ‡ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb-payfor` | QNB / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ziraat-katilim` | Ziraat Katılım | PayFor | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `kuveytturk` | Kuveyt Türk | BOA / TDV2.0 | ◐ | ✅ | — | — | ✅ | — | — |
+| `vakif-katilim` | Vakıf Katılım | BOA | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+
+† Driver'ın kendisi, aynı altyapıyı paylaşan bir başka bankanın test
+ortamında uçtan uca doğrulandı (NestPay ailesi Ziraat'te, PayFlex
+VakıfBank'ta, PayFor QNB'de). Kod yolu ortaktır; fark yalnızca uç nokta ve
+kimlik bilgisidir — yine de bu bankanın kendi terminaline karşı ölçülmüş
+değildir.
+
+‡ DenizBank test ortamı IP tanımlaması ister ve test üye işyeri bilgileri
+yayınlanmaz; ölçüm banka tarafında tanım yapılmadan koşulamıyor.
 
 Ödeme kuruluşları:
 
-| Driver | Kuruluş | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
-|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank-pos` | Akbank (yeni JSON API) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `paytr` | PayTR | — | ✅ | ✅ | ✅ | ✅ | — |
-| `param` | Param | ✅ | ✅ | — | ✅ | ✅ | — |
-| `tosla` | Tosla (AkÖde) | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `craftgate` | Craftgate | ✅ | — | — | ✅ | ✅ | — |
-| `moka` | Moka United | ✅ | — | — | ✅ | ✅ | ✅ |
-| `paratika` | Paratika (Payten) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `iyzico` | iyzico | ✅ | — | — | — | — | — |
-| `fake` | geliştirme için sahte driver | — | — | — | ✅ | ✅ | — |
+| Driver | Kuruluş | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
+|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| `akbank-pos` | Akbank (yeni JSON API) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `paytr` | PayTR | ⏳ | — | ✅ | ✅ | ✅ | ✅ | — |
+| `param` | Param | ⏳ | ✅ | ✅ | — | ✅ | ✅ | — |
+| `tosla` | Tosla (AkÖde) | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `craftgate` | Craftgate | ⏳ | ✅ | — | — | ✅ | ✅ | — |
+| `moka` | Moka United | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
+| `paratika` | Paratika (Payten) | ⏳ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `iyzico` | iyzico | ✅ | ✅ | — | — | — | — | — |
+| `fake` | geliştirme için sahte driver | — | — | — | — | ✅ | ✅ | — |
 
 **Aynı bankanın iki driver'ı varsa** ikisi de gerçektir; hangisinin
 tanımlandığını sanal POS sözleşmenizden teyit edin:
