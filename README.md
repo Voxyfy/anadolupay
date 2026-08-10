@@ -174,35 +174,26 @@ uygulandığını gösterir, çalıştığını değil:
 
 | Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank` | Akbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `isbank` | İş Bankası | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `akbank` | Akbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `isbank` | İş Bankası | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `halkbank` | Halkbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb` | QNB Finansbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `teb` | TEB | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `sekerbank` | Şekerbank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ing` | ING | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb` | QNB Finansbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `teb` | TEB | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `sekerbank` | Şekerbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `garanti` | Garanti BBVA | GVPS | ⏳ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ⏳ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
-| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ⏳ † | ✅ | — | — | ✅ | ✅ | ✅ |
-| `denizbank` | DenizBank | InterPos | ⏳ ‡ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ⏳ ortak driver | ✅ | — | — | ✅ | ✅ | ✅ |
+| `denizbank` | DenizBank | InterPos | ⏳ IP kısıtlı | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `qnb-payfor` | QNB / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ziraat-katilim` | Ziraat Katılım | PayFor | ⏳ † | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ziraat-katilim` | Ziraat Katılım | PayFor | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `kuveytturk` | Kuveyt Türk | BOA / TDV2.0 | ◐ | ✅ | — | — | ✅ | — | — |
 | `vakif-katilim` | Vakıf Katılım | BOA | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
-
-† Driver'ın kendisi, aynı altyapıyı paylaşan bir başka bankanın test
-ortamında uçtan uca doğrulandı (NestPay ailesi Ziraat'te, PayFlex
-VakıfBank'ta, PayFor QNB'de). Kod yolu ortaktır; fark yalnızca uç nokta ve
-kimlik bilgisidir — yine de bu bankanın kendi terminaline karşı ölçülmüş
-değildir.
-
-‡ DenizBank test ortamı IP tanımlaması ister ve test üye işyeri bilgileri
-yayınlanmaz; ölçüm banka tarafında tanım yapılmadan koşulamıyor.
 
 Ödeme kuruluşları:
 
