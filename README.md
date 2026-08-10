@@ -169,6 +169,8 @@ uygulandığını gösterir, çalıştığını değil:
 | ✅ | Sağlayıcının sandbox'ında uçtan uca gerçek bir ödeme tamamlandı |
 | ◐ | Kısmen ölçüldü — bazı akışlar doğrulandı, hepsi değil |
 | ⏳ | Henüz ölçülmedi; yalnızca dokümana göre uygulandı |
+| ⏳ ortak driver | Driver aynı altyapıyı paylaşan başka bir bankanın test ortamında uçtan uca doğrulandı (NestPay ailesi Ziraat'te, PayFlex VakıfBank'ta, PayFor QNB'de). Kod yolu ortaktır, fark yalnızca uç nokta ve kimlik bilgisidir — yine de bu bankanın kendi terminaline karşı ölçülmemiştir |
+| ⏳ IP kısıtlı | Ölçüm banka tarafında IP tanımlaması yapılmadan koşulamıyor |
 
 | Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
