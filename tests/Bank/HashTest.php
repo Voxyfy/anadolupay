@@ -136,6 +136,33 @@ it('PosNet güvenlik verisi ve mac değerini üretir', function () {
     expect($mac)->toBe('DS/uzZJ9BS0zmxURBoqwgVUxtoVHwbdXvYwVtrXSN54=');
 });
 
+/*
+| Yapı Kredi'nin test ortamında ölçülmüş dönüş imzası.
+|
+| 2026-08-10'da setmpos.ykb.com üzerinden gerçek bir 3D akışı koşuldu;
+| `oosResolveMerchantData` yanıtında bankanın ürettiği mac değeri aşağıdaki
+| girdilerle birebir eşleşti. Bu yüzden burada uydurma değil, bankadan gelmiş
+| bir değer kilitleniyor.
+*/
+it('PosNet dönüş mac değerini bankanın ürettiğiyle aynı hesaplar', function () {
+    $gateway = BankTestConfig::make(PosNetGateway::class, [
+        'merchant_id' => '6706598320',
+        'terminal_id' => '67005551',
+        'secret_key' => '10,10,10,10,10,10,10,10',
+        'extra' => ['posnet_id' => '9644'],
+    ]);
+
+    $resolved = [
+        'mdStatus' => '6',
+        'xid' => '0000ANDL260810071759',
+        'amount' => '100',
+        'currency' => 'TL',
+        'mac' => 'Y1cm0mvPdJzIGpXUm6f4NOoLLwNLAwIl2VBIADThvmI=',
+    ];
+
+    expect(CallsProtected::call($gateway, 'checkResolveMac', $resolved))->toBeTrue();
+});
+
 it('PosNet V1 3D mac değerini üretir', function () {
     $gateway = BankTestConfig::make(PosNetV1Gateway::class);
 

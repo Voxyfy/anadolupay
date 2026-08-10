@@ -567,6 +567,57 @@ KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services
 
 ---
 
+## Yapı Kredi (PosNet)
+
+**Kaynak:** [POSNET ThreeD Secure XML Servis Entegrasyonu v2.0.1.5](https://yapikredipos.com.tr/getmedia/780c5f70-fb98-45ed-817e-fc56fce37810/POSNET-3D-Secure-Entegrasyonu-2-0-1-5.pdf) —
+resmî, Yapı Kredi'nin kendi sitesi
+
+Yapı Kredi, **üye işyeri bilgilerini yayınlıyor ama test kartlarını
+yayınlamıyor.** Bu ayrım önemli: aşağıdaki terminale bağlanabilirsiniz, fakat
+3D akışını sonuna kadar götürecek kartı bankadan istemeniz gerekir.
+
+Dokümanın "Sample Data" sütununda açıkça verilen test terminali:
+
+```env
+YAPIKREDI_MERCHANT_ID=6706598320
+YAPIKREDI_TERMINAL_ID=67005551
+YAPIKREDI_POSNET_ID=9644
+YAPIKREDI_SECRET_KEY=10,10,10,10,10,10,10,10
+YAPIKREDI_PAYMENT_API=https://setmpos.ykb.com/PosnetWebService/XML
+YAPIKREDI_GATEWAY_3D=https://setmpos.ykb.com/3DSWebService/YKBPaymentService
+```
+
+`ENCKEY` için doküman "şifreleme anahtarı (**test ortamı için sabittir**)"
+diyor — yani bu değer size özel değil, test ortamının tamamında geçerli.
+
+> 2026-08-10'da bu bilgilerle şifreleme adımı (`oosRequestData`) çağrıldı ve
+> banka `approved=1` ile `data1`/`data2`/`sign` döndürdü. Doküman "test ortamı
+> için de statik IP bildirilmelidir" dese de XML servisi tanımsız bir IP'den
+> gelen isteği kabul etti. 3D doğrulama ve finansallaştırma adımlarında IP
+> kontrolü çıkar mı, henüz ölçülmedi.
+
+### Kart
+
+| Kart numarası | SKT | CVC | Nereden |
+|---|---|---|---|
+| `5400637500005263` | `3012` (biçim **YYAA**) | `111` | Dokümanın örnek isteği |
+
+Bu kart şifreleme adımını geçiyor, ancak **gerçek bir test kartı olduğu
+doğrulanmadı** — doküman onu yalnızca XML örneğinde kullanıyor. Çalışan kart
+setini `posnet.support@yapikredi.com.tr` adresinden test terminalinizle
+birlikte istersiniz.
+
+İki tuzak:
+
+- **SKT biçimi `YYAA`**, yani önce yıl sonra ay: Aralık 2030 için `3012`.
+  Ters yazarsanız `respCode 0150 PAKET HATALI (EXPDATE)` alırsınız — bu hatayı
+  ölçtük.
+- Doküman, `0150` hata kodu açıklamasında **test ortamında CVC olarak `XXX`**
+  kullanıldığını söylüyor. Kart setiniz bu davranıştaysa sayısal CVC yerine
+  `XXX` beklenir.
+
+---
+
 ## Diğer bankalar
 
 Aşağıdaki sağlayıcılar test kartlarını herkese açık yayınlamaz; kartlar test
@@ -576,7 +627,7 @@ kartı nereden alacağınızı yazıyoruz.
 | Driver | Sağlayıcı | Test kartını nereden alırsınız |
 |---|---|---|
 | `akbank`, `isbank`, `ziraat`, `halkbank`, `qnb`, `teb`, `sekerbank` | Asseco / Payten (NestPay) | Bankanızın gönderdiği NestPay entegrasyon dokümanı. Test üye işyeri başvurusu banka şubesi veya POS ekibi üzerinden yapılır. |
-| `yapikredi` | Yapı Kredi PosNet | YKB POS ekibi; test terminaliyle birlikte gelir |
+| `yapikredi` | Yapı Kredi PosNet | Terminal bilgileri dokümanda yayınlı — bkz. [Yapı Kredi (PosNet)](#yapı-kredi-posnet); kart için `posnet.support@yapikredi.com.tr` |
 | `albaraka` | Albaraka PosNet V1 | Albaraka e-POS başvurusu |
 | `denizbank` | InterPos (Intertech) | DenizBank sanal POS sözleşmesi |
 | `qnb-payfor`, `ziraat-katilim` | PayFor | [vpostest.qnb.com.tr](https://vpostest.qnb.com.tr) test terminali başvurusu |

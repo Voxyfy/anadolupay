@@ -79,6 +79,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
 | `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
+| `yapikredi` (PosNet) | **Kısmen ölçüldü** | 2026-08-10, `setmpos.ykb.com` — şifreleme, 3D form, bankanın ACS sayfası ve `oosResolveMerchantData` gerçek ortamda geçildi; dönüş MAC'i bankanın ürettiğiyle birebir eşleşti ve test vektörü olarak kilitlendi. Finansallaştırma ölçülemedi: banka IP tanımlaması istiyor (`0148 UNAUTHORIZED REQUEST`) ve yayınlanmış test kartlarının hepsi eskimiş |
 | `denizbank` (InterPos) | Dokümana göre | 3D form imzası bağımsız bir implementasyonla birebir aynı; ölçüm yapılamadı — test ortamı IP tanımlaması istiyor ve test üye işyeri bilgileri yayınlanmıyor |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
@@ -185,7 +186,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `garanti` | Garanti BBVA | GVPS | ⏳ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
-| `yapikredi` | Yapı Kredi | PosNet (XML) | ⏳ | ✅ | — | — | ✅ | ✅ | ✅ |
+| `yapikredi` | Yapı Kredi | PosNet (XML) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ⏳ ortak driver | ✅ | — | — | ✅ | ✅ | ✅ |

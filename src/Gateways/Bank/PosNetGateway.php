@@ -17,7 +17,6 @@ use Voxyfy\AnadoluPay\DTO\VerificationResponse;
 use Voxyfy\AnadoluPay\DTO\VerifyPaymentData;
 use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
-use Voxyfy\AnadoluPay\Support\Bank\Currency;
 use Voxyfy\AnadoluPay\Support\Money;
 
 /**
@@ -71,7 +70,7 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
                 'expDate' => $card->expiry('ym'),
                 'cvc' => $card->cvv,
                 'amount' => $this->formatAmount($data->money()),
-                'currencyCode' => Currency::numeric($data->currency),
+                'currencyCode' => $this->currencyCode($data->currency),
                 'installment' => $this->formatInstallment($data->installments()),
                 'XID' => $this->formatOrderId($data->orderId),
                 'cardHolderName' => $card->holderName ?? '',
@@ -117,7 +116,7 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
                 'bankData' => $this->pick($payload, ['BankPacket'], '') ?? '',
                 'merchantData' => $this->pick($payload, ['MerchantPacket'], '') ?? '',
                 'sign' => $this->pick($payload, ['Sign'], '') ?? '',
-                'mac' => $this->pick($payload, ['mac'], '') ?? '',
+                'mac' => $this->pick($payload, ['mac']) ?? $this->callbackMac($data),
             ],
         ]);
 
@@ -162,6 +161,29 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
                 'provision' => $provision,
             ],
         );
+    }
+
+    /**
+     * `oosResolveMerchantData` isteğinin `mac` değeri.
+     *
+     * Banka dönüşünde `mac` alanı **yoktur**; doküman bu değeri üye işyerinin
+     * kendi ürettiği sipariş bilgilerinden hesaplamasını ister. Boş
+     * gönderildiğinde banka `E216 Mac Doğrulama hatalı` döndürüyor; test
+     * ortamında ölçüldü.
+     *
+     * mac = sha256_b64( xid;amount;currency;mid;securityData )
+     */
+    protected function callbackMac(VerifyPaymentData $data): string
+    {
+        $payload = $data->payload;
+
+        return $this->hash(implode(';', [
+            (string) ($data->order('order_id') ?? $this->pick($payload, ['Xid'], '') ?? ''),
+            (string) ($data->order('amount') ?? $this->pick($payload, ['Amount'], '') ?? ''),
+            $this->currencyCode((string) ($data->order('currency') ?? 'TRY')),
+            $this->config->merchantId,
+            $this->securityData(),
+        ]));
     }
 
     /**
@@ -238,7 +260,7 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
                 'orderID' => $this->formatOrderId($data->orderId),
                 'installment' => $this->formatInstallment($data->installments()),
                 'amount' => $this->formatAmount($data->money()),
-                'currencyCode' => Currency::numeric($data->currency),
+                'currencyCode' => $this->currencyCode($data->currency),
                 'ccno' => $card->number,
                 'expDate' => $card->expiry('ym'),
                 'cvc' => $card->cvv,
@@ -266,7 +288,7 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
     {
         $transaction = [
             'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
-            'currencyCode' => Currency::numeric($data->currency),
+            'currencyCode' => $this->currencyCode($data->currency),
         ];
 
         $transaction += $this->reversalReference($data);
@@ -419,6 +441,28 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
     protected function formatAmount(Money $money): string
     {
         return $money->toMinorUnitsString();
+    }
+
+    /**
+     * PosNet para birimini ISO sayısal koduyla değil, kendi iki harfli
+     * kısaltmasıyla bekler: `TL`, `US`, `EU`.
+     *
+     * Sayısal kod (`949`) gönderildiğinde banka `E190 CurrencyCode hatalı`
+     * döndürüyor; test ortamında ölçüldü.
+     *
+     * @throws PaymentFailedException Para birimi PosNet'te tanımlı değilse
+     */
+    protected function currencyCode(string $currency): string
+    {
+        return match (strtoupper(trim($currency))) {
+            'TRY' => 'TL',
+            'USD' => 'US',
+            'EUR' => 'EU',
+            default => throw new PaymentFailedException(
+                message: "PosNet '{$currency}' para birimini desteklemiyor; yalnızca TRY, USD ve EUR kabul edilir.",
+                context: ['supported' => ['TRY', 'USD', 'EUR']],
+            ),
+        };
     }
 
     /**
@@ -584,7 +628,7 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
             'capt' => [
                 'hostLogKey' => $hostLogKey,
                 'amount' => $this->formatAmount($data->money() ?? Money::fromMinorUnits(0, $data->currency)),
-                'currencyCode' => Currency::numeric($data->currency),
+                'currencyCode' => $this->currencyCode($data->currency),
                 'installment' => $this->formatInstallment(1),
             ],
         ]);

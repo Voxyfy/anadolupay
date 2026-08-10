@@ -20,6 +20,36 @@
 
 ## Yayımlanmamış
 
+### Düzeltildi — Yapı Kredi PosNet, bankanın test ortamına karşı
+
+Yapı Kredi entegrasyon dokümanı test terminalini (üye işyeri, terminal ve
+POSNET numarası ile şifreleme anahtarı) açıkça yayınlıyor; anahtar için
+"test ortamı için sabittir" deniyor. Driver bu ortamda koşulduğunda iki
+gerçek kusur çıktı:
+
+- **Para birimi yanlış biçimde gidiyordu.** Alan ISO sayısal kodu (`949`)
+  taşıyordu, oysa PosNet kendi iki harfli kısaltmasını bekliyor ve banka
+  `E190 CurrencyCode hatalı` döndürüyordu. Artık `TRY → TL`, `USD → US`,
+  `EUR → EU` çevrimi yapılıyor; desteklenmeyen para biriminde sessizce banka
+  hatasına düşmek yerine açık bir hata veriliyor.
+- **3D dönüşünün çözümleme isteği imzasız gidiyordu.** `oosResolveMerchantData`
+  çağrısındaki `mac` değeri banka dönüşünden okunmaya çalışılıyordu, oysa banka
+  o alanı hiç göndermiyor — doküman bu değerin üye işyeri tarafından
+  hesaplanmasını istiyor. Boş gönderildiğinde banka `E216 Mac Doğrulama hatalı`
+  diyordu. Artık sipariş numarası, tutar, para birimi, üye işyeri numarası ve
+  güvenlik verisinden hesaplanıyor.
+
+Doğrulanan adımlar: kart verilerinin şifrelenmesi (`approved=1`), 3D formunun
+bankaya POST edilmesi, bankanın gerçek ACS sayfasının açılması ve dönüş
+paketinin `oosResolveMerchantData` ile çözülmesi.
+
+**Dönüş imzası ölçüldü.** Bankanın ürettiği `mac`, formülümüzle birebir
+eşleşti; gerçek dönüşten alınan değer test vektörü olarak kilitlendi.
+
+Finansallaştırma (satış, iade, iptal) ölçülemedi: banka bu işlemler için IP
+tanımlaması istiyor (`0148 UNAUTHORIZED REQUEST`) ve dolaşımdaki test
+kartlarının tamamı eskimiş.
+
 ### Düzeltildi — Akbank Sanal POS canlı test ortamına karşı
 
 Akbank'ın test store'u üye işyeri bilgilerini ve test kartını yayınlıyor.

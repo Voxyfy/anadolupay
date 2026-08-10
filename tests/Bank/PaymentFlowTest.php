@@ -10,6 +10,7 @@ use Voxyfy\AnadoluPay\Exceptions\InvalidSignatureException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AssecoGateway;
 use Voxyfy\AnadoluPay\Gateways\Bank\GarantiGateway;
+use Voxyfy\AnadoluPay\Gateways\Bank\PosNetGateway;
 use Voxyfy\AnadoluPay\Tests\Support\BankTestConfig;
 use Voxyfy\AnadoluPay\Tests\Support\CallsProtected;
 
@@ -240,3 +241,42 @@ it('Garanti iadesi ref_ret_num olmadan çalışmaz', function () {
 
     $gateway->refund(new RefundPaymentData('ORDER-1', 1.99));
 })->throws(PaymentFailedException::class);
+
+/*
+| PosNet para birimi
+|
+| Yapı Kredi'nin test ortamına karşı ölçülmüş bir kusurun regresyonu:
+| driver ISO sayısal kodu (949) gönderiyordu, PosNet ise kendi iki harfli
+| kısaltmasını bekliyor ve sayısal kod geldiğinde `E190 CurrencyCode hatalı`
+| döndürüyor.
+*/
+it('PosNet para birimini iki harfli kısaltmayla gönderir', function () {
+    $gateway = BankTestConfig::make(PosNetGateway::class);
+
+    expect(CallsProtected::call($gateway, 'currencyCode', 'TRY'))->toBe('TL')
+        ->and(CallsProtected::call($gateway, 'currencyCode', 'USD'))->toBe('US')
+        ->and(CallsProtected::call($gateway, 'currencyCode', 'EUR'))->toBe('EU')
+        ->and(CallsProtected::call($gateway, 'currencyCode', 'try'))->toBe('TL');
+});
+
+it('PosNet desteklemediği para biriminde açık hata verir', function () {
+    $gateway = BankTestConfig::make(PosNetGateway::class);
+
+    CallsProtected::call($gateway, 'currencyCode', 'GBP');
+})->throws(PaymentFailedException::class, 'PosNet');
+
+it('PosNet 3D isteğinde currencyCode alanı TL olur', function () {
+    Http::fake([
+        'bank.test/api' => Http::response(
+            '<?xml version="1.0" encoding="ISO-8859-9"?><posnetResponse><approved>1</approved>'
+            .'<oosRequestDataResponse><data1>D1</data1><data2>D2</data2><sign>S</sign>'
+            .'</oosRequestDataResponse></posnetResponse>',
+            200,
+        ),
+    ]);
+
+    BankTestConfig::make(PosNetGateway::class, ['extra' => ['posnet_id' => '9644']])
+        ->createPayment(BankTestConfig::order());
+
+    Http::assertSent(fn ($request) => str_contains(urldecode($request->body()), '<currencyCode>TL</currencyCode>'));
+});
