@@ -20,6 +20,34 @@
 
 ## Yayımlanmamış
 
+### Eklendi — Paycell (Turkcell) driver'ı
+
+Paycell'in ayırt edici yanı, kart bilgisinin ödeme ucuna hiç gitmemesi: önce
+ayrı bir uçtan kart token'ı alınır, ödeme o token ile yapılır. Driver bu iki
+adımı, 3D oturumunu, iadeyi, iptali, ön provizyon kapamasını ve durum
+sorgusunu kapsar.
+
+İmza iki aşamalıdır ve girdinin **tamamı büyük harfe çevrilir**:
+
+```
+securityData = base64( sha256( UPPER( applicationPwd + applicationName ) ) )
+hashData     = base64( sha256( UPPER( applicationName + transactionId
+                                      + transactionDateTime
+                                      + [responseCode] + [cardToken]
+                                      + secureCode + securityData ) ) )
+```
+
+**Yanıt imzası ölçüldü.** Sağlayıcının test ortamından alınan gerçek bir kart
+token yanıtındaki `hashData`, formülümüzle birebir eşleşti ve test vektörü
+olarak kilitlendi. Ölçüm sırasında protokolün üç ayrıntısı da doğrulandı:
+`transactionId` 20 hane olmalı (kısa gönderildiğinde `80003`), imzalanan
+alanlar `header` altında ama `hashData` yanıtın kökünde geliyor, ve imza
+istekte gönderilen değil **yanıtta dönen** `transactionId` ile hesaplanıyor.
+
+3D oturumu da gerçek ortamda açıldı. Ödeme adımı doğrulanamadı: dokümanın
+yayınladığı ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank
+error` döndürüyor.
+
 ### Düzeltildi — Yapı Kredi PosNet, bankanın test ortamına karşı
 
 Yapı Kredi entegrasyon dokümanı test terminalini (üye işyeri, terminal ve

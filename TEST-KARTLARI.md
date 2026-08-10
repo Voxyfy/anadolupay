@@ -567,6 +567,50 @@ KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services
 
 ---
 
+## Paycell (Turkcell)
+
+**Kaynak:** [paycellapi.apidog.io](https://paycellapi.apidog.io/test-kredi-kartlar%C4%B1-1889591m0) — resmî
+
+Paycell hem test kimlik bilgilerini hem de kart listesini **herkese açık**
+yayınlıyor; başvuru gerekmiyor.
+
+```env
+PAYCELL_MERCHANT_CODE=9998
+PAYCELL_APPLICATION_NAME=PAYCELLTEST
+PAYCELL_APPLICATION_PWD=PaycellTestPassword
+PAYCELL_SECURE_CODE=PAYCELL12345
+PAYCELL_EULA_ID=17
+PAYCELL_PAYMENT_API=https://tpay-test.turkcell.com.tr/tpay/provision/services/restful/getCardToken
+PAYCELL_TOKEN_API=https://omccstb.turkcell.com.tr/paymentmanagement/rest/getCardTokenSecure
+PAYCELL_GATEWAY_3D=https://omccstb.turkcell.com.tr/paymentmanagement/rest/threeDSecure
+```
+
+Doküman bu değerlerin "hem TEST hem PREPROD ortamları için geçerli" olduğunu
+söylüyor.
+
+### Kartlar
+
+Resmî tablo uzun ama **kartların çoğunun son kullanma tarihi geçmiştir**
+(2019–2023 arası). İleri tarihli olanlar:
+
+| Kart numarası | Banka | SKT | CVC | 3D şifresi |
+|---|---|---|---|---|
+| `4355093000777068` | Akbank | 11/2040 | 238 | Şifresiz |
+| `5578293000121055` | Akbank | 11/2040 | 313 | Şifresiz |
+| `5200190006338608` | DenizBank | 01/2030 | 410 | `123456` |
+| `5200190009721495` | DenizBank | 01/2030 | 462 | `123456` |
+| `4546711234567894` | Ziraat | 12/2026 | 000 | `a` |
+| `5401341234567891` | Ziraat | 12/2026 | 000 | `a` |
+
+> **Varsayılan test üye işyerinin sınırı var.** 2026-08-10'da bu kartlarla
+> kart token adımı sorunsuz geçildi (`Islem basarili`), fakat ödeme adımı
+> `9998` numaralı ortak test üye işyerinde `4000 Bank error`, 3D sayfası ise
+> "3D Sayfasına yönlendirilirken bir hata oluştu" veriyor. Kart tarafını
+> uçtan uca denemek için Paycell'den kendi üye işyeri kodunuzu istemeniz
+> gerekiyor (paycelldev@paycell.com.tr).
+
+---
+
 ## Yapı Kredi (PosNet)
 
 **Kaynak:** [POSNET ThreeD Secure XML Servis Entegrasyonu v2.0.1.5](https://yapikredipos.com.tr/getmedia/780c5f70-fb98-45ed-817e-fc56fce37810/POSNET-3D-Secure-Entegrasyonu-2-0-1-5.pdf) —

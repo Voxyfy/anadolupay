@@ -79,6 +79,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
 | `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
+| `paycell` | **Kısmen ölçüldü** | 2026-08-10, Turkcell test ortamı — kart token alındı ve **token yanıtının imzası sağlayıcının ürettiğiyle birebir eşleşti** (test vektörü olarak kilitlendi); 3D oturumu da gerçek ortamda açıldı. Ödeme adımı ölçülemedi: yayınlanmış ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank error` döndürüyor |
 | `yapikredi` (PosNet) | **Kısmen ölçüldü** | 2026-08-10, `setmpos.ykb.com` — şifreleme, 3D form, bankanın ACS sayfası ve `oosResolveMerchantData` gerçek ortamda geçildi; dönüş MAC'i bankanın ürettiğiyle birebir eşleşti ve test vektörü olarak kilitlendi. Finansallaştırma ölçülemedi: banka IP tanımlaması istiyor (`0148 UNAUTHORIZED REQUEST`) ve yayınlanmış test kartlarının hepsi eskimiş |
 | `denizbank` (InterPos) | Dokümana göre | 3D form imzası bağımsız bir implementasyonla birebir aynı; ölçüm yapılamadı — test ortamı IP tanımlaması istiyor ve test üye işyeri bilgileri yayınlanmıyor |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
@@ -207,6 +208,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `craftgate` | Craftgate | ⏳ | ✅ | — | — | ✅ | ✅ | — |
 | `moka` | Moka United | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `paratika` | Paratika (Payten) | ⏳ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `paycell` | Paycell (Turkcell) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `iyzico` | iyzico | ✅ | ✅ | — | — | — | — | — |
 | `fake` | geliştirme için sahte driver | — | — | — | — | ✅ | ✅ | — |
 
@@ -1289,10 +1291,12 @@ içinde kendiniz tanımlayabilirsiniz — bkz. [Yeni banka eklemek](#yeni-banka-
 - [x] ~~Paratika (Payten).~~ Dokümantasyonu ve resmî örnek kodu açık.
       Test vektörü yayınlanmadığı için imza formülü dokümana göre
       uygulandı, ölçülmedi.
-- [ ] **Paycell** — protokol iki bağımsız açık kaynak uygulamadan
-      çıkarılabiliyor ama resmî doküman yok. Paycell test kimlik
-      bilgilerini herkese açık yayınladığı için sandbox'a karşı
-      doğrulanabilir; önce o deneme yapılmalı.
+- [x] ~~**Paycell.**~~ Eklendi. Resmî doküman bu arada yayımlandı
+      ([paycellapi.apidog.io](https://paycellapi.apidog.io)); test kimlik
+      bilgileri ve kart listesi herkese açık. Kart token adımı ve **yanıt
+      imzası** sağlayıcının test ortamına karşı ölçüldü, 3D oturumu açıldı.
+      Ödeme adımı ortak test üye işyerinde `Bank error` verdiği için
+      doğrulanamadı — kendi üye işyeri kodunuzla denenmeli.
 - [ ] **Sipay** — imza şeması güvenilir bir public kaynaktan doğrulanamadığı
       için bilinçli olarak eklenmedi.
 - [ ] ~~**PayU Türkiye**~~ — **eklenmeyecek.** PayU'nun Türkiye'deki ödeme
