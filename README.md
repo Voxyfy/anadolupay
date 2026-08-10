@@ -79,6 +79,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
 | `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
+| `ziraat-payflex` | **Kısmen ölçüldü** | 2026-08-10, Innova preprod — 3D başlatma (MPI `Enrollment`) bankanın kendi test ortamında geçti; banka üye işyeri ve şifreyi kabul edip tam `VERes` döndürdü (`PaReq`, `ACSUrl`, `TermUrl`, `MD`). Satış/iade/iptal ölçülemedi: VPOS ucu ayrı bir iş yeri şifresi ve `TerminalNo` istiyor (`5001`). 3D'ye kayıtlı test kartı da bulunamadı — denenen altı kart `Status N` veya kart hatası verdi |
 | `paycell` | **Kısmen ölçüldü** | 2026-08-10, Turkcell test ortamı — kart token alındı ve **token yanıtının imzası sağlayıcının ürettiğiyle birebir eşleşti** (test vektörü olarak kilitlendi); 3D oturumu da gerçek ortamda açıldı. Ödeme adımı ölçülemedi: yayınlanmış ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank error` döndürüyor |
 | `yapikredi` (PosNet) | **Kısmen ölçüldü** | 2026-08-10, `setmpos.ykb.com` — şifreleme, 3D form, bankanın ACS sayfası ve `oosResolveMerchantData` gerçek ortamda geçildi; dönüş MAC'i bankanın ürettiğiyle birebir eşleşti ve test vektörü olarak kilitlendi. Finansallaştırma ölçülemedi: banka IP tanımlaması istiyor (`0148 UNAUTHORIZED REQUEST`) ve yayınlanmış test kartlarının hepsi eskimiş |
 | `denizbank` (InterPos) | Dokümana göre | 3D form imzası bağımsız bir implementasyonla birebir aynı; ölçüm yapılamadı — test ortamı IP tanımlaması istiyor ve test üye işyeri bilgileri yayınlanmıyor |
@@ -198,7 +199,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
-| `ziraat-payflex` | Ziraat Bankası **(PayFlex)** | PayFlex V4 | ⏳ ortak driver | ✅ | — | — | ✅ | ✅ | ✅ |
+| `ziraat-payflex` | Ziraat Bankası **(PayFlex)** | PayFlex V4 | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `denizbank` | DenizBank | InterPos | ⏳ IP kısıtlı | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `qnb-payfor` | QNB Finansbank / Enpara **(PayFor)** | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat-katilim` | Ziraat Katılım | PayFor | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |

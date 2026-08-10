@@ -567,6 +567,71 @@ KUVEYTTURK_PAYMENT_API=https://boatest.kuveytturk.com.tr/boa.virtualpos.services
 
 ---
 
+## Ziraat Bankası (PayFlex)
+
+**Kaynak:** İNNOVA "MPI + Sanal POS Entegrasyon Dokümanı (3D)" v4.1, 02/05/2026,
+[sanalpos.innova.com.tr/ziraatbankasi](http://sanalpos.innova.com.tr/ziraatbankasi/) — resmî
+
+Test uçları dokümanın "Erişim Bilgileri" bölümünden:
+
+```env
+ZIRAAT_PAYFLEX_MERCHANT_ID=000000000281567
+ZIRAAT_PAYFLEX_PASSWORD=123456
+ZIRAAT_PAYFLEX_TEST_MODE=true
+ZIRAAT_PAYFLEX_PAYMENT_API=https://preprod.payflex.com.tr/Ziraatbank/VposWeb/v3/Vposreq.aspx
+ZIRAAT_PAYFLEX_GATEWAY_3D=https://preprod.payflex.com.tr/ZiraatBank/MpiWeb/Enrollment.aspx
+ZIRAAT_PAYFLEX_QUERY_API=https://preprod.payflex.com.tr/ZIRAATBANK/UIWebService/Search.aspx
+# Preprod yavaştır; varsayılan 30 saniye yetmiyor.
+ZIRAAT_PAYFLEX_TIMEOUT=120
+```
+
+> 2026-08-10'da ölçüldü: bu üye işyeri ve şifre **MPI ucunda kabul ediliyor**.
+> Banka tam bir `VERes` döndürüyor (`PaReq`, `ACSUrl`, `TermUrl`, `MD`).
+
+Bu ortamda dört ayrı tuzağa düştük; hepsi ölçülmüş:
+
+- **Uç nokta adı.** Dolaşımdaki yapılandırmalar MPI için
+  `MPI_Enrollment.aspx` veriyor, resmî doküman ise **`Enrollment.aspx`**
+  diyor. Yanlış uçta banka, tanımadığı üye işyerine `1008 Invalid money
+  amount` döndürüyor — tutarla hiç ilgisi yok. Tutar biçiminin altı ayrı hâli
+  denendi, hata değişmedi. Doğru uca geçildiğinde aynı kimlik anında kabul
+  edildi.
+- **MPI şifresi ile VPOS şifresi ayrıdır.** Yukarıdaki şifre MPI'da çalışıyor
+  ama VPOS (satış/iade/iptal/sorgu) ucunda `5001 İş yeri şifresi yanlış`
+  veriyor. VPOS şifresi ve `TerminalNo` bankadan ayrıca istenmelidir;
+  `TerminalNo`'nun üç ayrı değeri denendi, sonuç değişmedi.
+- **Preprod yavaştır.** MPI isteği **46–62 saniye** sürüyor. Paketin 30
+  saniyelik varsayılanı bunu kesiyor; preset'e `timeout` verin. Web
+  sunucunuzun kendi sınırı da yeterli olmalı — nginx'in varsayılan
+  `fastcgi_read_timeout` değeri 60 saniyedir ve PHP hâlâ çalışırken
+  bağlantıyı kesip **502** döndürür.
+- **Sorgu ucunun preprod adresi vardır.** Dolaşımdaki yapılandırmalar burada
+  canlı adresi gösteriyor; doküman preprod adresini veriyor.
+
+### Kart
+
+**Bu ortamda 3D Secure'a kayıtlı bir test kartı bulunamadı.** Denenen kartlar
+ve bankanın yanıtı:
+
+| Kart numarası | Kaynak | Sonuç |
+|---|---|---|
+| `4546711234567894` | Ziraat NestPay | `Status N` — 3D'ye kayıtlı değil |
+| `5549601963997012` | Innova 3D Pay test formu | `Status N` — 3D'ye kayıtlı değil |
+| `5521010140829928` | VakıfBank PayFlex | `Status N` — 3D'ye kayıtlı değil |
+| `4546720000621074` | Innova 3D Pay dokümanı | `007 Issuer Exception` (SKT 05/2026, eskimiş) |
+| `4355084000000001` | VakıfBank PayFlex | `2029 Invalid pan` |
+| `5401341234567891` | Ziraat NestPay | `2009 Brand not found` |
+
+`Status N` "kart 3-D Secure programına dâhil değil" demektir; akış ACS
+ekranına hiç gitmez. 3D'yi sonuna kadar götürmek için bankadan kayıtlı bir
+test kartı istenmelidir.
+
+> **`BrandName` alanını atlamayın.** PayFlex kart markasını bu alandan
+> okuyor; `CardData`'ya `type` verilmezse alan hiç gönderilmez ve banka
+> `2009 Brand not found` döndürebilir.
+
+---
+
 ## Paycell (Turkcell)
 
 **Kaynak:** [paycellapi.apidog.io](https://paycellapi.apidog.io/test-kredi-kartlar%C4%B1-1889591m0) — resmî

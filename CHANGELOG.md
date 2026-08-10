@@ -24,6 +24,34 @@
 
 ## Yayımlanmamış
 
+### Belgelendi — Ziraat Bankası PayFlex test ortamı
+
+İNNOVA'nın Ziraat için yayınladığı entegrasyon dokümanı (MPI + Sanal POS v4.1)
+test uçlarını ve bir üye işyeri numarasını açıkça veriyor. Driver bu ortama
+karşı çalıştırıldığında 3D başlatma adımı geçti: banka üye işyeri ve şifreyi
+kabul edip tam bir `VERes` döndürdü (`PaReq`, `ACSUrl`, `TermUrl`, `MD`).
+
+Kodda değişiklik gerekmedi; ölçüm dört ayrı tuzağı ortaya çıkardı ve bunlar
+`TEST-KARTLARI.md`'ye yazıldı:
+
+- **MPI ucunun adı `Enrollment.aspx`**, dolaşımdaki yapılandırmalardaki
+  `MPI_Enrollment.aspx` değil. Yanlış uçta banka `1008 Invalid money amount`
+  döndürüyor — tutarla ilgisi yok, tutar biçiminin altı hâli denendi. Doğru
+  uçta aynı kimlik anında kabul edildi.
+- **MPI şifresi ile VPOS iş yeri şifresi ayrı kimliklerdir.** MPI'da çalışan
+  şifre VPOS'ta `5001 İş yeri şifresi yanlış` veriyor; satış, iade ve iptal
+  için bankadan ayrıca şifre ve `TerminalNo` alınmalı.
+- **Preprod yavaştır: MPI isteği 46–62 saniye sürüyor.** Paketin 30 saniyelik
+  varsayılanı yetmiyor, preset'e `timeout` verilmeli. Web sunucusunun kendi
+  sınırı da unutulmamalı — nginx'in varsayılan 60 saniyesi PHP hâlâ
+  çalışırken bağlantıyı kesip 502 döndürüyor.
+- **Sorgu servisinin preprod adresi vardır**; dolaşımdaki yapılandırmalar
+  burada yanlışlıkla canlı adresi gösteriyor.
+
+Bu ortamda **3D Secure'a kayıtlı test kartı bulunamadı**: denenen altı kart
+`Status N` ("kart 3-D Secure programına dâhil değil") ya da kart hatası
+verdi, dolayısıyla akış ACS ekranına hiç ulaşmıyor.
+
 ### Eklendi — Paycell (Turkcell) driver'ı
 
 Paycell'in ayırt edici yanı, kart bilgisinin ödeme ucuna hiç gitmemesi: önce
