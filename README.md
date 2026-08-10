@@ -162,6 +162,14 @@ Türkiye'deki sanal POS'lar birkaç ortak altyapı ailesine iner. Aynı aileyi
 kullanan bankalar aynı driver'ı paylaşır; aralarındaki fark yalnızca uç nokta
 ve kimlik bilgisidir.
 
+> **Aynı banka birden fazla satırda görünebilir.** Bir bankanın iki farklı
+> sanal POS ürünü varsa her biri ayrı bir driver'dır: ayrı protokol, ayrı kod,
+> ayrı doğrulama durumu. Birinin ölçülmüş olması diğeri hakkında hiçbir şey
+> söylemez. Bankanın adının yanındaki parantez hangisi olduğunu belirtir —
+> örneğin `akbank` **(NestPay)** ile `akbank-pos` **(yeni JSON API)** akraba
+> bile değildir. Ayrıca `akbank-pos` aşağıdaki **ödeme kuruluşları** tablosunda
+> yer alır. Hangisinin size tanımlandığını sanal POS sözleşmenizden teyit edin.
+
 Tablodaki **Test** sütunu, o driver'ın sağlayıcının kendi ortamına karşı
 koşulup koşulmadığını söyler — geri kalan sütunlar yalnızca protokolün
 uygulandığını gösterir, çalıştığını değil:
@@ -176,11 +184,11 @@ uygulandığını gösterir, çalıştığını değil:
 
 | Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank` | Akbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `akbank` | Akbank **(NestPay)** | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `isbank` | İş Bankası | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ziraat` | Ziraat Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ziraat` | Ziraat Bankası **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb` | QNB Finansbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb` | QNB Finansbank **(NestPay)** | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `teb` | TEB | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `sekerbank` | Şekerbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -190,9 +198,9 @@ uygulandığını gösterir, çalıştığını değil:
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
-| `ziraat-payflex` | Ziraat Bankası | PayFlex V4 | ⏳ ortak driver | ✅ | — | — | ✅ | ✅ | ✅ |
+| `ziraat-payflex` | Ziraat Bankası **(PayFlex)** | PayFlex V4 | ⏳ ortak driver | ✅ | — | — | ✅ | ✅ | ✅ |
 | `denizbank` | DenizBank | InterPos | ⏳ IP kısıtlı | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb-payfor` | QNB / Enpara | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb-payfor` | QNB Finansbank / Enpara **(PayFor)** | PayFor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat-katilim` | Ziraat Katılım | PayFor | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `kuveytturk` | Kuveyt Türk | BOA / TDV2.0 | ◐ | ✅ | — | — | ✅ | — | — |
 | `vakif-katilim` | Vakıf Katılım | BOA | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
@@ -201,7 +209,7 @@ uygulandığını gösterir, çalıştığını değil:
 
 | Driver | Kuruluş | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank-pos` | Akbank (yeni JSON API) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `akbank-pos` | Akbank **(yeni JSON API)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `paytr` | PayTR | ⏳ | — | ✅ | ✅ | ✅ | ✅ | — |
 | `param` | Param | ⏳ | ✅ | ✅ | — | ✅ | ✅ | — |
 | `tosla` | Tosla (AkÖde) | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ |
