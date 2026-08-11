@@ -2,6 +2,10 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.1 - 2026-08-11
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.0...v1.1.1
+
 ## v1.1.0 - 2026-08-10
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.0.9...v1.1.0
@@ -36,8 +40,8 @@ iade, kısmi iade, ön provizyon, kapama ve sorgu (ödenmiş sipariş `paid`,
 iptal edilen `cancelled` döndü). Kodda değişiklik gerekmedi.
 
 > Sorgu, ödemenin hemen ardından çağrılırsa `found: false` dönebiliyor —
-> NestPay kaydı henüz yazmamış oluyor. Birkaç saniye sonra aynı sipariş
-> `paid` görünüyor. Callback'te senkron sorgu yapıyorsanız buna dikkat.
+NestPay kaydı henüz yazmamış oluyor. Birkaç saniye sonra aynı sipariş
+`paid` görünüyor. Callback'te senkron sorgu yapıyorsanız buna dikkat.
 
 Kullanılan değerler README'ye yazıldı: mağaza `100100000` (`100200000` de
 çalışıyor), kullanıcı `AKTESTAPI`, şifre `AKBANK01`, storekey `123456`.
@@ -153,6 +157,7 @@ hashData     = base64( sha256( UPPER( applicationName + transactionId
                                       + transactionDateTime
                                       + [responseCode] + [cardToken]
                                       + secureCode + securityData ) ) )
+
 
 ```
 **Yanıt imzası ölçüldü.** Sağlayıcının test ortamından alınan gerçek bir kart
@@ -458,6 +463,7 @@ alandır**:
 
 ```
 ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A AUTH_DTTM:… AUTH_CODE:…
+
 
 
 ```
