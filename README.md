@@ -194,7 +194,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `isbank` | İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb` | QNB Finansbank **(NestPay)** | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb` | QNB Finansbank **(NestPay, muhtemelen kapalı)** ⚠️ | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `teb` | TEB | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `sekerbank` | Şekerbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -231,7 +231,12 @@ tanımlandığını sanal POS sözleşmenizden teyit edin:
 
 - Akbank → `akbank` (eski NestPay) veya `akbank-pos` (yeni JSON API)
 - Ziraat → `ziraat` (NestPay) veya `ziraat-payflex` (PayFlex)
-- QNB Finansbank → `qnb` (NestPay) veya `qnb-payfor` (PayFor)
+- QNB Finansbank → `qnb` (NestPay) veya `qnb-payfor` (PayFor). **`qnb`'nin
+  varsayılan adresi `www.fbwebpos.com` artık DNS'te çözülmüyor** (2026-08-11'de
+  doğrulandı, hem Google hem Cloudflare çözümleyicisiyle boş döndü); bankanın
+  kendi güncel dokümantasyonu da artık yalnızca PayFor altyapısından
+  (`vpos.qnb.com.tr`) bahsediyor. Yeni entegrasyonlarda **`qnb-payfor`'u
+  tercih edin** — o zaten uçtan uca doğrulanmış (bkz. yukarıdaki tablo).
 
 ## Nasıl çalışır
 
