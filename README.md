@@ -31,6 +31,12 @@ Bankayı değiştirmek için `'garanti'` yerine `'akbank'` yazmak yeterlidir.
 Çalışan bir örnek uygulama için:
 **[Voxyfy/anadolupay-laravel](https://github.com/Voxyfy/anadolupay-laravel)**
 
+Laravel'e değil düz Node.js/TypeScript'e bağlı kalmak isteyenler için aynı
+protokol bilgisiyle taşınan bir port da var:
+**[Voxyfy/anadolupay-node](https://github.com/Voxyfy/anadolupay-node)**
+([npm](https://www.npmjs.com/package/@voxyfy/anadolupay)) — test etmek için
+**[Voxyfy/anadolupay-node-example](https://github.com/Voxyfy/anadolupay-node-example)**.
+
 **Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
 kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
 uygulamanızın işi.
