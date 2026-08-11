@@ -218,7 +218,7 @@ uygulandığını gösterir, çalıştığını değil:
 |---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | `akbank-pos` | Akbank **(yeni JSON API)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `paytr` | PayTR | ⏳ | — | ✅ | ✅ | ✅ | ✅ | — |
-| `param` | Param | ⏳ | ✅ | ✅ | — | ✅ | ✅ | — |
+| ~~`param`~~ | Param ⚠️ **TMSF kayyımlığında, altyapı fiilen kapalı** | ⏳ | ✅ | ✅ | — | ✅ | ✅ | — |
 | `tosla` | Tosla (AkÖde) | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `craftgate` | Craftgate | ⏳ | ✅ | — | — | ✅ | ✅ | — |
 | `moka` | Moka United | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
@@ -498,7 +498,7 @@ if ($gateway instanceof SupportsStatusQuery) {
 | `vakif-katilim` | ✅ | ✅ | ✅ | ✅ | — | — | — |
 | `akbank-pos` | — | ✅ | ✅ | ✅ | — | — | ✅ |
 | `paytr` | ✅ | — | — | — | ✅ | ✅ | — |
-| `param` | ✅ | ✅ | ✅ | — | — | — | — |
+| ~~`param`~~ ⚠️ | ✅ | ✅ | ✅ | — | — | — | — |
 | `tosla` | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | `craftgate` | ✅ | — | ✅ | ✅ | ✅ | ✅ | — |
 | `moka` | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
@@ -725,6 +725,19 @@ seviyesinde `403` ile reddeder — yani kimlik bilgileriniz doğru olsa bile
 sunucunuzun IP'si Param'a bildirilmeden hiçbir çağrı geçmez. Ayrıca çok
 sayıda kaynakta geçen `test-dmz.param.com.tr` adresi artık `404` dönüyor;
 güncel test adresi `testposws.param.com.tr`'dir.
+
+**⚠️ Param'ın (Türk Elektronik Para A.Ş.) altyapısı fiilen kapalı — IP
+kısıtı bunun bir sonucu, sebebi değil.** TCMB 2026-04-30'da Param'ın ödeme
+hizmetleri ve e-para ihraç yetkisini geçici olarak durdurdu; 2026-05-04'te
+mahkeme yürütmeyi durdurunca şirket kesintisiz çalışmaya devam etti, ama
+2026-07-13'te mahkeme bu kararı geri çekti ve **TMSF, İstanbul Cumhuriyet
+Başsavcılığı soruşturması kapsamında Param ve grup şirketlerine kayyum
+olarak atandı.** 2026-08-05 tarihli basın duyurusunda TMSF, ParamPOS üye
+işyeri alacaklarının 100.000 TL'ye kadarının ödeneceğini açıkladı — yani
+POS hizmeti normal işlemiyor, tasfiye/iade süreci işliyor. Bu durumdayken
+`param` driver'ını yeniden doğrulamaya çalışmak (yeni IP bildirmek, test
+üye işyeri istemek) anlamsız: muhatap kurumun kendisi kayyım denetiminde.
+Kod repoda kalıyor ama **aktif olarak sürdürülmüyor.**
 
 **Craftgate iki ayrı anahtar kullanır.** API istekleri Secret Key ile,
 3D dönüşü panelde ayrıca üretilen **3D Secure Callback Key** ile imzalanır.
