@@ -80,6 +80,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `halkbank`, `teb`, `sekerbank`, `ing`, `alternatifbank` (NestPay) | Dokümana göre | Uçlar canlı ve ayakta (`entegrasyon.asseco-see.com.tr` ortak ucu ve kendi `sanalpos.*` adresleri 200 dönüyor; `torus-stage-halkbank` 503, `torus-stage-alternatifbank` DNS'te yok, diğerleri stage'de de ayakta). Ancak bu beş banka için hiçbir yerde (bankanın kendi sitesi, Payten dokümanları, `mewebstudio/pos` gibi topluluk paketleri) açık test clientid/storekey/API kullanıcısı yayınlanmıyor — `isbank` ve `turkiyefinans`'ın aksine. Ölçüm için bankadan veya Payten'den (`destek@payten.com`) test üye işyeri istenmesi gerekiyor; kör tahminle deneme yapılmadı, çünkü yanlış kimlik de doğru kimlik gibi `mdStatus` hatası üretebiliyor ve bu ayrım ölçmeden yapılamıyor |
 | `isbank` (NestPay) | **Uçtan uca** | 2026-08-11, İş Bankası'nın kendi mağazası (`entegrasyon.asseco-see.com.tr`, mağaza `700655000200`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, provizyon `Approved`, sorgu `paid`, iade `Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama ve sorgu. Dolaşımdaki yapılandırmaların `ISBANK07`'yi storekey sanması yüzünden bu driver uzun süre `mdStatus 7` veriyordu — `ISBANK07` API şifresidir, storekey `TRPS0200` |
 | `turkiyefinans` (NestPay) | **Kısmen ölçüldü** | 2026-08-11, bankanın kendi yayınladığı NestPay test dokümanındaki mağaza (`280000100`) — 3D formu bankaca kabul edilip 3DS akışına girdi ve storekey `TRPS2828` doğrulandı (yanlış anahtar `mdStatus 7` veriyor). Provizyon, iade, iptal ve sorgu ölçülemedi: API kullanıcısı `TFKBAPI` bu mağazada yetkili değil, her istek `99 / Insufficent permissions` dönüyor. Dokümandaki ikinci mağaza `280000200` artık yok (`mdStatus 6`) |
+| `qnb` (NestPay) | **Kısmen ölçüldü** | 2026-08-11, Asseco/Finansbank'ın resmî "NestPay Test Dokümanı"ndaki paylaşılan mağaza (`600100000`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, imza ve CAVV doğrulandı) örnek projeden **iki farklı test kartıyla** tamamlandı. Provizyon ikisinde de aynı jenerik hatayla düştü: `ProcReturnCode 99`, `ERRORCODE ISO8583-19` ("Tekrar girin, tekrar deneyin"). Kart değişkeni elendiği için Türkiye Finans'takiyle aynı kalıp: **paylaşılan kimlik 3D'yi geçirir ama provizyona yetkili değil.** Gerçek ortam (`www.fbwebpos.com`) artık DNS'te çözülmüyor; test ortamı ortak Asseco ucunda (`entegrasyon.asseco-see.com.tr`) çalışıyor |
 | `akbank` (NestPay) | **Uçtan uca** | 2026-08-11, Akbank'ın kendi test mağazası (`entegrasyon.asseco-see.com.tr`, mağaza `100100000`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, provizyon `Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama ve durum sorgusu. Storekey tahmin edilmedi, yanlış değerlerin `mdStatus 7` vermesiyle ölçülerek ayrıldı |
 | `garanti` (GVPS) | **Uçtan uca** | 2026-08-11, banka test terminali — 3D Secure tam turu (`mdStatus 1`, dönüş hash'i doğrulandı, provizyon `00 Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış (sekiz test kartının yedisi), taksitli satış, sipariş sorgusu ve hareket dökümü. **İade, iptal ve ön provizyon ölçülemedi:** terminal bunları `05 / RPC-05` ile reddediyor. Driver kusuru değil — istek biçiminin on dört çeşitlemesi aynı yanıtı verdi, `PROVAUT` ile denendiğinde `92 / 0652 yetkiniz yok` gelmesi kimliğin doğru kabul edildiğini gösteriyor |
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
@@ -195,7 +196,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `isbank` | İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `qnb` | QNB Finansbank **(NestPay, muhtemelen kapalı)** ⚠️ | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `qnb` | QNB Finansbank **(NestPay)** | Asseco / Payten | ◐ 3D geçti, provizyona yetkisiz | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `teb` | TEB | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `sekerbank` | Şekerbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -233,11 +234,19 @@ tanımlandığını sanal POS sözleşmenizden teyit edin:
 - Akbank → `akbank` (eski NestPay) veya `akbank-pos` (yeni JSON API)
 - Ziraat → `ziraat` (NestPay) veya `ziraat-payflex` (PayFlex)
 - QNB Finansbank → `qnb` (NestPay) veya `qnb-payfor` (PayFor). **`qnb`'nin
-  varsayılan adresi `www.fbwebpos.com` artık DNS'te çözülmüyor** (2026-08-11'de
-  doğrulandı, hem Google hem Cloudflare çözümleyicisiyle boş döndü); bankanın
-  kendi güncel dokümantasyonu da artık yalnızca PayFor altyapısından
-  (`vpos.qnb.com.tr`) bahsediyor. Yeni entegrasyonlarda **`qnb-payfor`'u
-  tercih edin** — o zaten uçtan uca doğrulanmış (bkz. yukarıdaki tablo).
+  varsayılan adresi `www.fbwebpos.com` gerçek ortam için artık DNS'te
+  çözülmüyor** — ama domain terk edilmiş değil, hâlâ Finansbank'a kayıtlı ve
+  DNSSEC ile aktif imzalanıyor; sadece web kaydı kaldırılmış. Test ortamı
+  ortak Asseco ucunda (`entegrasyon.asseco-see.com.tr`) çalışıyor: Asseco'nun
+  resmi "Finansbank Test Dokümanı"nda yayınlanmış, bankalar arası paylaşılan
+  bir kimlik var (ClientId `600100000`, Storekey `123456`, API kullanıcı/şifre
+  `FINANSAPI`/`FINANS06`). 2026-08-11'de örnek projeden ölçüldü: **3D Secure
+  tam turu geçti** (`mdStatus 1`, imza ve CAVV doğrulandı, iki farklı kartla
+  tekrarlandı) ama **provizyon ikisinde de aynı jenerik hatayla düştü**
+  (`ProcReturnCode 99`, `ERRORCODE ISO8583-19`) — Türkiye Finans'takiyle aynı
+  kalıp: paylaşılan kimlik 3D'yi geçirir, provizyona yetkili değil. Kendi
+  üye işyerinizle deneyin; **`qnb-payfor` şu an daha az riskli** çünkü
+  uçtan uca doğrulanmış.
 
 ## Nasıl çalışır
 
@@ -1207,6 +1216,13 @@ TURKIYEFINANS_PASSWORD=TFKB2828
 TURKIYEFINANS_SECRET_KEY=TRPS2828
 TURKIYEFINANS_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
 TURKIYEFINANS_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
+
+QNB_MERCHANT_ID=600100000
+QNB_USERNAME=FINANSAPI
+QNB_PASSWORD=FINANS06
+QNB_SECRET_KEY=123456
+QNB_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
+QNB_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
 
 YAPIKREDI_PAYMENT_API=https://setmpos.ykb.com/PosnetWebService/XML
 YAPIKREDI_GATEWAY_3D=https://setmpos.ykb.com/3DSWebService/YKBPaymentService
