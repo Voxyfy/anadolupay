@@ -28,6 +28,47 @@
 
 ## Yayımlanmamış
 
+### Doğrulandı — İş Bankası ve Türkiye Finans (NestPay)
+
+Akbank'ta işe yarayan yol iki bankada daha denendi: kendi mağaza numarasıyla
+NestPay'in ortak test ucuna (`entegrasyon.asseco-see.com.tr`) bağlanmak.
+`torus-stage-<banka>` host'u aramaya gerek yok — İş Bankası'nınki zaten
+DNS'te yok.
+
+**İş Bankası — uçtan uca.** Mağaza `700655000200`, API kullanıcısı
+`ISBANKAPI` / `ISBANK07`, storekey `TRPS0200`. 3D Secure tam turu (3DS
+2.2.0, `mdStatus 1`, provizyon `Approved`, sorgu `paid`, iade `Approved`)
+örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade,
+kısmi iade, ön provizyon, kapama ve sorgu — hepsi `00`.
+
+> **`ISBANK07` storekey değil, API şifresidir.** Dolaşımdaki
+> yapılandırmalar bunu storekey sanıyor; öyle kullanılınca 3D formu her
+> zaman `mdStatus 7 / Guvenlik Kodu hatali` veriyor ve hata kodda aranıyor.
+> Storekey `TRPS0200`. Kalıp `TRPS` + dört hane olarak görünüyor
+> (Türkiye Finans `TRPS2828`).
+
+**Türkiye Finans — kısmen.** Kimlikler bankanın kendi yayınladığı NestPay
+test dokümanından alındı (mağaza `280000100`, `TFKBAPI` / `TFKB2828`,
+storekey `TRPS2828`). 3D formu bankaca kabul edilip 3DS akışına giriyor ve
+storekey doğrulandı — yanlış anahtar `mdStatus 7` veriyor. Provizyon, iade,
+iptal ve sorgu ölçülemedi: API kullanıcısı bu mağazada yetkili değil, her
+istek `99 / Insufficent permissions` dönüyor. Kullanıcı adı, şifre, kart ve
+mağaza numarasının yedi çeşitlemesinde de aynı yanıt geldi. Dokümandaki
+ikinci mağaza `280000200` artık yok (`mdStatus 6`).
+
+**Kartlar hakkında.** Ortak test ucundaki kartlar büyük ölçüde mağazadan
+bağımsız: İş Bankası mağazasında Akbank, Türkiye Finans ve Ziraat
+dokümanlarından gelen altı kartın altısı da 3D'siz satışta `00` aldı, hatta
+Türkiye Finans dokümanındaki geçmiş `12/22` tarihi bile kabul edildi.
+**Ama 3D'de durum farklı:** altı kart da gateway'i geçip 3DS akışına
+giriyor, fark ancak directory server'da ortaya çıkıyor. Türkiye Finans kartı
+`5377195377190410`, hem İş Bankası hem **Türkiye Finans'ın kendi**
+mağazasında `mdStatus 5 / Authentication unavailable (DS)` veriyor
+(`TDS2_transStatusReason: 08 – No Card record`) — bankanın kendi
+dokümanındaki kart, kendi test ortamında 3D doğrulamasından geçmiyor.
+3D ölçümünde kartı formun ilk adımına bakarak seçmeyin; ölçüm için
+`5571135571135575` kullanın.
+
 ### Doğrulandı — Akbank (NestPay) kendi test mağazasında
 
 `akbank` driver'ı bugüne kadar yalnızca Ziraat'in terminalinde ölçülmüştü ve

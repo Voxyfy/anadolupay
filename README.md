@@ -76,7 +76,9 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
 | `tosla` | **Uçtan uca** | 2026-08-09 — 3D satış, durum, taksit, iade ve iptal doğrulandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
-| NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal. `akbank` ve `ziraat` ayrıca kendi mağazalarında ölçüldü; kalan sekiz banka yalnızca bu ortak ölçüme dayanır |
+| NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal. `ziraat`, `akbank` ve `isbank` ayrıca kendi mağazalarında ölçüldü; kalan altı banka yalnızca bu ortak ölçüme dayanır |
+| `isbank` (NestPay) | **Uçtan uca** | 2026-08-11, İş Bankası'nın kendi mağazası (`entegrasyon.asseco-see.com.tr`, mağaza `700655000200`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, provizyon `Approved`, sorgu `paid`, iade `Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama ve sorgu. Dolaşımdaki yapılandırmaların `ISBANK07`'yi storekey sanması yüzünden bu driver uzun süre `mdStatus 7` veriyordu — `ISBANK07` API şifresidir, storekey `TRPS0200` |
+| `turkiyefinans` (NestPay) | **Kısmen ölçüldü** | 2026-08-11, bankanın kendi yayınladığı NestPay test dokümanındaki mağaza (`280000100`) — 3D formu bankaca kabul edilip 3DS akışına girdi ve storekey `TRPS2828` doğrulandı (yanlış anahtar `mdStatus 7` veriyor). Provizyon, iade, iptal ve sorgu ölçülemedi: API kullanıcısı `TFKBAPI` bu mağazada yetkili değil, her istek `99 / Insufficent permissions` dönüyor. Dokümandaki ikinci mağaza `280000200` artık yok (`mdStatus 6`) |
 | `akbank` (NestPay) | **Uçtan uca** | 2026-08-11, Akbank'ın kendi test mağazası (`entegrasyon.asseco-see.com.tr`, mağaza `100100000`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, provizyon `Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama ve durum sorgusu. Storekey tahmin edilmedi, yanlış değerlerin `mdStatus 7` vermesiyle ölçülerek ayrıldı |
 | `garanti` (GVPS) | **Uçtan uca** | 2026-08-11, banka test terminali — 3D Secure tam turu (`mdStatus 1`, dönüş hash'i doğrulandı, provizyon `00 Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış (sekiz test kartının yedisi), taksitli satış, sipariş sorgusu ve hareket dökümü. **İade, iptal ve ön provizyon ölçülemedi:** terminal bunları `05 / RPC-05` ile reddediyor. Driver kusuru değil — istek biçiminin on dört çeşitlemesi aynı yanıtı verdi, `PROVAUT` ile denendiğinde `92 / 0652 yetkiniz yok` gelmesi kimliğin doğru kabul edildiğini gösteriyor |
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
@@ -189,7 +191,7 @@ uygulandığını gösterir, çalıştığını değil:
 | Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | `akbank` | Akbank **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `isbank` | İş Bankası | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `isbank` | İş Bankası | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `qnb` | QNB Finansbank **(NestPay)** | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -197,7 +199,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `sekerbank` | Şekerbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `turkiyefinans` | Türkiye Finans | Asseco / Payten | ◐ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `garanti` | Garanti BBVA | GVPS | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
@@ -1172,6 +1174,20 @@ AKBANK_SECRET_KEY=123456
 AKBANK_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
 AKBANK_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
 AKBANK_GATEWAY_3D_HOST=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
+
+ISBANK_MERCHANT_ID=700655000200
+ISBANK_USERNAME=ISBANKAPI
+ISBANK_PASSWORD=ISBANK07
+ISBANK_SECRET_KEY=TRPS0200
+ISBANK_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
+ISBANK_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
+
+TURKIYEFINANS_MERCHANT_ID=280000100
+TURKIYEFINANS_USERNAME=TFKBAPI
+TURKIYEFINANS_PASSWORD=TFKB2828
+TURKIYEFINANS_SECRET_KEY=TRPS2828
+TURKIYEFINANS_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
+TURKIYEFINANS_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
 
 YAPIKREDI_PAYMENT_API=https://setmpos.ykb.com/PosnetWebService/XML
 YAPIKREDI_GATEWAY_3D=https://setmpos.ykb.com/3DSWebService/YKBPaymentService

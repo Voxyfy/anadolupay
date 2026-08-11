@@ -498,7 +498,7 @@ reddedilir.
 
 ---
 
-## NestPay (Asseco / Payten) — Ziraat
+## NestPay (Asseco / Payten) — Ziraat ve ortak test ucu
 
 **Kaynak:** Ziraat NestPay test terminali (`torus-stage-ziraat.asseco-see.com.tr`)
 ve [Paratika'nın resmî test kartı tablosu](https://docs.paratika.com.tr/test-kartlari)
@@ -527,12 +527,75 @@ ZIRAAT_PAYMENT_API=https://torus-stage-ziraat.asseco-see.com.tr/fim/api
 ZIRAAT_GATEWAY_3D=https://torus-stage-ziraat.asseco-see.com.tr/fim/est3Dgate
 ```
 
-Aynı kart ve akış diğer NestPay bankalarında da (İş Bankası, Halkbank, QNB,
-TEB, Şekerbank, ING, Alternatif Bank, Türkiye Finans) geçerlidir; yalnızca uç
-nokta ve kimlik bilgileri değişir.
+Aynı kart ve akış diğer NestPay bankalarında da (Halkbank, QNB, TEB,
+Şekerbank, ING, Alternatif Bank) geçerlidir; yalnızca uç nokta ve kimlik
+bilgileri değişir.
 
-**Akbank artık kendi mağazasında doğrulandı** — Ziraat terminalini ödünç
-almanıza gerek yok. Kartları ve kimlikleri için yukarıdaki
+### Ortak test ucundaki kartlar banka bağımsızdır
+
+Ortak test ucundaki (`entegrasyon.asseco-see.com.tr`) kartlar büyük ölçüde
+mağazadan bağımsızdır. 2026-08-11'de İş Bankası mağazasında altı kartın
+altısı da `00` ile onaylandı — Akbank, Türkiye Finans ve Ziraat
+dokümanlarından gelenler dahil:
+
+| Kart numarası | Marka | Geldiği doküman |
+|---|---|---|
+| `5571135571135575` | Mastercard | Akbank |
+| `4355084355084358` | Visa | Akbank |
+| `5377195377190410` | Mastercard | Türkiye Finans |
+| `4799174799173828` | Visa | Türkiye Finans |
+| `5401341234567891` | Mastercard | Ziraat |
+| `4546711234567894` | Visa | Ziraat |
+
+Hepsinde CVV `000`, 3D şifresi `a`. **Son kullanma tarihi de denetlenmiyor:**
+Türkiye Finans dokümanındaki geçmiş `12/22` tarihi bile kabul edildi. Yine de
+`12/26` kullanın — bu davranış ortak test ucuna özgüdür, bankanın kendi
+terminalinde geçerli olacağını varsaymayın.
+
+**Hangisini kullanın:** `5571135571135575`. Akbank ve İş Bankası
+mağazalarında hem 3D'siz satış hem de 3D tam turu bununla doğrulandı.
+
+> **3D'siz geçmesi 3D'de de geçeceği anlamına gelmiyor.** Yukarıdaki altı
+> kartın altısı da 3D'siz satışta `00` alıyor ve altısı da 3D formunda
+> gateway'i geçip 3DS akışına giriyor — fark ancak directory server'da
+> ortaya çıkıyor. Türkiye Finans kartı `5377195377190410` 3D turunda
+> `mdStatus 5` / `Authentication unavailable (DS)` /
+> `TDS2_transStatusReason: 08 – No Card record` veriyor: kart BIN düzeyinde
+> kayıtlı görünüyor (`veresEnrolledStatus: Y`) ama DS'te kaydı yok. Bu
+> **Türkiye Finans'ın kendi mağazasında da** böyle — yani bankanın kendi
+> dokümanındaki kart, kendi test ortamında 3D doğrulamasından geçmiyor.
+> Bu yüzden 3D ölçümü yapacaksanız kartı formun ilk adımına bakarak
+> seçmeyin, turu sonuna kadar koşun.
+
+Mağazaya özel bir istisna daha: `4355084355084358` İş Bankası mağazasında
+geçerken Akbank'ın `100100000` mağazasında
+`Kartin son kullanma tarihi hatali` veriyor.
+
+### Doğrulanmış mağazalar
+
+Bu üç banka kendi mağaza numaralarıyla ortak uçta ölçüldü — Ziraat
+terminalini ödünç almanıza gerek yok:
+
+| Banka | ClientId | API kullanıcı / şifre | Storekey | Ne kadarı ölçüldü |
+|---|---|---|---|---|
+| Akbank | `100100000` | `AKTESTAPI` / `AKBANK01` | `123456` | tamamı, 3D tam turu dahil |
+| İş Bankası | `700655000200` | `ISBANKAPI` / `ISBANK07` | `TRPS0200` | tamamı, 3D tam turu dahil |
+| Türkiye Finans | `280000100` | `TFKBAPI` / `TFKB2828` | `TRPS2828` | yalnızca 3D formu |
+
+Türkiye Finans'ta yalnızca 3D adımı doğrulanabildi: API kullanıcısı bu
+mağazada yetkili değil, provizyon ve sorgu istekleri `99 / Insufficent
+permissions` dönüyor. Kimlikler bankanın kendi yayınladığı
+[NestPay test dokümanından](https://www.turkiyefinans.com.tr/Documents/sanal_pos_asseco.pdf)
+alındı; aynı dokümandaki `280000200` (3D_Pay mağazası) artık yok
+(`mdStatus 6 / Invalid merchant assigned ID`).
+
+> **`ISBANK07` storekey değildir, API şifresidir.** Dolaşımdaki
+> yapılandırmalar bunu storekey sanıyor; öyle kullanılınca 3D formu her
+> zaman `mdStatus 7 / Guvenlik Kodu hatali` veriyor. İş Bankası'nın
+> storekey'i `TRPS0200`. Kalıp `TRPS` + dört hane olarak görünüyor
+> (Türkiye Finans `TRPS2828`).
+
+Akbank'ın kendi kart tablosu için yukarıdaki
 [Akbank (NestPay / Asseco)](#akbank-nestpay--asseco) bölümüne bakın.
 
 ---
