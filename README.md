@@ -42,7 +42,8 @@ uygulamanızın işi.
 > Bu paketteki protokoller bankaların public dokümantasyonuna göre yazıldı ve
 > istek üretimi, imza ve yanıt eşlemesi birim testleriyle kilitlendi. **Ancak
 > banka driver'larının çoğu gerçek bir bankaya karşı çalıştırılmadı.**
-> (İstisna: NestPay ailesi Ziraat test terminalinde kısmen doğrulandı.)
+> (Ölçülmüş olanlar için [Doğrulama durumu](#doğrulama-durumu) tablosuna
+> bakın — hangisinin nereye kadar götürüldüğü orada yazılıdır.)
 >
 > Testler benim yazdığım algoritmayı doğrular, bankanın beklediğini değil. Bir
 > alanın sırası yanlışsa test yeşil kalır, banka işlemi reddeder. Kullanacağınız
@@ -75,7 +76,9 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `moka` | **Uçtan uca** | 2026-08-09, test servisinde 3D Secure satış tamamlandı |
 | `tosla` | **Uçtan uca** | 2026-08-09 — 3D satış, durum, taksit, iade ve iptal doğrulandı |
 | `paratika` | Dokümana göre | Vektör yayınlanmıyor |
-| NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal |
+| NestPay bankaları | **Uçtan uca** | 2026-08-09, Ziraat test terminali — 3D satış, durum, iade ve iptal. `akbank` ve `ziraat` ayrıca kendi mağazalarında ölçüldü; kalan sekiz banka yalnızca bu ortak ölçüme dayanır |
+| `akbank` (NestPay) | **Uçtan uca** | 2026-08-11, Akbank'ın kendi test mağazası (`entegrasyon.asseco-see.com.tr`, mağaza `100100000`) — 3D Secure tam turu (3DS 2.2.0, `mdStatus 1`, provizyon `Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama ve durum sorgusu. Storekey tahmin edilmedi, yanlış değerlerin `mdStatus 7` vermesiyle ölçülerek ayrıldı |
+| `garanti` (GVPS) | **Uçtan uca** | 2026-08-11, banka test terminali — 3D Secure tam turu (`mdStatus 1`, dönüş hash'i doğrulandı, provizyon `00 Approved`) örnek projeden tamamlandı; ayrıca 3D'siz satış (sekiz test kartının yedisi), taksitli satış, sipariş sorgusu ve hareket dökümü. **İade, iptal ve ön provizyon ölçülemedi:** terminal bunları `05 / RPC-05` ile reddediyor. Driver kusuru değil — istek biçiminin on dört çeşitlemesi aynı yanıtı verdi, `PROVAUT` ile denendiğinde `92 / 0652 yetkiniz yok` gelmesi kimliğin doğru kabul edildiğini gösteriyor |
 | `vakifbank` (PayFlex) | **Uçtan uca** | 2026-08-10, banka sandbox'ı — 3D Secure satış tamamlandı; ayrıca non-3D satış, durum, iade (kısmî ve tam), iptal, ön provizyon ve kapama |
 | `akbank-pos` | **Uçtan uca** | 2026-08-10, Akbank test store — 3D Secure satış ve iptali örnek projeden tamamlandı; ayrıca non-3D satış, kısmî/tam iade, ön provizyon, kapama ve işlem geçmişi. Dönüş imzası bankanın ürettiği hash ile birebir eşleşti |
 | `qnb-payfor` (PayFor) | **Uçtan uca** | 2026-08-10, QNB demo ortamı — 3D Secure satış (`Onaylandı`), durum sorgusu ve iptal; dönüş imzası bankanın ürettiği `ResponseHash` ile iki ayrı gerçek dönüşte birebir eşleşti |
