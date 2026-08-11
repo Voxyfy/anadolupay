@@ -192,7 +192,10 @@ return [
             'endpoints' => [
                 'payment_api' => env('AKBANK_PAYMENT_API', 'https://www.sanalakpos.com/fim/api'),
                 'gateway_3d' => env('AKBANK_GATEWAY_3D', 'https://www.sanalakpos.com/fim/est3Dgate'),
-                'gateway_3d_host' => env('AKBANK_GATEWAY_3D_HOST', 'https://sanalpos.sanalakpos.com.tr/fim/est3Dgate'),
+                // Varsayılan yok: dolaşımdaki `sanalpos.sanalakpos.com.tr`
+                // adresi DNS'te çözülmüyor. 3D Host kullanacaksanız
+                // bankanın verdiği adresi env ile geçin.
+                'gateway_3d_host' => env('AKBANK_GATEWAY_3D_HOST'),
             ],
         ],
 

@@ -185,7 +185,7 @@ uygulandığını gösterir, çalıştığını değil:
 
 | Driver | Banka | Altyapı | Test | 3D | 3D Pay | 3D Host | Non-secure | İade | İptal |
 |---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `akbank` | Akbank **(NestPay)** | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `akbank` | Akbank **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `isbank` | İş Bankası | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `ziraat` | Ziraat Bankası **(NestPay)** | Asseco / Payten | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `halkbank` | Halkbank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -1122,9 +1122,10 @@ olarak geçer.
 ## Test ortamı
 
 Test kartları için ayrı bir belge var:
-**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, PayTR, Craftgate,
-Moka ve Paratika'nın resmî listeleri (hata senaryosu kartları dahil), diğer
-bankalar için kartı nereden alacağınız.
+**[TEST-KARTLARI.md](TEST-KARTLARI.md)** — iyzico, Garanti, Akbank, PayTR,
+Craftgate, Moka ve Paratika'nın listeleri (hata senaryosu kartları dahil),
+diğer bankalar için kartı nereden alacağınız. Her bölümde hangi kartla
+ölçüm yaptığımız ve hangisinden kaçınmanız gerektiği yazılıdır.
 
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
@@ -1161,8 +1162,13 @@ GARANTI_TEST_MODE=true
 GARANTI_PAYMENT_API=https://sanalposprovtest.garantibbva.com.tr/VPServlet
 GARANTI_GATEWAY_3D=https://sanalposprovtest.garantibbva.com.tr/servlet/gt3dengine
 
+AKBANK_MERCHANT_ID=100100000
+AKBANK_USERNAME=AKTESTAPI
+AKBANK_PASSWORD=AKBANK01
+AKBANK_SECRET_KEY=123456
 AKBANK_PAYMENT_API=https://entegrasyon.asseco-see.com.tr/fim/api
 AKBANK_GATEWAY_3D=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
+AKBANK_GATEWAY_3D_HOST=https://entegrasyon.asseco-see.com.tr/fim/est3Dgate
 
 YAPIKREDI_PAYMENT_API=https://setmpos.ykb.com/PosnetWebService/XML
 YAPIKREDI_GATEWAY_3D=https://setmpos.ykb.com/3DSWebService/YKBPaymentService

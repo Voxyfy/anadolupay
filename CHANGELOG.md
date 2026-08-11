@@ -24,6 +24,52 @@
 
 ## Yayımlanmamış
 
+### Doğrulandı — Akbank (NestPay) kendi test mağazasında
+
+`akbank` driver'ı bugüne kadar yalnızca Ziraat'in terminalinde ölçülmüştü ve
+tabloda `⏳ ortak driver` olarak duruyordu. Akbank'ın kendi test mağazası
+NestPay'in ortak test ucunda (`entegrasyon.asseco-see.com.tr`) tanımlıymış;
+driver bu mağazaya karşı çalıştırıldı ve **bütün akışlar geçti**: 3D Secure
+tam turu (3DS 2.2.0, ACS doğrulaması `mdStatus 1`, callback hash'i
+doğrulandı, provizyon `Approved / 00`), 3D'siz satış, taksitli satış, iptal,
+iade, kısmi iade, ön provizyon, kapama ve sorgu (ödenmiş sipariş `paid`,
+iptal edilen `cancelled` döndü). Kodda değişiklik gerekmedi.
+
+> Sorgu, ödemenin hemen ardından çağrılırsa `found: false` dönebiliyor —
+> NestPay kaydı henüz yazmamış oluyor. Birkaç saniye sonra aynı sipariş
+> `paid` görünüyor. Callback'te senkron sorgu yapıyorsanız buna dikkat.
+
+Kullanılan değerler README'ye yazıldı: mağaza `100100000` (`100200000` de
+çalışıyor), kullanıcı `AKTESTAPI`, şifre `AKBANK01`, storekey `123456`.
+Storekey tahmin edilmedi, ölçülerek ayrıldı: yalnızca `123456` ACS'ye
+geçiyor, denenen diğer değerler `mdStatus 7 / Guvenlik Kodu hatali` veriyor.
+
+Ayrıca `torus-stage-akbank.asseco-see.com.tr` DNS'te yok — Ziraat için
+işleyen `torus-stage-<banka>` kalıbı Akbank'ta geçerli değil, ama gerek de
+kalmadı.
+
+### Düzeltildi — NestPay sorgusunda maskeli kart hep boş dönüyordu
+
+`AssecoGateway::status()` maskeli kartı `MaskedPan` alanından okumaya
+çalışıyordu; oysa NestPay sorgu yanıtında kart `Extra.PAN` içinde gelir,
+`MaskedPan` yalnızca ödeme yanıtlarında bulunur. Üstelik okuma
+`Extra.NUMCODE` boşsa koşuluna bağlıydı ve `NUMCODE` her yanıtta dolu
+geliyordu — yani `StatusResponse::$maskedCardNumber` NestPay ailesinin
+**on bankasında da** her zaman `null` kalıyordu.
+
+Akbank'ın test mağazasında ortaya çıktı: `Extra.PAN` = `5571 13** **** 5575`
+dolu gelirken alan boştu. Artık `Extra.PAN` okunuyor, bulunamazsa
+`MaskedPan`e düşülüyor. Kart bankanın döndürdüğü biçimde bırakılıyor —
+NestPay araya boşluk koyar, sıkıştırılmıyor.
+
+### Düzeltildi — Akbank 3D Host varsayılanı
+
+`akbank` preset'inin `gateway_3d_host` varsayılanı
+`https://sanalpos.sanalakpos.com.tr/fim/est3Dgate` idi; bu host DNS'te
+çözülmüyor. NestPay ailesindeki diğer dokuz bankanın hiçbirinde
+`gateway_3d_host` varsayılanı yoktu, yalnızca Akbank'ta vardı ve yanlıştı.
+Varsayılan kaldırıldı; `AKBANK_GATEWAY_3D_HOST` ile geçilebilir.
+
 ### Doğrulandı — Garanti BBVA test ortamı
 
 Garanti, test üye işyeri bilgilerini geliştirici portalında açıkça yayınlıyor

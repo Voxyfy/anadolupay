@@ -335,9 +335,12 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
                 ? $this->parseMinorAmount($this->pick($extra, ['ORIG_TRANS_AMT', 'CAPTURE_AMT']))
                 : $this->parseAmount($this->pick($extra, ['ORIG_TRANS_AMT'])),
             transactionTime: $this->pick($extra, ['TRXDATE', 'AUTH_DTTM']),
-            maskedCardNumber: $this->pick($extra, ['NUMCODE']) === null
-                ? $this->pick($response, ['MaskedPan'])
-                : null,
+            // Sorgu yanıtında maskeli kart `Extra.PAN` alanındadır; ödeme
+            // yanıtlarındaki `MaskedPan` sorguda gelmez. Kart, bankanın
+            // döndürdüğü biçimde bırakılır — NestPay araya boşluk koyar
+            // ("5571 13** **** 5575"), uydurup sıkıştırmıyoruz.
+            maskedCardNumber: $this->pick($extra, ['PAN'])
+                ?? $this->pick($response, ['MaskedPan']),
             errorMessage: $this->pick($response, ['ErrMsg']),
             raw: $response,
         );

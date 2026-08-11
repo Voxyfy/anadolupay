@@ -213,6 +213,31 @@ describe('Kuveyt Türk iptal', function () {
             ->and($status->transactionTime)->toBe('2026-08-09 19:12:07');
     });
 
+    /*
+     * Akbank'ın kendi test mağazasında ortaya çıktı: sorgu yanıtı maskeli
+     * kartı `Extra.PAN` içinde döndürüyor. Driver bunun yerine yalnızca
+     * `MaskedPan`e bakıyor, üstelik `NUMCODE` boşsa diye koşula bağlıyordu;
+     * `NUMCODE` her yanıtta dolu geldiği için alan on NestPay bankasında da
+     * daima `null` kalıyordu.
+     */
+    it('maskeli kartı Extra.PAN alanından okur', function () {
+        Http::fake([
+            'bank.test/*' => Http::response(
+                '<CC5Response><ProcReturnCode>00</ProcReturnCode><TransId>TRX-1</TransId><Extra>'
+                .'<ORDERSTATUS>ORD_ID:ORDER-1 ORIG_TRANS_AMT:199 CAPTURE_AMT:199 TRANS_STAT:C '
+                .'AUTH_CODE:979527</ORDERSTATUS>'
+                .'<PAN>5571 13** **** 5575</PAN><NUMCODE>0</NUMCODE>'
+                .'</Extra></CC5Response>'
+            ),
+        ]);
+
+        $status = BankTestConfig::make(AssecoGateway::class)->status('ORDER-1');
+
+        expect($status->found)->toBeTrue()
+            // Banka araya boşluk koyuyor; olduğu gibi aktarılır.
+            ->and($status->maskedCardNumber)->toBe('5571 13** **** 5575');
+    });
+
     it('sipariş bulunamadığında boş şablonu durum sanmaz', function () {
         // Bankanın var olmayan sipariş için gerçekte döndürdüğü yanıt.
         Http::fake([

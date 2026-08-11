@@ -118,6 +118,39 @@ kabul eder. Bu kartlar o ayrımı test etmenizi sağlar.
 
 Garanti kartlarında CVV kart başına farklıdır; tabloya birebir uyun.
 
+**Hangisini kullanın:** `4282209004348015` (Simulator, 08/27, CVV `123`).
+2026-08-11'de sekiz kartla ölçüldü; 3D'siz satış, taksitli satış ve 3D tam
+turu bu kartla sorunsuz geçti.
+
+**`5549600732695519` (Bonus) kullanmayın** — internete kapalı, her istekte
+`93` / `INTERNETTEN KULLANILAMAZ` döndürüyor. Tablodaki diğer kartlar
+çalışıyor.
+
+---
+
+## Akbank (NestPay / Asseco)
+
+**Kaynak:** dolaşımdaki NestPay örneklerinden derlendi, **ölçülerek
+doğrulandı** (2026-08-11, `entegrasyon.asseco-see.com.tr`)
+
+Bu bölüm `akbank` driver'ı içindir. Akbank'ın yeni JSON API'sini
+(`akbank-pos`) kullanıyorsanız aşağıdaki Akbank Sanal POS bölümüne bakın.
+
+**3D doğrulama şifresi:** `a`
+
+| Kart numarası | Marka | SKT | CVV |
+|---|---|---|---|
+| `5571135571135575` | Mastercard | 12/26 | 000 |
+| `4355084355084358` | Visa | 12/26 | 000 |
+
+**Hangisini kullanın:** `5571135571135575`. Her iki test mağazasında da
+(`100100000` ve `100200000`) çalışır. Visa kart `100100000`'de
+`Kartin son kullanma tarihi hatali` veriyor, yalnızca `100200000`'de geçiyor.
+
+Mastercard kartla dokuz akış ölçüldü ve hepsi `00` döndü: 3D başlatma,
+3D'siz satış, taksitli satış, iptal, iade, kısmi iade, ön provizyon, kapama
+ve sorgu.
+
 ---
 
 ## PayTR
@@ -494,9 +527,13 @@ ZIRAAT_PAYMENT_API=https://torus-stage-ziraat.asseco-see.com.tr/fim/api
 ZIRAAT_GATEWAY_3D=https://torus-stage-ziraat.asseco-see.com.tr/fim/est3Dgate
 ```
 
-Aynı kart ve akış diğer NestPay bankalarında da (Akbank, İş Bankası,
-Halkbank, QNB, TEB, Şekerbank, ING, Alternatif Bank, Türkiye Finans) geçerlidir;
-yalnızca uç nokta ve kimlik bilgileri değişir.
+Aynı kart ve akış diğer NestPay bankalarında da (İş Bankası, Halkbank, QNB,
+TEB, Şekerbank, ING, Alternatif Bank, Türkiye Finans) geçerlidir; yalnızca uç
+nokta ve kimlik bilgileri değişir.
+
+**Akbank artık kendi mağazasında doğrulandı** — Ziraat terminalini ödünç
+almanıza gerek yok. Kartları ve kimlikleri için yukarıdaki
+[Akbank (NestPay / Asseco)](#akbank-nestpay--asseco) bölümüne bakın.
 
 ---
 
