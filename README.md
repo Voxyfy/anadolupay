@@ -195,7 +195,7 @@ uygulandığını gösterir, çalıştığını değil:
 | `ing` | ING | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `alternatifbank` | Alternatif Bank | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `turkiyefinans` | Türkiye Finans | Asseco / Payten | ⏳ ortak driver | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `garanti` | Garanti BBVA | GVPS | ⏳ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
+| `garanti` | Garanti BBVA | GVPS | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ |
 | `yapikredi` | Yapı Kredi | PosNet (XML) | ◐ | ✅ | — | — | ✅ | ✅ | ✅ |
 | `albaraka` | Albaraka Türk | PosNet V1 (JSON) | ⏳ | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 | `vakifbank` | VakıfBank | PayFlex V4 | ✅ | ✅ | — | — | ✅ | ✅ | ✅ |
@@ -1129,6 +1129,32 @@ bankalar için kartı nereden alacağınız.
 Preset'lerdeki uç noktalar canlı ortamı gösterir. Test için ilgili
 `*_PAYMENT_API` / `*_GATEWAY_3D` değişkenlerini bankanızın test adresiyle
 değiştirin ve `*_TEST_MODE=true` yapın.
+
+Garanti, çoğu bankanın aksine test üye işyeri bilgilerini
+[geliştirici portalında açıkça yayınlar](https://dev.garantibbva.com.tr/sanalpos-satis-pesin-3dli)
+— bankadan ayrıca bir şey istemeniz gerekmez. Bu değerlerle çalıştığı
+2026-08-11'de doğrulandı:
+
+```env
+GARANTI_MERCHANT_ID=7000679
+GARANTI_TERMINAL_ID=30691297
+GARANTI_USERNAME=PROVAUT
+GARANTI_PASSWORD=123qweASD/
+GARANTI_SECRET_KEY=12345678
+GARANTI_REFUND_USERNAME=PROVRFN
+GARANTI_REFUND_PASSWORD=123qweASD/
+```
+
+Ödeme ve iade iki ayrı kullanıcı ister (`PROVAUT` / `PROVRFN`); test
+ortamında ikisinin şifresi de aynıdır. Test yönetim paneli
+[sanalpostest.garanti.com.tr](https://sanalpostest.garanti.com.tr/web/login)
+adresinde: kullanıcı `99999999999`, parola `Destek.9`, şifre `147852`.
+
+Bu terminalde **iade ve iptal banka tarafından reddedilir** (`05` /
+`RPC-05`); ön provizyon da `14` verir. Driver'ın hatası değildir —
+istek biçiminin on dört ayrı çeşitlemesi (tam/kısmi tutar,
+`OriginalRetrefNum` ile ve olmadan, `void`/`refund`) aynı yanıtı verir,
+terminalde bu yetkiler tanımlı değildir.
 
 ```env
 GARANTI_TEST_MODE=true

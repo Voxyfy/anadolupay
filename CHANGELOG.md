@@ -24,6 +24,46 @@
 
 ## Yayımlanmamış
 
+### Doğrulandı — Garanti BBVA test ortamı
+
+Garanti, test üye işyeri bilgilerini geliştirici portalında açıkça yayınlıyor
+(MerchantID `7000679`, TerminalID `30691297`, `PROVAUT`/`PROVRFN`, StoreKey
+`12345678`). Driver bu terminale karşı çalıştırıldı ve **uçtan uca gerçek bir
+ödeme tamamlandı**; kodda değişiklik gerekmedi.
+
+Geçen akışlar:
+
+- **3D Secure tam turu.** Form bankaca kabul edildi, ACS'ye yönlendi
+  (3DS 2.1.0, `creq`), doğrulama `mdstatus 1 / Authenticated` döndü,
+  callback hash'i `checkCallbackHash`'ten geçti, provizyon `00 Approved`
+  verdi ve `orderinq` siparişi `paid` olarak gördü.
+- **3D'siz satış.** Sekiz resmî test kartının yedisi `00` ile onaylandı.
+- **Taksitli satış**, **sipariş sorgulama** (`orderinq`) ve **hareket
+  dökümü** (`orderhistoryinq`).
+
+Ölçüm dört şeyi ortaya çıkardı ve bunlar README'ye yazıldı:
+
+- **İade ve iptal bu test terminalinde reddediliyor** (`05` / `RPC-05`).
+  İstek biçiminin on dört çeşitlemesi denendi — `void` ve `refund`, tam ve
+  kısmi tutar, `OriginalRetrefNum` ile ve olmadan (İptal dokümanının
+  tablosunda bu alan yok), `CardholderPresentCode` 0 ve 13, `<Card>` bloğu
+  ile ve olmadan — hepsi aynı yanıtı verdi. Kimlik doğru kabul ediliyor:
+  aynı isteği `PROVAUT` ile göndermek `92 / 0652 "yetkiniz yok"` veriyor,
+  `PROVRFN` ile host'a ulaşıp `RPC-05` alıyor. Ret banka tarafında.
+  Ön provizyon da `14` veriyor.
+- **Kart `5549600732695519` internete kapalı** (`93` /
+  `INTERNETTEN KULLANILAMAZ`); ölçüm için `4282209004348015` kullanılmalı.
+- **`secure3dsecuritylevel` için `3D` değeri çalışıyor.** Garanti'nin form
+  örneği yalnızca `CUSTOM_PAY`, `3D_PAY`, `3D_FULL`, `3D_HALF` sayıyor ama
+  driver'ın gönderdiği `3D` de ACS'ye ulaşıyor. `CUSTOM_PAY` ise bu
+  terminalde `Isyeri Kullanim Tipi Desteklenmiyor` veriyor.
+- **Test ortamı arıza yapabiliyor.** Ölçümün ilk yarısında `gt3dengine` her
+  forma HTTP 500, `VPServlet` her XML'e `92 / 9999` döndürdü — kasten bozuk
+  hash ile doğru hash **birebir aynı** yanıtı verdi, yani istek hash
+  kontrolüne hiç ulaşmıyordu. Aynı istekler yarım saat sonra değişmeden
+  çalıştı. Sabit yanıt görürseniz kodu değil ortamı şüpheli sayın; uydurma
+  bir terminal numarası anlamlı hata döndürüyorsa ortam sağlıklıdır.
+
 ### Belgelendi — Ziraat Bankası PayFlex test ortamı
 
 İNNOVA'nın Ziraat için yayınladığı entegrasyon dokümanı (MPI + Sanal POS v4.1)
