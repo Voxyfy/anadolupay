@@ -827,6 +827,34 @@ birlikte istersiniz.
 
 ---
 
+## Tami
+
+**Kaynak:** [dev.tami.com.tr/test-kartlari](https://dev.tami.com.tr/test-kartlari)
+— sayfa hangi senaryoyu (başarılı/başarısız/3D kodu) simüle ettiğini
+belirtmiyor, yalnızca kart/banka/SKT/CVV bilgisini veriyor.
+
+| Kart numarası | Banka | SKT | CVV | Not |
+|---|---|---|---|---|
+| `5406697543211173` | Garanti BBVA | 04/27 | 423 | Bonus Kredi Kartı |
+| `5549605007824017` | Garanti BBVA | 12/25 | 460 | Bonus Kredi Kartı |
+| `5549603469426017` | Garanti BBVA | 01/27 | 916 | Bonus Kredi Kartı |
+| `5170404942561157` | Garanti BBVA | 10/25 | 329 | Paracard Bonus (banka kartı) |
+| `5423740051890870` | Ziraat Bankası | 05/27 | 015 | |
+| `4938410180801789` | VakıfBank | 12/29 | 767 | |
+| `4155650100416111` | QNB Finansbank | 01/50 | 715 | Diğer sürücülerde de aynı numara geçiyor (bkz. NestPay bölümü) |
+| — | Halkbank | 12/26 | 000 | Sayfada "birden fazla kart" deniyor, tekil numara verilmemiş |
+| `4543600372218357` | İş Bankası | 09/27 | 448 | |
+| `5127543000946141` | Akbank | 01/35 | 517 | |
+| `4355084355084358` | TEB | 12/28 | 000 | Diğer sürücülerde de aynı numara geçiyor |
+
+> ⚠️ Tami sürücüsü (`TamiGateway`) henüz gerçek bir sandbox'a karşı hiç
+> çalıştırılmadı — `securityHash` imza formülü dokümantasyonun kendi
+> içinde çelişkili (bkz. README'deki [Tami](../README.md#tami) bölümü).
+> Bu kartlarla ilk denemede `4003 Headerda gönderilen hash değeri
+> tutarsız` alırsanız bu bilinen risk gerçekleşmiş olabilir.
+
+---
+
 ## Diğer bankalar
 
 Aşağıdaki sağlayıcılar test kartlarını herkese açık yayınlamaz; kartlar test

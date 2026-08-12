@@ -96,6 +96,7 @@ Her driver aynı ölçüde doğrulanmış değil. Bu tablo hangisinin nereye kad
 | `paycell` | **Kısmen ölçüldü** | 2026-08-10, Turkcell test ortamı — kart token alındı ve **token yanıtının imzası sağlayıcının ürettiğiyle birebir eşleşti** (test vektörü olarak kilitlendi); 3D oturumu da gerçek ortamda açıldı. Ödeme adımı ölçülemedi: yayınlanmış ortak test üye işyeri (`9998`) kart provizyonunda `4000 Bank error` döndürüyor |
 | `yapikredi` (PosNet) | **Kısmen ölçüldü** | 2026-08-10, `setmpos.ykb.com` — şifreleme, 3D form, bankanın ACS sayfası ve `oosResolveMerchantData` gerçek ortamda geçildi; dönüş MAC'i bankanın ürettiğiyle birebir eşleşti ve test vektörü olarak kilitlendi. Finansallaştırma ölçülemedi: banka IP tanımlaması istiyor (`0148 UNAUTHORIZED REQUEST`) ve yayınlanmış test kartlarının hepsi eskimiş |
 | `denizbank` (InterPos) | Dokümana göre | 3D form imzası bağımsız bir implementasyonla birebir aynı; ölçüm yapılamadı — test ortamı IP tanımlaması istiyor ve test üye işyeri bilgileri yayınlanmıyor |
+| `tami` | Dokümana göre — **çelişkili** | dev.tami.com.tr dokümantasyonundan uygulandı, sandbox kimliği henüz yok. `securityHash` formülü için doküman kendi içinde çelişkili (bkz. [Tami](#tami)); iade/iptal aynı uca gidiyor, ön provizyon kapama ucu tahmin |
 | Diğer banka driver'ları | Dokümana göre | Banka entegrasyon dokümanları |
 
 ### iyzico'da tam olarak ne doğrulandı
@@ -1157,6 +1158,58 @@ AnadoluPay::driver('craftgate')->refund(new RefundPaymentData(
 verir. Tam iade için tutarı hiç göndermeyin. Gün içi iptal ayrı bir uç
 değildir; Craftgate mutabakata girmemiş işlemi iade isteğinde kendisi void
 olarak geçer.
+
+## Tami
+
+> ⚠️ **Henüz gerçek bir sandbox'a karşı doğrulanmadı.** Aşağıdaki üç nokta
+> dokümantasyondan (dev.tami.com.tr) çıkarıldı ama test edilmedi — sandbox
+> kimlik bilgisi elinize geçtiğinde ilk iş bunları doğrulamak olmalı.
+
+Tami de Craftgate gibi bir orkestrasyon platformu; `/payment/auth` ucu 3D
+başlatmayı ve non-secure satışı birlikte karşılar, 3D doğrulaması banka
+`callbackUrl`'e POST ettiğinde ise para **ayrı bir `/payment/complete-3ds`
+isteğiyle** çekilir:
+
+```php
+$response = AnadoluPay::driver('tami')->createPayment($data);
+
+return response($response->htmlContent);   // 3D sayfası (base64 çözülmüş)
+```
+
+**İki katmanlı kimlik doğrulama:**
+
+| Anahtar | Nerede | Formül |
+|---|---|---|
+| `secret_key` | `PG-Auth-Token` başlığı | `merchantNumber:terminalNumber:base64(sha256(merchantNumber+terminalNumber+secretKey))` |
+| `username`/`password` (JWK `kid`/`k`) | Gövdedeki `securityHash` alanı | HS512 ile imzalanmış JWT (JWS compact) — payload, `securityHash` alanı **hariç** gövdenin JSON'u |
+
+```env
+TAMI_MERCHANT_NUMBER=xxx
+TAMI_TERMINAL_NUMBER=xxx
+TAMI_SECRET_KEY=xxx
+TAMI_JWK_KID=xxx
+TAMI_JWK_K=xxx
+TAMI_PAYMENT_API=https://sandbox-paymentapi.tami.com.tr
+```
+
+**Bilinen sınırlar:**
+
+- `securityHash` için JWT/JWS yorumu, dokümantasyonun "Security Hash
+  Hesaplama" sayfasındaki somut kod örneğine (JWSObject/MACSigner)
+  dayanır. Ama diğer sayfalardaki örnek `securityHash` değerleri nokta
+  içermiyor — düz bir HMAC digest'i gibi görünüyor, JWT gibi değil.
+  Dokümantasyon bu noktada kendi içinde çelişkili.
+- Ön provizyon kapama ucu (`/payment/post-auth`) doğrulanmadı;
+  `/payment/pre-auth` ile aynı adlandırma kalıbından tahmin edildi.
+- 3D dönüş callback'inin imzası (`hashedData` = `base64(hmac_sha256(
+  cardOrganization+cardBrand+cardType+maskedNumber+installmentCount+
+  currencyCode+txnAmount+orderId+systemTime+success, secretKey))`)
+  Tami'nin kendi dokümantasyonunda formülsüz bırakılmıştı; alan sırası
+  ve anahtar bağımsız bir kaynaktan doğrulandı — Tami'nin resmî bir
+  onayı değil, gerçek bir sandbox'a karşı hâlâ test edilmedi.
+- İptal (`cancel`) ve iade (`refund`) dokümantasyonda **aynı uca**
+  (`/payment/reverse`) gidiyor; ikisi arasında protokol seviyesinde bir
+  fark bulunamadı.
 
 ## Test ortamı
 

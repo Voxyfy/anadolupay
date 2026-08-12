@@ -18,6 +18,7 @@ use Voxyfy\AnadoluPay\Gateways\Provider\ParamGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ParatikaGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\PaycellGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\PayTrGateway;
+use Voxyfy\AnadoluPay\Gateways\Provider\TamiGateway;
 use Voxyfy\AnadoluPay\Gateways\Provider\ToslaGateway;
 
 return [
@@ -629,6 +630,31 @@ return [
             'endpoints' => [
                 // Sandbox: https://sandbox-api.craftgate.io
                 'payment_api' => env('CRAFTGATE_PAYMENT_API', 'https://api.craftgate.io'),
+            ],
+        ],
+
+        'tami' => [
+            'gateway' => TamiGateway::class,
+            // Tami terminolojisi: merchant_id => merchantNumber,
+            // terminal_id => terminalNumber, secret_key => PG-Auth-Token
+            // hesabında kullanılan secretKey. username/password ise
+            // securityHash imzası için JWK kid/k çiftidir (ayrı bir anahtar).
+            'merchant_id' => env('TAMI_MERCHANT_NUMBER'),
+            'terminal_id' => env('TAMI_TERMINAL_NUMBER'),
+            'secret_key' => env('TAMI_SECRET_KEY'),
+            'username' => env('TAMI_JWK_KID'),
+            'password' => env('TAMI_JWK_K'),
+            // 3D dönüş imzasının (hashedData) formülü Tami tarafından resmen
+            // doğrulanmadı (bkz. TamiGateway docblock'u); sandbox'ta yanlış
+            // pozitif almamak için kapatılabilir.
+            'verify_hash' => env('TAMI_VERIFY_HASH', true),
+            'test_mode' => env('TAMI_TEST_MODE', false),
+            'extra' => [
+                'payment_group' => env('TAMI_PAYMENT_GROUP', 'PRODUCT'),
+            ],
+            'endpoints' => [
+                // Test: https://sandbox-paymentapi.tami.com.tr
+                'payment_api' => env('TAMI_PAYMENT_API', 'https://paymentapi.tami.com.tr'),
             ],
         ],
 
