@@ -2,6 +2,10 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.2 - 2026-08-12
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.1...v1.1.2
+
 ## v1.1.1 - 2026-08-11
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.0...v1.1.1
@@ -42,10 +46,10 @@ DNS'te yok.
 kısmi iade, ön provizyon, kapama ve sorgu — hepsi `00`.
 
 > **`ISBANK07` storekey değil, API şifresidir.** Dolaşımdaki
-> yapılandırmalar bunu storekey sanıyor; öyle kullanılınca 3D formu her
-> zaman `mdStatus 7 / Guvenlik Kodu hatali` veriyor ve hata kodda aranıyor.
-> Storekey `TRPS0200`. Kalıp `TRPS` + dört hane olarak görünüyor
-> (Türkiye Finans `TRPS2828`).
+yapılandırmalar bunu storekey sanıyor; öyle kullanılınca 3D formu her
+zaman `mdStatus 7 / Guvenlik Kodu hatali` veriyor ve hata kodda aranıyor.
+Storekey `TRPS0200`. Kalıp `TRPS` + dört hane olarak görünüyor
+(Türkiye Finans `TRPS2828`).
 
 **Türkiye Finans — kısmen.** Kimlikler bankanın kendi yayınladığı NestPay
 test dokümanından alındı (mağaza `280000100`, `TFKBAPI` / `TFKB2828`,
@@ -198,6 +202,7 @@ hashData     = base64( sha256( UPPER( applicationName + transactionId
                                       + transactionDateTime
                                       + [responseCode] + [cardToken]
                                       + secureCode + securityData ) ) )
+
 
 
 ```
@@ -504,6 +509,7 @@ alandır**:
 
 ```
 ORD_ID:ZR-1 CHARGE_TYPE_CD:S ORIG_TRANS_AMT:1.00 TRANS_STAT:A AUTH_DTTM:… AUTH_CODE:…
+
 
 
 
