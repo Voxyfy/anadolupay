@@ -42,6 +42,12 @@ kardeş proje de var: **[Voxyfy/anadoluship](https://github.com/Voxyfy/anadolush
 ([npm](https://www.npmjs.com/package/@voxyfy/anadoluship)) — MNG, UPS,
 Yurtiçi, Aras, PTT ve Sürat Kargo için Node.js/TypeScript SDK'sı.
 
+LLM API'lerine (OpenAI/Anthropic/Gemini) müşteri verisi gönderirken KVKK
+riskini azaltmak için de bir kardeş kütüphane var:
+**[Voxyfy/anadolushield](https://github.com/Voxyfy/anadolushield)**
+([npm](https://www.npmjs.com/package/@voxyfy/anadolushield)) — TCKN, VKN,
+IBAN, telefon, isim gibi kişisel verileri LLM'e göndermeden önce maskeler.
+
 **Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
 kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
 uygulamanızın işi.
