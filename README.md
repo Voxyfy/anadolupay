@@ -37,6 +37,11 @@ protokol bilgisiyle taşınan bir port da var:
 ([npm](https://www.npmjs.com/package/@voxyfy/anadolupay)) — test etmek için
 **[Voxyfy/anadolupay-node-example](https://github.com/Voxyfy/anadolupay-node-example)**.
 
+Aynı "çok sağlayıcı, tek arayüz" mimarisini kargo firmaları için uygulayan bir
+kardeş proje de var: **[Voxyfy/anadoluship](https://github.com/Voxyfy/anadoluship)**
+([npm](https://www.npmjs.com/package/@voxyfy/anadoluship)) — MNG, UPS,
+Yurtiçi, Aras, PTT ve Sürat Kargo için Node.js/TypeScript SDK'sı.
+
 **Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
 kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
 uygulamanızın işi.
