@@ -48,6 +48,10 @@ riskini azaltmak için de bir kardeş kütüphane var:
 ([npm](https://www.npmjs.com/package/@voxyfy/anadolushield)) — TCKN, VKN,
 IBAN, telefon, isim gibi kişisel verileri LLM'e göndermeden önce maskeler.
 
+KVKK/GDPR uyumlu çerez rızası için de bir kardeş kütüphane var:
+**[Voxyfy/anadolucookie](https://github.com/Voxyfy/anadolucookie)** —
+framework'e bağımlı olmayan çerez rıza (cookie consent) banner kütüphanesi.
+
 **Ne yapmaz:** Arayüz üretmez, sipariş durumu tutmaz, stok düşmez, fatura
 kesmez. Ödeme akışını yürütür ve yanıtı normalleştirir; gerisi sizin
 uygulamanızın işi.
