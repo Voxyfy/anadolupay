@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Voxyfy\AnadoluPay\DTO;
 
 use Voxyfy\AnadoluPay\Support\Money;
+use Voxyfy\AnadoluPay\Support\OrderNumber;
 
 /**
  * Ödeme Oluşturma Verisi DTO
@@ -30,12 +31,22 @@ final readonly class CreatePaymentData
     public const MODEL_NON_SECURE = 'regular';
 
     /**
+     * Satıcı sistemindeki sipariş referansı.
+     *
+     * Promote edilmiyor çünkü boş geçildiğinde yapılandırmadan üretilmesi
+     * gerekiyor; parametre sırası korunduğu için çağıranlar etkilenmez.
+     */
+    public string $orderId;
+
+    /**
      * @param  float|Money  $amount  Ödeme tutarı. Kuruş kaybı olmaması için
      *                               `Money::fromMinorUnits(19990)` tercih edilir;
      *                               float (199.90) geriye dönük uyumluluk için
      *                               kabul edilir ve iki ondalık haneye yuvarlanır.
      * @param  string  $currency  ISO para birimi kodu (örn: TRY, USD)
-     * @param  string  $orderId  Satıcı sistemindeki benzersiz sipariş referansı
+     * @param  string  $orderId  Satıcı sistemindeki benzersiz sipariş referansı.
+     *                           Boş bırakılırsa `anadolupay.order` ayarlarına
+     *                           göre üretilir (örn. ODM-4KX9AB2Q7T).
      * @param  array<string, mixed>  $customer  Müşteri bilgileri
      * @param  string|null  $successUrl  Başarılı ödeme sonrası yönlendirme URL'i (opsiyonel)
      * @param  string|null  $failUrl  Başarısız ödeme sonrası yönlendirme URL'i (opsiyonel)
@@ -52,7 +63,7 @@ final readonly class CreatePaymentData
     public function __construct(
         public float|Money $amount,
         public string $currency,
-        public string $orderId,
+        string $orderId,
         public array $customer,
         public ?string $successUrl = null,
         public ?string $failUrl = null,
@@ -63,7 +74,9 @@ final readonly class CreatePaymentData
         public ?string $ip = null,
         public string $lang = 'tr',
         public bool $preAuthorization = false,
-    ) {}
+    ) {
+        $this->orderId = $orderId !== '' ? $orderId : OrderNumber::generate();
+    }
 
     /**
      * Aynı veriden ön provizyon isteği üretir.

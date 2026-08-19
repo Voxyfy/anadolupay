@@ -8,6 +8,7 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Exceptions\DriverNotFoundException;
 use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
 use Voxyfy\AnadoluPay\Gateways\Bank\AbstractBankGateway;
+use Voxyfy\AnadoluPay\Support\OrderNumber;
 
 /**
  * AnadoluPay Ana Sınıfı
@@ -79,6 +80,21 @@ class AnadoluPay
             array_keys(config('anadolupay.drivers', [])),
             array_keys(config('anadolupay.banks', [])),
         )));
+    }
+
+    /**
+     * `anadolupay.order` ayarlarına göre yeni bir sipariş numarası üretir.
+     *
+     * Numara ödeme başlatılmadan önce gerekebilir: geri dönüş (callback)
+     * URL'ine ve satıcının kendi sipariş kaydına aynı değerin yazılması
+     * gerekir, dolayısıyla üretimin `CreatePaymentData` içinde kalması
+     * her zaman yeterli olmaz.
+     *
+     * @throws PaymentFailedException Ön ek ya da uzunluk yapılandırması geçersizse
+     */
+    public function orderId(): string
+    {
+        return OrderNumber::generate();
     }
 
     /**

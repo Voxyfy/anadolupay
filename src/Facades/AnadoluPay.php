@@ -17,6 +17,7 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
  * @method static PaymentGatewayInterface driver(string|null $name = null) Ödeme geçidi driver instance'ı döndürür
  * @method static string|null getDefaultDriver() Varsayılan driver adını döndürür
  * @method static array|null getDriverConfig(string $name) Belirli bir driver için yapılandırmayı döndürür
+ * @method static string orderId() Yapılandırılmış ön ekle yeni bir sipariş numarası üretir
  * @method static array getAvailableDrivers() Tüm kayıtlı driver adlarını döndürür
  * @method static bool hasDriver(string $name) Driver'ın yapılandırılıp yapılandırılmadığını kontrol eder
  *
@@ -31,6 +32,9 @@ use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
  *
  * // Varsayılan driver ile ödeme oluştur
  * $sonuc = AnadoluPay::driver()->createPayment($odemeVerisi);
+ *
+ * // Ödemeyi başlatmadan önce sipariş numarası üret
+ * $siparisNo = AnadoluPay::orderId(); // ODM-4KX9AB2Q7T
  *
  * // Mevcut driver'ları kontrol et
  * $drivers = AnadoluPay::getAvailableDrivers();

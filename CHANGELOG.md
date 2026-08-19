@@ -2,6 +2,24 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.3 - 2026-08-19
+
+### Sipariş numarası üretimi
+
+`CreatePaymentData`'ya `orderId` boş geçilirse numara artık yapılandırmadan
+üretiliyor: `ANADOLUPAY_ORDER_PREFIX=ODM-` ile `ODM-4KX9AB2Q7T`. Ödemeyi
+başlatmadan önce numara gerekiyorsa (callback URL'i, kendi sipariş kaydı)
+`AnadoluPay::orderId()` var.
+
+Numara `A-Z0-9` ile sınırlı ve rastgele: bazı bankalar küçük harf/noktalama
+içeren numarayı reddediyor, numara imzaya girdiği için de sonradan
+düzeltilemiyor. Ön ek yalnızca harf, rakam, `-` ve `_` kabul ediyor; rastgele
+bölüm 6 karakterin altına inemiyor.
+
+Sipariş numarasını kendiniz veriyorsanız davranış değişmedi.
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.2...v1.1.3
+
 ## v1.1.2 - 2026-08-12
 
 **Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.1...v1.1.2

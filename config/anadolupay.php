@@ -62,6 +62,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sipariş Numarası
+    |--------------------------------------------------------------------------
+    |
+    | `CreatePaymentData`'ya sipariş numarası boş geçilirse burada tanımlanan
+    | ön ek ve uzunlukla otomatik üretilir; ön ek ANADOLUPAY_ORDER_PREFIX=ODM-
+    | ise sonuç ODM-4KX9AB2Q7T biçiminde olur.
+    |
+    | Ön eki kısa tutun. PosNet (Yapı Kredi, Albaraka) ve Paycell sipariş
+    | numarasını 20 karaktere sığdırır; ön ek bu bütçeden düşer ve taşarsa
+    | driver sessizce kesmek yerine hata verir.
+    |
+    | Paycell'in ayrı bir davranışı var: referans numarasını üretirken
+    | rakam dışındaki her karakteri atar. Yani ön ek Paycell'de hiç
+    | görünmez, benzersizlik tamamen rastgele bölümdedir.
+    |
+    */
+
+    'order' => [
+        'prefix' => env('ANADOLUPAY_ORDER_PREFIX', ''),
+        'length' => env('ANADOLUPAY_ORDER_LENGTH', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Loglama
     |--------------------------------------------------------------------------
     |

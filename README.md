@@ -351,6 +351,36 @@ YAPIKREDI_SECRET_KEY=xxxxxxx
 
 Tüm anahtarlar için yayınladığınız `config/anadolupay.php` dosyasına bakın.
 
+### Sipariş numarası
+
+Sipariş numarasını kendiniz veriyorsanız hiçbir şey değişmez. Vermek
+istemiyorsanız `orderId`'yi boş geçin; paket ön eki yapılandırmadan alıp
+numarayı üretir:
+
+```env
+ANADOLUPAY_ORDER_PREFIX=ODM-
+ANADOLUPAY_ORDER_LENGTH=10        # rastgele bölümün uzunluğu, en az 6
+```
+
+```php
+new CreatePaymentData(amount: 199.90, currency: 'TRY', orderId: '', ...);
+// orderId → ODM-4KX9AB2Q7T
+
+AnadoluPay::orderId();   // ödemeyi başlatmadan önce gerekirse
+```
+
+Numara `A-Z0-9` ile sınırlıdır ve rastgeledir; sayaç tutulmaz. Sebebi: sipariş
+numarası bankada kalıcı bir anahtardır — aynı numara ikinci kez gönderilirse
+işlem reddedilir ve numara iade/sorgulamada da kullanıldığı için sonradan
+değiştirilemez. Sayaç bunun için kalıcı depolama ve kilit gerektirir.
+
+İki sınırı bilerek seçin:
+
+- **PosNet (Yapı Kredi, Albaraka) ve Paycell numarayı 20 karaktere sığdırır.**
+  Ön ek bu bütçeden düşer; taştığında driver sessizce kesmek yerine hata verir.
+- **Paycell ön eki tamamen atar.** Referans numarasını üretirken rakam dışındaki
+  her karakteri siler, yani benzersizlik tamamen rastgele bölümdedir.
+
 ## Ödeme akışı
 
 Türk banka sanal POS'larında 3D Secure bir GET yönlendirmesi değil, bankanın
@@ -373,7 +403,7 @@ use Voxyfy\AnadoluPay\Facades\AnadoluPay;
 $data = new CreatePaymentData(
     amount: 199.90,
     currency: 'TRY',
-    orderId: 'SIPARIS-123',
+    orderId: 'SIPARIS-123',        // boş geçilirse yapılandırmadan üretilir
     customer: [
         'name'  => 'Ahmet Yılmaz',
         'email' => 'ahmet@example.com',
