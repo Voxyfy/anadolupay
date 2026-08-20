@@ -42,12 +42,17 @@ describe('Garanti bayi kodu', function () {
         Http::fake(['bank.test/*' => Http::response(garantiResponse())]);
     });
 
-    it('3D’siz provizyona bayi kodunu ekler', function () {
+    it('3D’siz provizyona bayi kodunu Terminal düğümünde ekler', function () {
         garanti('BAYI-42')->createPayment(
             BankTestConfig::order(paymentModel: CreatePaymentData::MODEL_NON_SECURE)
         );
 
-        Http::assertSent(fn ($request) => str_contains($request->body(), '<SubMerchantID>BAYI-42</SubMerchantID>'));
+        // Banka dokümanı alanı Terminal düğümünde bekliyor; varsayılan yol bu.
+        Http::assertSent(function ($request) {
+            $terminal = (string) preg_replace('/.*<Terminal>(.*)<\/Terminal>.*/s', '$1', $request->body());
+
+            return str_contains($terminal, '<SubMerchantID>BAYI-42</SubMerchantID>');
+        });
     });
 
     it('provizyon kapamaya bayi kodunu ekler', function () {
@@ -110,15 +115,16 @@ describe('Garanti bayi kodu', function () {
         Http::assertSent(fn ($request) => ! str_contains($request->body(), 'SubMerchantID'));
     });
 
-    it('alanı yapılandırılan iç düğüme yazar', function () {
-        garanti('BAYI-42', 'Terminal.SubMerchantID')->createPayment(
+    it('alanı yapılandırılan düğüme taşır', function () {
+        garanti('BAYI-42', 'SubMerchantID')->createPayment(
             BankTestConfig::order(paymentModel: CreatePaymentData::MODEL_NON_SECURE)
         );
 
         Http::assertSent(function ($request) {
             $terminal = (string) preg_replace('/.*<Terminal>(.*)<\/Terminal>.*/s', '$1', $request->body());
 
-            return str_contains($terminal, '<SubMerchantID>BAYI-42</SubMerchantID>');
+            return str_contains($request->body(), '<SubMerchantID>BAYI-42</SubMerchantID>')
+                && ! str_contains($terminal, 'SubMerchantID');
         });
     });
 });

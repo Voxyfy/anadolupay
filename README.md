@@ -338,8 +338,9 @@ GARANTI_REFUND_PASSWORD=xxxxxxx
 # Yalnızca bayi (alt üye işyeri) yapılandırmalı terminaller için; bankanın
 # verdiği bayi kodu. Boş bırakılırsa istekler bugünkü hâliyle gider.
 GARANTI_SUB_MERCHANT_ID=
-# Alanın XML'deki yeri bankanın bayi tanımına göre değişebiliyor.
-GARANTI_SUB_MERCHANT_ID_PATH=SubMerchantID
+# Banka dokümanı alanı Terminal düğümü içinde tanımlıyor; varsayılanı ancak
+# bankanız farklı bir düğüm isterse değiştirin.
+GARANTI_SUB_MERCHANT_ID_PATH=Terminal.SubMerchantID
 
 # Akbank (NestPay)
 AKBANK_MERCHANT_ID=xxxxxxx
@@ -734,9 +735,15 @@ kodu zorunludur; gitmezse işlem `0809` — "SubMerchantID alanında bayii kodun
 gönderilmesi zorunludur" — ile reddedilir. `GARANTI_SUB_MERCHANT_ID` verildiğinde
 paket alanı provizyon, 3D form, provizyon kapama, iptal/iade ve sorgu
 isteklerine ekler; boş bırakılırsa istekler alanı hiç içermez. Alan imzaya
-girmediği için mevcut kurulumların hash'i değişmez. Bankanın bayi tanımı alanı
-başka bir düğümün altında bekliyorsa `GARANTI_SUB_MERCHANT_ID_PATH` ile
-taşıyabilirsiniz (örn. `Terminal.SubMerchantID`).
+girmediği için mevcut kurulumların hash'i değişmez. XML isteklerinde alan
+bankanın dokümanına uygun olarak `Terminal` düğümünün içine, 3D form post'unda
+`submerchantid` alanı olarak yazılır; banka farklı bir düğüm isterse
+`GARANTI_SUB_MERCHANT_ID_PATH` ile taşıyabilirsiniz.
+
+Bankanın bayi tanımında ayrıca her bayinin kullanacağı kart numaraları da
+tanımlanır: gönderilen kart o bayi altında kayıtlı değilse işlem reddedilir.
+Bayi ve kart tanımları sanal POS yönetim ekranından (tam yetkili kullanıcı,
+*Yönetim > Bayii tanımlama* / *Bayii kart tanımlama*) yapılır.
 
 **PosNet üç sunucu isteği yapar.** Önce `oosRequestData` ile veri paketleri
 alınır, sonra 3D geçidine POST edilir, dönüşte `oosResolveMerchantData` ile

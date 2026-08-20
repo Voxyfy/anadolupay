@@ -365,9 +365,9 @@ return [
                 // verdiği bayi kodunu her istekte zorunlu tutar; boş
                 // bırakıldığında istek bu alanı hiç içermez.
                 'sub_merchant_id' => env('GARANTI_SUB_MERCHANT_ID'),
-                // Alanın XML'deki yeri bankanın bayi tanımına göre değişebiliyor;
-                // gerekirse iç düğüme taşınabilir (örn. Terminal.SubMerchantID).
-                'sub_merchant_id_path' => env('GARANTI_SUB_MERCHANT_ID_PATH', 'SubMerchantID'),
+                // Banka dokümanı alanı Terminal düğümü içinde tanımlıyor; yol
+                // yine de yapılandırılabilir bırakıldı.
+                'sub_merchant_id_path' => env('GARANTI_SUB_MERCHANT_ID_PATH', 'Terminal.SubMerchantID'),
             ],
             'test_mode' => env('GARANTI_TEST_MODE', false),
             'endpoints' => [

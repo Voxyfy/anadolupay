@@ -54,8 +54,11 @@ class GarantiGateway extends AbstractBankGateway implements SupportsBinQuery, Su
     /** MotoInd: N => e-ticaret işlemi, Y => mail order. */
     protected const MOTO = 'N';
 
-    /** Bayi kodunun varsayılan olarak yazıldığı düğüm (GVPSRequest kökü). */
-    protected const SUB_MERCHANT_FIELD = 'SubMerchantID';
+    /**
+     * Bayi kodunun varsayılan yolu. Garanti'nin bayi (B2B) dokümanı alanı
+     * `Terminal` düğümünün içinde tanımlar.
+     */
+    protected const SUB_MERCHANT_FIELD = 'Terminal.SubMerchantID';
 
     /**
      * @return array<string, scalar>

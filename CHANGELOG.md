@@ -2,6 +2,37 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.5 - 2026-08-20
+
+### Garanti bayi kodu artık doğru düğüme yazılıyor
+
+Garanti'nin bayi (B2B) dokümanı elimize geçti ve alanın yerini kesinleştirdi:
+`SubMerchantID`, `GVPSRequest` kökünde değil `Terminal` düğümünün içinde
+gönderiliyor. v1.1.4'teki varsayılan yol (`SubMerchantID`) bu yüzden yanlıştı;
+bayi kodu tanımlı bir kurulumda alan bankanın okumadığı bir yere gidiyor ve
+işlem `0809` ile reddedilmeye devam ediyordu. Varsayılan
+`Terminal.SubMerchantID` oldu.
+
+`GARANTI_SUB_MERCHANT_ID` boş bırakıldığında istek alanı hâlâ hiç içermez ve
+alan imzaya girmez; bayi kullanmayan kurulumlar için hiçbir şey değişmiyor.
+Yolu elle vermiş olanların değeri de aynen korunuyor.
+
+3D form tarafı zaten dokümanla uyumluydu: alan `submerchantid` adıyla hidden
+input olarak gidiyor.
+
+Doküman ayrıca bayi tanımının kart bazlı olduğunu netleştiriyor: her bayinin
+kullanacağı kart numaraları banka panelinde tanımlanır ve gönderilen kart o
+bayi altında kayıtlı değilse işlem reddedilir. README bu kısıtı da anlatıyor.
+
+Bankanın verdiği B2B test terminaliyle (30691244) uçtan uca ölçüm yapılamadı:
+terminal, gönderilen alandan bağımsız olarak `92 / ErrorId 0654 — "Kullanıcı
+statüsü kapalı"` dönüyor, yani PROVAUT kullanıcısı test ortamında kapalı.
+Düğümün yeri bu yüzden banka dokümanına dayanıyor, ölçüme değil. Mevcut
+(bayisiz) test terminalinde 3D'siz satış bu değişiklikten sonra da `00 —
+Approved` veriyor.
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.4...v1.1.5
+
 ## v1.1.4 - 2026-08-20
 
 ### Garanti bayi (alt üye işyeri) kodu
