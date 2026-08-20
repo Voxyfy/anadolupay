@@ -2,6 +2,28 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.4 - 2026-08-20
+
+### Garanti bayi (alt üye işyeri) kodu
+
+Bayi yapılandırmalı Garanti terminallerinde banka her finansal istekte bayi
+kodunu zorunlu tutuyor; alan gitmediği için bu terminallerde hiçbir provizyon
+geçmiyordu (`0809` — "SubMerchantID alanında bayii kodunun gönderilmesi
+zorunludur"). `GARANTI_SUB_MERCHANT_ID` tanımlıysa alan artık provizyon,
+3D form, provizyon kapama, iptal/iade ve sorgu isteklerine ekleniyor.
+
+Alan `createRequestHash()` ve `create3dHash()`'in okuduğu sabit listelere
+girmiyor, bu yüzden imza hesaplandıktan sonra ekleniyor: bayi kodu olan ve
+olmayan terminalin hash'i aynı, mevcut kurulumlar etkilenmiyor. Kod boş
+bırakıldığında istek alanı hiç içermez.
+
+Bayi tanımı alanı başka bir düğümün altında bekliyorsa
+`GARANTI_SUB_MERCHANT_ID_PATH` ile taşınabiliyor (örn.
+`Terminal.SubMerchantID`); düğümün yeri banka dokümanından teyit edilmedi,
+bu yüzden yol yapılandırmadan geliyor.
+
+**Full Changelog**: https://github.com/Voxyfy/anadolupay/compare/v1.1.3...v1.1.4
+
 ## v1.1.3 - 2026-08-19
 
 ### Sipariş numarası üretimi

@@ -54,6 +54,9 @@ class GarantiGateway extends AbstractBankGateway implements SupportsBinQuery, Su
     /** MotoInd: N => e-ticaret işlemi, Y => mail order. */
     protected const MOTO = 'N';
 
+    /** Bayi kodunun varsayılan olarak yazıldığı düğüm (GVPSRequest kökü). */
+    protected const SUB_MERCHANT_FIELD = 'SubMerchantID';
+
     /**
      * @return array<string, scalar>
      */
@@ -86,6 +89,13 @@ class GarantiGateway extends AbstractBankGateway implements SupportsBinQuery, Su
         ];
 
         $inputs['secure3dhash'] = $this->create3dHash($inputs);
+
+        // 3D_PAY'de provizyonu banka form post'undan tamamladığı için bayi
+        // kodu burada da gerekiyor. İmzadan sonra ekleniyor: create3dHash()
+        // sabit bir alan listesi üzerinden hesaplanıyor.
+        if (($subMerchantId = $this->subMerchantId()) !== null) {
+            $inputs['submerchantid'] = $subMerchantId;
+        }
 
         return $inputs;
     }
@@ -484,9 +494,62 @@ class GarantiGateway extends AbstractBankGateway implements SupportsBinQuery, Su
     {
         return $this->client->postXml(
             url: $this->config->endpoint('payment_api'),
-            data: $request,
+            data: $this->withSubMerchant($request),
             root: 'GVPSRequest',
         );
+    }
+
+    /**
+     * Bayi (alt üye işyeri) kodu; tanımlı değilse null.
+     */
+    protected function subMerchantId(): ?string
+    {
+        $value = $this->config->extra('sub_merchant_id');
+
+        return is_scalar($value) && (string) $value !== '' ? (string) $value : null;
+    }
+
+    /**
+     * Bayi terminallerinde Garanti her finansal istekte bayi kodunu zorunlu
+     * tutar; alan gitmezse işlem 0809 ("SubMerchantID alanında bayii kodunun
+     * gönderilmesi zorunludur") ile reddedilir.
+     *
+     * Enjeksiyon tek noktadan, bütün XML isteklerinin geçtiği `postXml()`
+     * üzerinden yapılıyor: alan `createRequestHash()`'in okuduğu sabit listeye
+     * girmediği için imza hesaplandıktan sonra eklenmesi güvenli. Böylece
+     * provizyon, postauth, iptal/iade ve sorgu istekleri tek yerden kapsanıyor.
+     *
+     * Düğümün yeri bankanın bayi tanımına göre değişebildiği için
+     * `sub_merchant_id_path` ile taşınabilir: nokta ile ayrılmış yol
+     * (örn. `Terminal.SubMerchantID`) alanı iç düğüme yazar.
+     *
+     * @param  array<string, mixed>  $request
+     * @return array<string, mixed>
+     */
+    protected function withSubMerchant(array $request): array
+    {
+        if (($subMerchantId = $this->subMerchantId()) === null) {
+            return $request;
+        }
+
+        $path = $this->config->extra('sub_merchant_id_path');
+        $path = is_string($path) && trim($path) !== '' ? trim($path) : self::SUB_MERCHANT_FIELD;
+
+        $keys = explode('.', $path);
+        $field = (string) array_pop($keys);
+        $target = &$request;
+
+        foreach ($keys as $key) {
+            if (! isset($target[$key]) || ! is_array($target[$key])) {
+                $target[$key] = [];
+            }
+
+            $target = &$target[$key];
+        }
+
+        $target[$field] = $subMerchantId;
+
+        return $request;
     }
 
     /**

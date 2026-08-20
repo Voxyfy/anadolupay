@@ -335,6 +335,11 @@ GARANTI_PASSWORD=xxxxxxx
 GARANTI_SECRET_KEY=xxxxxxx
 GARANTI_REFUND_USERNAME=PROVRFN      # iade/iptal ayrı kullanıcı ister
 GARANTI_REFUND_PASSWORD=xxxxxxx
+# Yalnızca bayi (alt üye işyeri) yapılandırmalı terminaller için; bankanın
+# verdiği bayi kodu. Boş bırakılırsa istekler bugünkü hâliyle gider.
+GARANTI_SUB_MERCHANT_ID=
+# Alanın XML'deki yeri bankanın bayi tanımına göre değişebiliyor.
+GARANTI_SUB_MERCHANT_ID_PATH=SubMerchantID
 
 # Akbank (NestPay)
 AKBANK_MERCHANT_ID=xxxxxxx
@@ -722,6 +727,16 @@ iade edildiğinde döner.
 **Garanti iade için ayrı kullanıcı ister.** `refund` ve `void` işlemlerinde
 `securityData` normal şifreyle değil iade şifresiyle hesaplanır. İki ayrı
 kullanıcı tanımlamazsanız iadeler reddedilir.
+
+**Garanti bayi terminalleri bayi kodu ister.** Üye işyeriniz banka tarafında
+bayi (alt üye işyeri) yapılandırmasıyla açıldıysa her finansal istekte bayi
+kodu zorunludur; gitmezse işlem `0809` — "SubMerchantID alanında bayii kodunun
+gönderilmesi zorunludur" — ile reddedilir. `GARANTI_SUB_MERCHANT_ID` verildiğinde
+paket alanı provizyon, 3D form, provizyon kapama, iptal/iade ve sorgu
+isteklerine ekler; boş bırakılırsa istekler alanı hiç içermez. Alan imzaya
+girmediği için mevcut kurulumların hash'i değişmez. Bankanın bayi tanımı alanı
+başka bir düğümün altında bekliyorsa `GARANTI_SUB_MERCHANT_ID_PATH` ile
+taşıyabilirsiniz (örn. `Terminal.SubMerchantID`).
 
 **PosNet üç sunucu isteği yapar.** Önce `oosRequestData` ile veri paketleri
 alınır, sonra 3D geçidine POST edilir, dönüşte `oosResolveMerchantData` ile
