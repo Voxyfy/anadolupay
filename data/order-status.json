@@ -1,0 +1,125 @@
+{
+  "version": "1.0.0",
+  "description": "Sağlayıcıların sipariş durumu kodlarının ortak duruma eşlenmesi. Tanınmayan kodlar 'unknown' sayılır; sessizce 'paid' saymak ödeme yolunda yapılabilecek en pahalı hatadır.",
+  "statuses": [
+    "paid",
+    "failed",
+    "pending",
+    "cancelled",
+    "refunded",
+    "pre_authorized",
+    "unknown"
+  ],
+  "providers": {
+    "NESTPAY": {
+      "note": "Asseco/NestPay ailesi (İş Bankası, Akbank eski, Halkbank, Ziraat, Finansbank, TEB). Tek harfli kodlar kullanır.",
+      "codes": {
+        "A": "paid",
+        "C": "paid",
+        "S": "paid",
+        "PN": "pending",
+        "CNCL": "cancelled",
+        "V": "cancelled",
+        "D": "failed",
+        "ERR": "failed"
+      }
+    },
+    "GARANTI": {
+      "note": "Garanti BBVA. WAITINGPOSTAUTH ön provizyondur: tutar bloke edilmiş, tahsil edilmemiştir.",
+      "codes": {
+        "APPROVED": "paid",
+        "VOID": "cancelled",
+        "CANCELLED": "cancelled",
+        "REFUNDED": "refunded",
+        "DECLINED": "failed",
+        "ERROR": "failed",
+        "WAITINGPOSTAUTH": "pre_authorized"
+      }
+    },
+    "BOA": {
+      "note": "Kuveyt Türk ve Vakıf Katılım. Hem 4 hem 5 iadeye eşlenir; ikisi kısmi ve tam iadeyi ayırır ama ortak durum aynıdır.",
+      "codes": {
+        "1": "paid",
+        "4": "refunded",
+        "5": "refunded",
+        "6": "cancelled"
+      }
+    },
+    "TOSLA": {
+      "note": "Tosla (AkÖde).",
+      "codes": {
+        "0": "failed",
+        "1": "paid",
+        "2": "cancelled",
+        "3": "refunded",
+        "4": "refunded",
+        "5": "pre_authorized"
+      }
+    },
+    "PARAM": {
+      "note": "TurkPos/Param. Param TMSF kayyımlığındadır ve sanal POS altyapısı fiilen kapalıdır; sözlük yalnızca PHP sürümünde canlıdır, Node ve Go sürümleri param sürücüsünü taşımaz.",
+      "codes": {
+        "SUCCESS": "paid",
+        "FAIL": "failed",
+        "BANK_FAIL": "failed",
+        "CANCEL": "cancelled",
+        "REFUND": "refunded",
+        "PARTIAL_REFUND": "refunded"
+      }
+    },
+    "AKBANK": {
+      "note": "Akbank POS. Hiçbir sürücü bu sözlüğü tüketmez: Akbank POS durum sorgusu ucu sunmadığı için sürücüler SupportsStatusQuery uygulamaz. Kodlar belgelenmek üzere burada tutulur; işlem geçmişi ucu Türkçe kelime de döndürür.",
+      "codes": {
+        "N": "paid",
+        "S": "failed",
+        "V": "cancelled",
+        "R": "refunded",
+        "BAŞARILI": "paid",
+        "BAŞARISIZ": "failed",
+        "İPTAL": "cancelled"
+      }
+    },
+    "IYZICO": {
+      "note": "iyzico ödeme durumları.",
+      "codes": {
+        "SUCCESS": "paid",
+        "FAILURE": "failed",
+        "INIT_THREEDS": "pending",
+        "CALLBACK_THREEDS": "pending",
+        "CALLBACK_PECCO": "pending",
+        "BKM_POS_PENDING": "pending"
+      }
+    },
+    "CRAFTGATE": {
+      "note": "Craftgate. İadeyi ödemenin durumunda değil ayrı bir iade kaydında tuttuğu için sözlükte 'refunded' karşılığı yoktur.",
+      "codes": {
+        "SUCCESS": "paid",
+        "FAILURE": "failed",
+        "INIT_THREEDS": "pending",
+        "CALLBACK_THREEDS": "pending",
+        "WAITING": "pending"
+      }
+    },
+    "MOKA": {
+      "note": "Moka United PaymentStatus. Bu kod tek başına yeterli değildir: işlemin başarılı olup olmadığını TrxStatus söyler, sürücü önce onu kontrol eder.",
+      "codes": {
+        "0": "pending",
+        "1": "pre_authorized",
+        "2": "paid",
+        "3": "cancelled",
+        "4": "refunded"
+      }
+    },
+    "PARATIKA": {
+      "note": "Paratika transactionStatus. MR (manuel inceleme) kasıtlı olarak pending'dir: işlem henüz sonuçlanmamıştır, başarılı da başarısız da sayılamaz.",
+      "codes": {
+        "AP": "paid",
+        "FA": "failed",
+        "VD": "cancelled",
+        "CA": "cancelled",
+        "IP": "pending",
+        "MR": "pending"
+      }
+    }
+  }
+}

@@ -17,6 +17,16 @@ use Voxyfy\AnadoluPay\DTO\StatusResponse;
  *
  * Tanınmayan kodlar `STATUS_UNKNOWN` döner; sessizce "başarılı" saymak
  * yerine bilinmediğini söylemek doğru davranıştır.
+ *
+ * Bu tabloların kaynağı paketin kodu değil, `data/order-status.json`
+ * dosyasıdır. Aynı dosya AnadoluPay'in Node ve Go paketlerinde de
+ * birebir aynı içerikle taşınır: bir eşleme değiştiğinde üçünde
+ * birlikte değişmesi gerekir, çünkü aynı bankanın aynı kodu üç dilde
+ * farklı duruma eşlenirse sapma sessizce olur.
+ *
+ * Dosyanın kanonik hâli github.com/Voxyfy/anadolupay-data deposunda;
+ * paketlerdeki kopyalar oradan alınır. Buradaki tablonun o dosyadan
+ * ayrılması `tests/DataConformanceTest.php` tarafından yakalanır.
  */
 final class OrderStatus
 {

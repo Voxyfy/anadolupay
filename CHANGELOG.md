@@ -2,6 +2,36 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.6 - 2026-08-22
+
+### Para birimi ve durum tabloları paylaşılan veriye bağlandı
+
+Aynı ödeme kütüphanesi PHP, Node.js ve Go'da yaşıyor ve bu üç paket
+aynı saf veriyi taşıyor: ISO 4217 para birimi kodları ve sağlayıcıların
+durum kodu eşlemeleri. Üç kopyayı elle senkron tutmak sürdürülebilir
+değildi; sapma sessizce olur ve yanlış eşlenmiş bir durumun "başarılı"
+sanılması ödeme yolunda en pahalı hata türüdür.
+
+Veri artık `data/currencies.json` ve `data/order-status.json`
+dosyalarında; aynı dosyalar diğer iki pakette de birebir aynı içerikle
+duruyor ve kanonik hâlleri `Voxyfy/anadolupay-data` deposunda tutuluyor. `tests/DataConformanceTest.php`, `Currency` ve `OrderStatus`
+tablolarının bu dosyalardan sapmasını engelliyor. Ayrıntı ve güncelleme
+akışı için `data/README.md`.
+
+Davranış değişmedi: tablolar aynen korundu, dosyalar çalışma zamanında
+okunmuyor ve `data/` dizini composer paketine girmiyor. Çıkarma
+sırasında PHP ve Node sürümlerinin paylaştığı sekiz sözlük
+karşılaştırıldı, aralarında sapma bulunmadı.
+
+İki sözlüğün durumu kayda geçti:
+
+- `OrderStatus::PARAM` yalnızca bu pakette canlı. Param TMSF
+  kayyımlığında ve sanal POS altyapısı fiilen kapalı olduğu için sürücü
+  Node ve Go paketlerine taşınmadı.
+- `OrderStatus::AKBANK` hiçbir sürücü tarafından tüketilmiyor. Akbank
+  POS durum sorgusu ucu sunmadığından sürücü `SupportsStatusQuery`
+  uygulamıyor. Sabit, kodlar belgelenmiş kalsın diye korundu.
+
 ## v1.1.5 - 2026-08-20
 
 ### Garanti bayi kodu artık doğru düğüme yazılıyor

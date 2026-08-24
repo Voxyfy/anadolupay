@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "description": "ISO 4217 alfabetik para birimi kodlarının sayısal karşılıkları. Türk banka sanal POS'ları para birimini alfabetik kod yerine sayısal kodla bekler.",
+  "numeric": {
+    "TRY": "949",
+    "USD": "840",
+    "EUR": "978",
+    "GBP": "826",
+    "JPY": "392",
+    "RUB": "643",
+    "CHF": "756",
+    "CAD": "124",
+    "AUD": "036",
+    "SAR": "682",
+    "AED": "784",
+    "CNY": "156"
+  }
+}

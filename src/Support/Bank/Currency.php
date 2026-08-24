@@ -11,6 +11,11 @@ use Voxyfy\AnadoluPay\Exceptions\PaymentFailedException;
  *
  * Türk banka sanal POS'ları para birimini alfabetik kod yerine
  * sayısal ISO 4217 kodu ile bekler (örn: TRY => 949).
+ *
+ * Tablonun kaynağı paketin kodu değil, `data/currencies.json`
+ * dosyasıdır; aynı dosya Node ve Go paketlerinde de birebir aynı
+ * içerikle taşınır ve kanonik hâli
+ * github.com/Voxyfy/anadolupay-data deposundadır.
  */
 final class Currency
 {
