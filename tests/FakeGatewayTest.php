@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
 use Voxyfy\AnadoluPay\AnadoluPay;
 use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Contracts\ProvidesWebhookAcknowledgement;
