@@ -111,6 +111,9 @@ class AkbankPosGateway extends AbstractBankGateway implements SupportsCancellati
      */
     protected function checkCallbackHash(array $payload): bool
     {
+        // Boş anahtarla üretilen hash dışarıdan hesaplanabilir; doğrulama yolunda da zorunlu.
+        $this->config->require(['secretKey']);
+
         $incoming = $this->pick($payload, ['hash']);
         $hashParams = $this->pick($payload, ['hashParams']);
 

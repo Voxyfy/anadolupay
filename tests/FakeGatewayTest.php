@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 use Voxyfy\AnadoluPay\AnadoluPay;
+use Voxyfy\AnadoluPay\Contracts\PaymentGatewayInterface;
 use Voxyfy\AnadoluPay\Contracts\ProvidesWebhookAcknowledgement;
 use Voxyfy\AnadoluPay\Contracts\SupportsCancellation;
 use Voxyfy\AnadoluPay\Contracts\SupportsPreAuthorization;
@@ -161,5 +163,51 @@ describe('webhook onay yanıtı', function () {
         $response = $this->post('/anadolupay/webhook/fake', ['payment_id' => 'fake_pay_1']);
 
         $response->assertOk()->assertJson(['success' => true]);
+    });
+});
+
+describe('webhook güvenlik sıkılaştırması', function () {
+    it('secret_key boşken hash doğrulaması geçmez', function () {
+        config()->set('anadolupay.banks.paytr', [
+            'gateway' => PayTrGateway::class,
+            'merchant_id' => 'M1',
+            'secret_key' => '',
+            'password' => 'SALT',
+            'endpoints' => ['payment_api' => 'https://paytr.test'],
+        ]);
+
+        // Boş anahtarla üretilen hash dışarıdan hesaplanabilir; kabul edilmemeli.
+        $forged = base64_encode(hash_hmac('sha256', 'ORDER-1SALTsuccess19990', '', true));
+
+        $response = $this->post('/anadolupay/webhook/paytr', [
+            'merchant_oid' => 'ORDER-1',
+            'status' => 'success',
+            'total_amount' => '19990',
+            'hash' => $forged,
+        ]);
+
+        expect($response->status())->toBe(400)
+            ->and($response->getContent())->not->toBe('OK');
+    });
+
+    it('beklenmeyen hatada iç mesaj dışarı çıkmaz', function () {
+        app()->instance(AnadoluPay::class, new class extends AnadoluPay
+        {
+            public function driver(string $name): PaymentGatewayInterface
+            {
+                throw new RuntimeException('gizli ayrıntı');
+            }
+        });
+
+        $response = $this->post('/anadolupay/webhook/fake', []);
+
+        $response->assertStatus(500)->assertJson(['message' => 'Webhook işlenemedi.']);
+        expect($response->getContent())->not->toContain('gizli ayrıntı');
+    });
+
+    it('webhook rotası hız sınırı taşır', function () {
+        $route = app('router')->getRoutes()->getByName('anadolupay.webhook');
+
+        expect($route->gatherMiddleware())->toContain('throttle:60,1');
     });
 });

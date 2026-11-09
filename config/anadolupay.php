@@ -121,6 +121,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Webhook
+    |--------------------------------------------------------------------------
+    |
+    | /anadolupay/webhook/{driver} rotasına uygulanan middleware listesi.
+    | Rota kimlik doğrulaması gerektirmez; imzasız sürücülerde her istek
+    | bankaya bir sorgu tetiklediği için hız sınırı varsayılan olarak açıktır.
+    |
+    */
+
+    'webhook' => [
+        'middleware' => ['throttle:60,1'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Yeniden Deneme
     |--------------------------------------------------------------------------
     |

@@ -235,6 +235,9 @@ class TamiGateway extends AbstractBankGateway implements SupportsCancellation, S
      */
     protected function checkCallbackHash(array $payload): bool
     {
+        // Boş anahtarla üretilen hash dışarıdan hesaplanabilir; doğrulama yolunda da zorunlu.
+        $this->config->require(['secretKey']);
+
         $incoming = $this->pick($payload, ['hashedData']);
 
         if ($incoming === null) {

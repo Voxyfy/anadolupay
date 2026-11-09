@@ -71,9 +71,12 @@ class WebhookController
             ], status: 400);
 
         } catch (Throwable $e) {
+            // İç hata mesajı (yapılandırma, banka adresi) dışarıya çıkmaz; raporlanır.
+            report($e);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Webhook işlenemedi.',
             ], 500);
         }
     }

@@ -111,6 +111,9 @@ class AssecoGateway extends AbstractBankGateway implements SupportsCancellation,
      */
     protected function checkCallbackHash(array $payload): bool
     {
+        // Boş anahtarla üretilen hash dışarıdan hesaplanabilir; doğrulama yolunda da zorunlu.
+        $this->config->require(['secretKey']);
+
         $incoming = $this->pick($payload, ['HASH']);
 
         if ($incoming === null) {

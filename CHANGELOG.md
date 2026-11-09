@@ -2,6 +2,19 @@
 
 `voxyfy/anadolupay` üzerindeki tüm kayda değer değişiklikler bu dosyada tutulur.
 
+## v1.1.7 - 2026-11-09
+
+### Callback doğrulama sıkılaştırması
+
+- Hash hesaplayan tüm sürücülerde `secret_key` (PayTR'de ayrıca `password`)
+  artık doğrulama yolunda da zorunlu. Boş anahtarla üretilen hash dışarıdan
+  hesaplanabildiği için eksik yapılandırma sessizce "doğrulandı" sayılmıyor.
+- Webhook rotasına yapılandırılabilir middleware eklendi
+  (`webhook.middleware`, varsayılan `throttle:60,1`).
+- Webhook beklenmeyen hatada iç mesajı dışarı vermiyor; `report()` ile
+  raporlanıp genel bir mesaj dönüyor.
+- README Güvenlik bölümü: tutar/sipariş eşlemesi ve replay uyarısı.
+
 ## v1.1.6 - 2026-08-22
 
 ### Para birimi ve durum tabloları paylaşılan veriye bağlandı

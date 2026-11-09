@@ -1408,6 +1408,14 @@ Gerçek kartlarla denemek isterseniz [TEST-KARTLARI.md](TEST-KARTLARI.md).
 - `verify_hash` yalnızca bankanın hash'i tutarsız ürettiği bilinen kurulumlarda
   kapatılmalıdır. Kapalıyken sahte callback'lere açıksınızdır.
 - `verify_ssl` her zaman `true` kalmalıdır.
+- İmza doğrulaması callback'in **bankadan** geldiğini kanıtlar; **doğru siparişe**
+  ait olduğunu kanıtlamaz. `verify()` sonrası tutarı, para birimini ve sipariş
+  durumunu kendi veritabanınızla karşılaştırın; ödenmiş siparişe gelen ikinci
+  callback'i yok sayın. Aynı imzalı dönüş tekrar gönderilebilir (replay).
+- Webhook rotası kimlik doğrulaması gerektirmez; `webhook.middleware` ile
+  gelen hız sınırını (`throttle:60,1`) kapatmayın, gerekirse sıkılaştırın.
+- Beklenmeyen hatalarda webhook yanıtı genel bir mesaj döner; ayrıntı
+  `report()` ile uygulamanın exception handler'ına gider.
 - 3D Host modeli kart verisini sunucunuzdan tamamen uzak tutar; PCI kapsamını
   daraltmak istiyorsanız en iyi seçenektir.
 

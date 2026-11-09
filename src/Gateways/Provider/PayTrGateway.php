@@ -91,6 +91,9 @@ class PayTrGateway extends AbstractBankGateway implements ProvidesWebhookAcknowl
      */
     protected function checkCallbackHash(array $payload): bool
     {
+        // Boş anahtarla üretilen hash dışarıdan hesaplanabilir; doğrulama yolunda da zorunlu.
+        $this->config->require(['password', 'secretKey']);
+
         $incoming = $this->pick($payload, ['hash']);
 
         if ($incoming === null) {

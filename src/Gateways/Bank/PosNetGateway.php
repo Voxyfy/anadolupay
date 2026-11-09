@@ -195,6 +195,9 @@ class PosNetGateway extends AbstractBankGateway implements SupportsCancellation,
      */
     protected function checkResolveMac(array $resolved): bool
     {
+        // Boş anahtarla üretilen MAC dışarıdan hesaplanabilir; doğrulama yolunda da zorunlu.
+        $this->config->require(['secretKey']);
+
         $incoming = $this->pick($resolved, ['mac']);
 
         if ($incoming === null) {
